@@ -1,5 +1,6 @@
 import type { Resource } from '../state/model.js';
 import type { CityBillEvent, Progress } from '../world.js';
+import type { SocialStore } from '../social.js';
 
 export type PutResult = { ok: true } | { ok: false; error: string };
 
@@ -84,6 +85,8 @@ export interface BillStore {
 
 export interface Stores {
   progress: ProgressStore;
+  /** v2.11: live city and leaderboards (server/src/social.ts). */
+  social: SocialStore;
   accounts: AccountStore;
   bills: BillStore;
   quota: QuotaStore;

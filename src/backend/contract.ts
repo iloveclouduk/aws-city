@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// AWS City ⇄ backend contract v2.9. SOURCE OF TRUTH — docs/backend-contract.md mirrors this, and the
+// AWS City ⇄ backend contract v2.16. SOURCE OF TRUTH — docs/backend-contract.md mirrors this, and the
 // server (server/) imports it, so drift breaks its build.
 //
 // Transport: ONE WebSocket to the AWS City server (server/src/http.ts): ws://127.0.0.1:<port>/ws locally,
@@ -15,7 +15,8 @@
 // the pixel agents visibly work.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CONTRACT_VERSION = 2.9;
+/** A string since v2.10 (the number 2.10 is 2.1, which reads as older than 2.9). */
+export const CONTRACT_VERSION = '2.16';
 
 // ── Console Copilot shapes (also used by the content script in src/console/) ──
 export type ConsoleAction = 'click' | 'type' | 'select' | 'point' | 'done';
@@ -215,6 +216,45 @@ export interface FlowEnable {
   on: boolean;
 }
 
+/**
+ * v2.10: check that a workshop step really happened in the player's account (shared/workshops/*.json). The server runs
+ * the step's one read-only check (server/src/workshops/checks.ts, a fixed registry: no writes, no CLI) with the values
+ * the player typed for the step's placeholders (a table or function name), and answers with workshop.verified.
+ */
+export interface WorkshopVerify {
+  action: 'workshop.verify';
+  workshopId: string;
+  stepId: string;
+  /** The step's placeholder values (`<table>` → "orders"); each checked against the check's own pattern. */
+  values?: Record<string, string>;
+}
+
+/**
+ * v2.11: the player is in this Region's city now (sent on connect, on arriving in a city, and every 30 s while a tab is
+ * open and visible). The server answers with presence.state. A public profile is shown by its Mayor name; a private
+ * one is only counted.
+ */
+export interface PresenceBeat {
+  action: 'presence.beat';
+  region: string;
+  /** The city's rank name (src/state/rank.ts), shown beside a public Mayor's name. v2.12: adds 'Global City'. */
+  rank?: 'Village' | 'Town' | 'City' | 'Metropolis' | 'Megacity' | 'Global City';
+}
+/**
+ * v2.11: a score for a leaderboard: a mini-game id, or `mayors:<region>` (the city's rank points). Kept only for a
+ * public profile, clamped to what a real round can score, best of the ISO week. Answered with leaderboard.state.
+ */
+export interface ScoreSubmit {
+  action: 'score.submit';
+  board: string;
+  score: number;
+}
+/** v2.11: this week's top of a board. */
+export interface LeaderboardGet {
+  action: 'leaderboard.get';
+  board: string;
+}
+
 export type ClientCommand =
   | TaskSubmit
   | ChatAsk
@@ -235,7 +275,11 @@ export type ClientCommand =
   | FindingFixCommand
   | FindingUndo
   | BillEnable
-  | FlowEnable;
+  | FlowEnable
+  | WorkshopVerify
+  | PresenceBeat
+  | ScoreSubmit
+  | LeaderboardGet;
 
 // ── Server → client ──────────────────────────────────────────────────────────
 
@@ -654,6 +698,32 @@ export interface ErrorEvent {
   code?: 'quota' | 'paused' | 'auth' | 'unlinked' | 'mfa_required';
 }
 
+/** v2.10: the answer to workshop.verify. `detail` is one plain sentence (what was found, or what to try). */
+export interface WorkshopVerifiedEvent {
+  type: 'workshop.verified';
+  workshopId: string;
+  stepId: string;
+  ok: boolean;
+  detail: string;
+}
+
+/** v2.11: who's in this Region's city now. `practice`: the demo's made-up mayors, never real players. */
+export interface PresenceStateEvent {
+  type: 'presence.state';
+  region: string;
+  online: number;
+  mayors: { name: string; rank: string }[];
+  practice?: boolean;
+}
+/** v2.11: this week's top of a board. `you` marks the player's own row; `practice` the demo's made-up board. */
+export interface LeaderboardStateEvent {
+  type: 'leaderboard.state';
+  board: string;
+  week: string;
+  entries: { name: string; score: number; you?: boolean }[];
+  practice?: boolean;
+}
+
 export type ServerEvent =
   | TaskPlanEvent
   | TaskStepEvent
@@ -676,6 +746,9 @@ export type ServerEvent =
   | CityFlowEvent
   | AwsHealthEvent
   | AwsNewsEvent
+  | WorkshopVerifiedEvent
+  | PresenceStateEvent
+  | LeaderboardStateEvent
   | ErrorEvent;
 
 // ── Progress (stored by the backend per Cognito user) ─────────────────────────
@@ -693,6 +766,22 @@ export interface CardState {
   /** Epoch ms of next review. */
   due: number;
   reps: number;
+  /** v2.12: the card was remembered for a week once (its one-time bonus is paid). Never unset, even after an Again. */
+  remembered?: true;
+}
+
+/**
+ * Rounds played of one mini-game. v2.12: `scored`, the rounds that scored above 0 (the crown counts these; absent on an
+ * older save, where `plays` stands in); `bestTimed`, the best round played against the clock in the ISO week `bestWeek`
+ * of the UTC date, the week the boards file it under (`isoWeekUtc`); relaxed rounds never count: it's what the
+ * leaderboard is sent.
+ */
+export interface GameProgress {
+  best: number;
+  plays: number;
+  scored?: number;
+  bestTimed?: number;
+  bestWeek?: string;
 }
 
 export interface Progress {
@@ -704,21 +793,179 @@ export interface Progress {
   cards?: Record<string, CardState>;
   quests?: Record<string, { status: 'active' | 'done'; step: number; count?: number }>;
   puzzles?: Record<string, { best: number }>;
-  /** Games played per mini-game id. */
-  games?: Record<string, { best: number; plays: number }>;
+  /** Games played per mini-game id (v2.12: GameProgress's scored rounds and this week's timed best). */
+  games?: Record<string, GameProgress>;
   /** v2.3: what each citizen has learned from you (see shared/citizens.json levels). */
   citizens?: Record<string, { xp: number }>;
   /** v2.3: findings fixed, by finding id → ISO time. */
   fixes?: Record<string, string>;
-  /** v2.4: the learning streak. `last` is the player's local date (YYYY-MM-DD); `best` the longest run. */
-  streak?: { days: number; last: string; best: number };
+  /**
+   * v2.4: the learning streak. `last` is the player's local date (YYYY-MM-DD); `best` the longest run. v2.11: `frozen`,
+   * the day the weekly streak freeze last covered a missed day.
+   */
+  streak?: { days: number; last: string; best: number; frozen?: string };
   /** v2.5: the player turned the bill on (Cost Explorer reads, at most daily). Absent = off. */
   bill?: boolean;
   /** v2.8: the player turned live traffic on (CloudWatch reads, at most every 5 minutes while open). Absent = off. */
   flow?: boolean;
   /** v2.9: golden tokens found around the cities (src/world/tokens.ts), by token id → the local date found (YYYY-MM-DD). */
   finds?: Record<string, string>;
+  /**
+   * v2.10: hands-on workshops, by workshop id: each step done, in practice (the simulated terminal) or for real (checked
+   * in the account by workshop.verify), and the local date the whole workshop was finished.
+   */
+  workshops?: Record<string, WorkshopProgress>;
+  /** v2.10: AWS North Hall talks whose check was passed, by talk id → the local date (YYYY-MM-DD). */
+  talks?: Record<string, string>;
+  /**
+   * v2.11: badges earned at a moment the rest of Progress doesn't record (the re:Invent quiz), by badge id → local date.
+   * Most badges are read from Progress itself (src/state/badges.ts) and aren't stored.
+   */
+  badges?: Record<string, string>;
+  /** v2.11: the public profile. Off by default; the name is generated from word lists (no free text). */
+  profile?: PlayerProfile;
+  /** v2.11: architecture sandbox designs, by design id (at most 20). */
+  designs?: Record<string, SavedDesign>;
+  /** v2.13: City Clients side jobs, by business id (shared/clients.json): levels finished and tasks done (each pays once ever). */
+  clients?: Record<string, ClientProgress>;
+  /** v2.13: build mode's decorations, by Region city: the props placed there (at most 120 a city). */
+  decor?: Record<string, CityDecor>;
+  /** v2.14: City Coins (🪙), the one thing the player spends (src/state/wallet.ts). Stars (⭐) are knowledge and are never spent. */
+  wallet?: Wallet;
+  /** v2.15: City Lights, the forgiving streak (src/state/lights.ts): each learning day lights a window on the skyline. */
+  lights?: CityLights;
+  /** v2.15: the free monthly season roads (src/state/season.ts), by season id: points from finished shifts and the steps claimed. */
+  seasons?: Record<string, SeasonProgress>;
+  /** v2.15: the Daily Supply Drop (src/state/drops.ts): the last day a crate was opened and the cosmetics it gave. */
+  drops?: SupplyDrops;
+  /** v2.15: the Service Codex (src/state/codex.ts): combos found, by combo id (shared/combos.json) → the local date first found. */
+  codex?: CodexProgress;
   updatedAt: string; // ISO; newest wins between server and chrome.storage
+}
+
+/**
+ * v2.15: City Lights. `days`: the local dates (YYYY-MM-DD) the player learned something, the last 60, sorted; `total`:
+ * learning days ever (a window each, never taken away); `freezes`: earned freezes held now (one per 7 learning days, at
+ * most 3), each covering one missed day so its window stays lit; `usedFreezes`: the missed days a freeze covered (the
+ * last 60). A missed day that no freeze covers dims one window until a later learning day relights it: nothing is lost.
+ */
+export interface CityLights {
+  days: string[];
+  total?: number;
+  freezes: number;
+  usedFreezes?: string[];
+  /**
+   * v2.16: freezes as counters that only go up: earned ever and used ever (held = earned − used, at most 3; `freezes`
+   * is kept equal to it for older clients). A merge takes the higher of each, so a freeze earned on one surface and one
+   * spent on the other both count. Absent: `freezes` counts as earned.
+   */
+  freezesEarned?: number;
+  freezesUsed?: number;
+}
+
+/**
+ * v2.15: one season road: `points` from finished shifts (v2.16: at most the road's end, the rest flows into the next
+ * unfinished road), `claimed` the road's step indexes taken, `last` the last day that paid. v2.16 `extra`: crate
+ * cosmetic ids a freeze step gave instead while the freezes were full.
+ */
+export interface SeasonProgress {
+  points: number;
+  claimed: number[];
+  last?: string;
+  extra?: string[];
+}
+
+/**
+ * v2.15: the Daily Supply Drop: `last` the local day a crate was last opened (one a day); `owned` the cosmetic ids it
+ * gave. v2.16: `overtime` the local day the overtime goal's bonus crate was opened; `bought` crate cosmetics bought with
+ * City Coins in Decorate; `spares` extra copies of an owned decoration a city may place (cosmetic id → count, at most 3),
+ * what a crate holds once every crate item is owned.
+ */
+export interface SupplyDrops {
+  last?: string;
+  owned: string[];
+  overtime?: string;
+  bought?: string[];
+  spares?: Record<string, number>;
+}
+
+/** v2.15: the Service Codex's stored part (service cards and sets are read from the rest of Progress). */
+export interface CodexProgress {
+  combos: Record<string, string>;
+}
+
+/**
+ * v2.14: the City Coins wallet. Coins to spend = `earned` − `spent`. Both only ever go up (a refund adds to `earned`),
+ * so a merge takes the higher of each and nothing earned or spent on either surface goes negative. `log`: coins earned
+ * on each of the last 14 local days (YYYY-MM-DD), for "today" lines. `refunded`: stars spent on decorations before
+ * v2.14 (CityDecor.spent), given back once as coins; kept so the refund is never paid twice. `shift`: the last local day
+ * (YYYY-MM-DD) whose finished shift paid its coins, so a day's shift pays once across surfaces. v2.16 `refundedBy`: those
+ * refunded stars city by city (Region → stars), so an older client still buying with stars in one city is refunded only
+ * what's new there; `refunded` stays their total.
+ */
+export interface Wallet {
+  earned: number;
+  spent: number;
+  log?: { day: string; coins: number }[];
+  refunded?: number;
+  refundedBy?: Record<string, number>;
+  shift?: string;
+}
+
+/**
+ * v2.13: one business's side jobs (src/world/clients.ts). `level`: levels finished (0..3); `done`: the ids of tasks done
+ * (any level; a task pays its stars once ever); `at`: level → the local date (YYYY-MM-DD) it was finished. Merged as
+ * the higher level, the union of `done` and the earlier date per level.
+ */
+export interface ClientProgress {
+  level: number;
+  done: string[];
+  at?: Record<string, string>;
+}
+
+/** v2.13: one decoration placed in build mode: an id, the prop's kind (its atlas sprite), its tile and the local date placed. */
+export interface DecorProp {
+  id: string;
+  kind: string;
+  x: number;
+  y: number;
+  at: string;
+}
+
+/**
+ * v2.13: a city's decorations. v2.16: merged prop by prop: every prop in either copy unless either lists it in `gone`
+ * (prop ids removed, the last 200), a prop in both where the copy with the later `updatedAt` has it. A copy without
+ * `gone` (before v2.16) can't say what it removed, so then the later copy wins whole, city by city, as in v2.13.
+ */
+export interface CityDecor {
+  updatedAt: string;
+  props: DecorProp[];
+  gone?: string[];
+  /**
+   * Before v2.14: stars spent on this city's decorations, net of refunds. v2.14 decorations cost City Coins (Progress.wallet)
+   * and a client moves this into the wallet once (refunded as coins) and drops it; an older client may still send it.
+   */
+  spent?: number;
+}
+
+/** v2.11: what other players may see: a generated Mayor name, only while `public` is on. */
+export interface PlayerProfile {
+  public: boolean;
+  /** Two words from src/state/names.ts lists, e.g. "Kind Otter" (shown as "Mayor Kind Otter"). */
+  name: string;
+}
+
+/** v2.11: one sandbox drawing (src/ui/diagram/Sandbox.tsx): icons and groups on a grid, and the arrows between them. */
+export interface SavedDesign {
+  name: string;
+  updatedAt: string;
+  nodes: { id: string; kind: string; x: number; y: number; w?: number; h?: number }[];
+  edges: { from: string; to: string }[];
+}
+
+export interface WorkshopProgress {
+  steps: Record<string, 'practice' | 'real'>;
+  done?: string;
 }
 
 export const SERVER_EVENT_TYPES: ServerEvent['type'][] = [
@@ -743,6 +990,9 @@ export const SERVER_EVENT_TYPES: ServerEvent['type'][] = [
   'city.flow',
   'aws.health',
   'aws.news',
+  'workshop.verified',
+  'presence.state',
+  'leaderboard.state',
   'error',
 ];
 

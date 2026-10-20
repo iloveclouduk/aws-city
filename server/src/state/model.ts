@@ -30,6 +30,8 @@ export interface AccountSettings {
   trails?: number;
   /** EBS volumes not attached to any instance (status "available"), at most 50. */
   unattachedVolumes?: { id: string; name: string; sizeGiB: number }[];
+  /** gp2 volumes (any status), at most 50: gp3 costs less per GB and starts at 3,000 IOPS. */
+  gp2Volumes?: { id: string; name: string; sizeGiB: number }[];
 }
 
 export interface WorldSnapshot {

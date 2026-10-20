@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { ProgressSchema } from '../contract/progress.js';
+import { dynamoSocial } from './social-dynamo.js';
+import { withPresenceCache } from '../social.js';
 import { log } from '../log.js';
 import type { Resource } from '../state/model.js';
 import type { Progress } from '../world.js';
@@ -13,6 +15,7 @@ import { type AccountLocks, type AccountRecord, type BillRecord, DELETED_TOMBSTO
  *   QUOTA#GLOBAL  <day>
  *   AWSACCT#<id>  LOCK | PENDING#<kind:id>
  *   DELETED#<sub> TOMBSTONE   (DELETE /me: refuses the player's still-valid tokens for a while)
+ *   PRESENCE#<region>, LB#<board>#<week>, USER#<sub> SOCIAL#…   (v2.11 live city and leaderboards: store/social-dynamo.ts)
  * `ttl` (epoch seconds) expires quotas, locks, pending entries and tombstones.
  */
 const LEASE_MS = 30_000;
@@ -27,6 +30,7 @@ export const dynamoStores = (deps: { client: DynamoDBClient; table: string; now?
   const TableName = deps.table;
   const now = deps.now ?? Date.now;
   const user = (sub: string) => `USER#${sub}`;
+  const social = withPresenceCache(dynamoSocial(db, TableName, now));
 
   const locks: AccountLocks = {
     async withLock(accountKey, fn) {
@@ -228,8 +232,11 @@ export const dynamoStores = (deps: { client: DynamoDBClient; table: string; now?
       },
     },
     locks,
+    social,
     /** Every item of the player, page by page; throttled deletes are retried (privacy: nothing may be left behind). */
     async deleteUser(sub) {
+      // Presence and leaderboard rows first: their refs live under the player's own key, which is deleted below.
+      await social.forget(sub);
       // The tombstone first: a PUT /progress racing the delete (another task, a still-valid token) is refused from now on.
       await db.send(
         new PutCommand({ TableName, Item: { pk: `DELETED#${sub}`, sk: 'TOMBSTONE', until: now() + DELETED_TOMBSTONE_MS, ttl: ttl(DELETED_TOMBSTONE_MS + 60_000) } }),

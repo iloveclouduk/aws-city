@@ -58,6 +58,14 @@ describe('findings: rules over what the city read', () => {
     expect(f.every((x) => x.why)).toBe(true);
   });
 
+  it('suggests gp3 for gp2 volumes (at most ten, so a fleet is one lesson)', () => {
+    const vols = Array.from({ length: 14 }, (_, i) => ({ id: `vol-${i}`, name: `disk-${i}`, sizeGiB: 20 }));
+    const f = findingsFor(snapshot([], { account: { gp2Volumes: vols } })).filter((x) => x.ruleId === 'ebs-gp2');
+    expect(f).toHaveLength(10);
+    expect(f[0]).toMatchObject({ citizenId: 'citizen:cost', pillar: 'cost' });
+    expect(findingsFor(snapshot([], { account: {} })).some((x) => x.ruleId === 'ebs-gp2')).toBe(false);
+  });
+
   it("doesn't call a bucket exposed when the account blocks public access, or when a setting is unknown", () => {
     expect(findingsFor({ ...world, account: { ...world.account, s3AccountBpa: '1111' } }).some((x) => x.ruleId === 's3-public-access')).toBe(false);
     expect(findingsFor({ ...world, account: {} }).map((x) => x.ruleId)).not.toContain('ebs-default-encryption');

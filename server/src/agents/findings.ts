@@ -61,6 +61,8 @@ export const checkWorld = (s: WorldSnapshot): Hit[] => {
   }
   if (s.account?.trails === 0) hits.push({ ruleId: 'no-cloudtrail', resource: { id: `trails:${s.region}`, name: 'CloudTrail', gameOwned: false }, accountWide: true });
   for (const v of s.account?.unattachedVolumes ?? []) hits.push({ ruleId: 'ebs-unattached', resource: { id: v.id, name: v.name, gameOwned: false } });
+  // At most ten gp2 volumes are reported (a fleet of them is one lesson, not a wall of findings).
+  for (const v of (s.account?.gp2Volumes ?? []).slice(0, 10)) hits.push({ ruleId: 'ebs-gp2', resource: { id: v.id, name: v.name, gameOwned: false } });
   for (const i of of('instance')) {
     const type = String(i.meta.instanceType ?? '');
     if (previousGeneration(type)) hits.push({ ruleId: 'ec2-previous-generation', resource: res(i) });

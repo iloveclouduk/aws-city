@@ -303,7 +303,7 @@ const COLLECTORS: Record<Service, Collector> = {
 
 /** Account- and Region-wide settings (each one unknown if it can't be read). */
 const collectAccount = async (clients: AwsClients, accountId: string): Promise<AccountSettings> => {
-  const [ebsEncryptionByDefault, s3AccountBpa, trails, unattachedVolumes] = await Promise.all([
+  const [ebsEncryptionByDefault, s3AccountBpa, trails, unattachedVolumes, gp2Volumes] = await Promise.all([
     setting(clients, 'ebs-default', async () => (await clients.ec2.send(new GetEbsEncryptionByDefaultCommand({}))).EbsEncryptionByDefault ?? false),
     setting(clients, 's3-account-bpa', async () => {
       try {
@@ -331,8 +331,13 @@ const collectAccount = async (clients: AwsClients, accountId: string): Promise<A
       const { Volumes = [] } = await clients.ec2.send(new DescribeVolumesCommand({ Filters: [{ Name: 'status', Values: ['available'] }], MaxResults: 50 }));
       return Volumes.filter((v) => v.VolumeId).map((v) => ({ id: v.VolumeId!, name: tagValue(v.Tags, 'Name') ?? v.VolumeId!, sizeGiB: v.Size ?? 0 }));
     }),
+    // gp2 volumes (same permission, ec2:DescribeVolumes): gp3 is cheaper per GB and faster at small sizes.
+    setting(clients, 'gp2-volumes', async () => {
+      const { Volumes = [] } = await clients.ec2.send(new DescribeVolumesCommand({ Filters: [{ Name: 'volume-type', Values: ['gp2'] }], MaxResults: 50 }));
+      return Volumes.filter((v) => v.VolumeId).map((v) => ({ id: v.VolumeId!, name: tagValue(v.Tags, 'Name') ?? v.VolumeId!, sizeGiB: v.Size ?? 0 }));
+    }),
   ]);
-  return { ebsEncryptionByDefault, s3AccountBpa, trails, unattachedVolumes };
+  return { ebsEncryptionByDefault, s3AccountBpa, trails, unattachedVolumes, gp2Volumes };
 };
 
 export interface Poller {

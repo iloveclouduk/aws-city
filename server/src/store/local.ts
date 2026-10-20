@@ -1,3 +1,4 @@
+import { memorySocial } from '../social.js';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -107,14 +108,17 @@ export const localStores = (progressFile: string): Stores => {
   const accounts = new Map<string, AccountRecord>();
   /** sub → until (epoch ms): players who deleted their account (DELETE /me). */
   const tombstones = new Map<string, number>();
+  const social = memorySocial();
   return {
     progress,
     bills,
     accounts: { get: async (sub) => accounts.get(sub), put: async (sub, r) => void accounts.set(sub, r) },
     quota: memoryQuota(),
     locks: memoryLocks(),
+    social,
     async deleteUser(sub) {
       tombstones.set(sub, Date.now() + DELETED_TOMBSTONE_MS);
+      await social.forget(sub);
       accounts.delete(sub);
       await rm(progress.fileFor(sub), { force: true });
       await rm(bills.fileFor(sub), { force: true });
