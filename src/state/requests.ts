@@ -32,12 +32,14 @@ export interface RequestLog {
 }
 export const requestsLeft = (log: RequestLog | undefined, today: string) => Math.max(0, REQUESTS_A_DAY - (log?.day === today ? log.n : 0));
 export const countRequest = (log: RequestLog | undefined, today: string): RequestLog => ({ day: today, n: (log?.day === today ? log.n : 0) + 1 });
+/** Where the day's count is kept on this device (src/ui/RequestCard.tsx counts a request when it's answered). */
+export const REQUEST_LOG_KEY = 'awscity.requests';
 
 const short = (c: Flashcard) => c.simple ?? c.a;
 
 /**
  * A request for the city in `region`: a card that's due (or new) from a building that stands there, with two wrong
- * answers from other buildings' cards. `seed` picks which (the same seed, the same request). Undefined when the
+ * answers from the same building's other cards (other buildings' when it has too few). `seed` picks which (the same seed, the same request). Undefined when the
  * city has nothing to ask about yet.
  */
 export function pickRequest(p: Progress, region: string | undefined, seed: number, now = Date.now()): CitizenRequest | undefined {
@@ -50,14 +52,19 @@ export function pickRequest(p: Progress, region: string | undefined, seed: numbe
   if (!deck.length) return undefined;
   const card = deck[Math.abs(seed) % deck.length]!;
   const serviceId = here.find((id) => cardsFor(id).some((c) => c.id === card.id))!;
-  // Wrong answers from other services, so the right one isn't a near-duplicate of a sibling card.
-  const others = here.filter((id) => id !== serviceId).flatMap(cardsFor);
-  const pool = [...new Set((others.length >= 2 ? others : cardsFor(serviceId).filter((c) => c.id !== card.id)).map(short))].filter((t) => t !== short(card));
-  if (pool.length < 2) return undefined;
-  const a = pool[Math.abs(seed * 7 + 3) % pool.length]!;
-  const b = pool.filter((t) => t !== a)[Math.abs(seed * 13 + 5) % (pool.length - 1)]!;
-  const right = Math.abs(seed) % 3;
+  // Wrong answers from the same building's other cards first (they sound alike, so the question needs knowing, not
+  // spotting which answer is about the right service), then from other buildings when its deck is too small.
+  const right = short(card);
+  const same = [...new Set(cardsFor(serviceId).filter((c) => c.id !== card.id).map(short))].filter((t) => t !== right);
+  const rest = [...new Set(here.filter((id) => id !== serviceId).flatMap(cardsFor).map(short))].filter((t) => t !== right && !same.includes(t));
+  const pick = (from: string[], salt: number) => from[Math.abs(seed * salt + 3) % from.length]!;
+  const a = same.length ? pick(same, 7) : rest.length ? pick(rest, 7) : undefined;
+  const sameLeft = same.filter((t) => t !== a);
+  const restLeft = rest.filter((t) => t !== a);
+  const b = sameLeft.length ? pick(sameLeft, 13) : restLeft.length ? pick(restLeft, 13) : undefined;
+  if (!a || !b) return undefined;
+  const at = Math.abs(seed) % 3;
   const options = [a, b];
-  options.splice(right, 0, short(card));
-  return { cardId: card.id, serviceId, question: card.q, options, right, answer: card.a };
+  options.splice(at, 0, right);
+  return { cardId: card.id, serviceId, question: card.q, options, right: at, answer: card.a };
 }

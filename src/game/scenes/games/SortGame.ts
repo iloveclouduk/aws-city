@@ -3,7 +3,8 @@ import { FRAME_H, FRAME_W, PIVOT } from '../../assets';
 import { sfx } from '../../audio';
 import { reducedMotion } from '../../motion';
 import { crisp } from '../../SpeechBubble';
-import { MiniGame, pace, PAL, TXT } from './MiniGame';
+import { FEEDBACK, MiniGame, pace, PAL, TXT } from './MiniGame';
+import { POINTS } from './scoring';
 import { drain, isHot, label, newSortStats, nextParcel, send, shelfFor, SHELVES, SORT, SORT_LESSON, sortPoints, sortStars, sortVerdict, spawnMs, type Parcel, type SortStats } from './sorting';
 
 interface Box {
@@ -24,6 +25,7 @@ const SHELF_COLORS = [0xdd344c, 0xfde047, 0x8c4fff, 0x01a88d];
 /**
  * DynamoDB Sorting Office: each parcel's key says which shelf it lives on. Send it there fast. In the
  * hot moment one key floods in and its shelf gets too busy (throttled) until you spread the key.
+ * A wrong shelf is a wrong call and costs more than a guess earns, so mashing 1-2-3-4 misses the accuracy floor.
  */
 export class SortGame extends MiniGame {
   private belt: Box[] = [];
@@ -36,7 +38,7 @@ export class SortGame extends MiniGame {
   private spreadBtn?: Phaser.GameObjects.Container;
   private hint!: Phaser.GameObjects.Text;
   private dyna!: Phaser.GameObjects.Sprite;
-  private geo = { beltY: 0, frontX: 0, step: 0, shelfTop: 0, shelfW: 0, shelfH: 0 };
+  private geo = { beltY: 0, frontX: 0, step: 0, shelfTop: 0, shelfW: 0, shelfH: 0, hintY: 0, left: 0, right: 0 };
 
   constructor() {
     super('game:dynamodb', 'dynamodb', 'dynamodb', '📦 DynamoDB Sorting Office — send each parcel to the shelf with its key');
@@ -57,33 +59,40 @@ export class SortGame extends MiniGame {
     // library wall (Database Row purple) and a wooden floor
     g.fillStyle(0x2a1035, 1).fillRect(0, 0, w, h);
     for (let x = 0; x < w; x += 36) g.fillStyle(0x341443, 1).fillRect(x, top, 18, h);
+    // The office is laid out top-down in a centred column (MiniGame.column): the belt, Dyna, the shelves (no taller
+    // than they need to be), and the hint right under them. The belt runs on to the canvas's right edge.
+    const room = h - top;
+    const scale = Phaser.Math.Clamp(Math.floor((Math.min(room, 560) / 300) * 2) / 2, 1, 2);
+    // Dyna stands between the belt's "sort me" mark and the shelves.
+    const dynaRoom = 40 + Math.round(62 * scale) + 22;
+    const shelfH = Phaser.Math.Clamp(room - 34 - dynaRoom - 44, 120, 230);
+    const col = this.column(34 + dynaRoom + shelfH + 44);
     // the belt
-    const beltY = top + 34;
+    const beltY = col.y + 34;
     g.fillStyle(PAL.black, 1).fillRect(0, beltY - 18, w, 36);
     g.fillStyle(0x334155, 1).fillRect(0, beltY - 16, w, 32);
     for (let x = 6; x < w; x += 22) g.fillStyle(0x475569, 1).fillRect(x, beltY - 16, 4, 32);
-    const frontX = 44;
+    const frontX = col.x + 44;
     g.fillStyle(0xffb84d, 1).fillRect(frontX - 30, beltY + 18, 60, 4);
     crisp(this.add.text(frontX, beltY + 30, 'sort me', TXT(12, '#ffb84d'))).setOrigin(0.5);
     // Dyna in the middle, sorting
-    const shelfTop = Math.round(Math.max(beltY + 120, h * 0.5));
-    const scale = Phaser.Math.Clamp(Math.floor((h / 300) * 2) / 2, 1, 2);
-    this.dyna = this.add.sprite(w / 2, shelfTop - 26, 'char:dynamodb', 0).setOrigin(PIVOT.x / FRAME_W, PIVOT.y / FRAME_H).setScale(scale);
+    const shelfTop = beltY + dynaRoom;
+    this.dyna = this.add.sprite(col.cx, shelfTop - 22, 'char:dynamodb', 0).setOrigin(PIVOT.x / FRAME_W, PIVOT.y / FRAME_H).setScale(scale);
     this.dyna.play('dynamodb:idle:SE');
     // four shelves (partitions), each with its keys, a busy meter and a tap zone
     const n = SHELVES.length;
     const gap = 6;
-    const shelfW = (w - 16 - gap * (n - 1)) / n;
-    const shelfH = h - 48 - shelfTop;
+    const shelfW = (col.w - 16 - gap * (n - 1)) / n;
     SHELVES.forEach((keys, i) => {
-      const x = 8 + i * (shelfW + gap);
+      const x = col.x + 8 + i * (shelfW + gap);
       const cx = x + shelfW / 2;
       g.fillStyle(PAL.black, 1).fillRect(x - 2, shelfTop - 2, shelfW + 4, shelfH + 4);
       g.fillStyle(0x7c4a21, 1).fillRect(x, shelfTop, shelfW, shelfH);
       for (let y = shelfTop + 44; y < shelfTop + shelfH - 6; y += 22) g.fillStyle(0x5b3415, 1).fillRect(x + 4, y, shelfW - 8, 4);
       g.fillStyle(SHELF_COLORS[i], 1).fillRect(x, shelfTop, shelfW, 6);
-      crisp(this.add.text(cx, shelfTop + 16, `${i + 1}`, TXT(18, '#ffffff'))).setOrigin(0.5);
-      const keyText = crisp(this.add.text(cx, shelfTop + 36, keys.join(' '), { ...TXT(16, '#ffffff'), align: 'center' })).setOrigin(0.5, 0);
+      crisp(this.add.text(cx, shelfTop + 18, `${i + 1}`, TXT(20, '#ffffff'))).setOrigin(0.5);
+      // The keys are the thing to read: big, on a dark plate so they stand off the wood.
+      const keyText = crisp(this.add.text(cx, shelfTop + 34, keys.join(' '), { ...TXT(24, '#ffffff'), align: 'center', backgroundColor: '#140d1f99', padding: { x: 6, y: 3 } })).setOrigin(0.5, 0);
       this.add.rectangle(x + 4, shelfTop + shelfH - 12, shelfW - 8, 8, 0x1f2937).setOrigin(0, 0.5).setStrokeStyle(1, PAL.black);
       const bar = this.add.rectangle(x + 5, shelfTop + shelfH - 12, 0, 6, 0x6fe3a3).setOrigin(0, 0.5);
       const busy = crisp(this.add.text(cx, shelfTop + shelfH - 26, '', { ...TXT(12, PAL.bad), backgroundColor: '#140d1fcc', padding: { x: 3, y: 1 } })).setOrigin(0.5);
@@ -94,8 +103,8 @@ export class SortGame extends MiniGame {
         .on('pointerdown', () => this.sortTo(i));
       this.shelves.push({ x: cx, keys: keyText, bar, busy });
     });
-    this.geo = { beltY, frontX, step: Math.min(46, (w - frontX - 20) / SORT.beltMax), shelfTop, shelfW, shelfH };
-    this.hint = crisp(this.add.text(w / 2, h - 22, 'Tap the shelf with the parcel’s key (or press 1–4)', { ...TXT(13, PAL.muted), align: 'center', wordWrap: { width: w - 24 } })).setOrigin(0.5);
+    this.geo = { beltY, frontX, step: Math.min(46, (col.r - frontX - 20) / SORT.beltMax), shelfTop, shelfW, shelfH, hintY: shelfTop + shelfH + 24, left: col.x, right: col.r };
+    this.hint = crisp(this.add.text(w / 2, this.geo.hintY, 'Tap the shelf with the parcel’s key (or press 1–4)', { ...TXT(13, PAL.muted), align: 'center', wordWrap: { width: col.w - 24 } })).setOrigin(0.5);
     this.onKeys((k) => {
       const i = Number(k) - 1;
       if (i >= 0 && i < SHELVES.length) this.sortTo(i);
@@ -107,7 +116,7 @@ export class SortGame extends MiniGame {
 
   /** Keeps a floater over a shelf on screen. */
   private near(x: number) {
-    return Phaser.Math.Clamp(x, 90, this.scale.width - 90);
+    return Phaser.Math.Clamp(x, this.geo.left + 90, this.geo.right - 90);
   }
 
   private get t() {
@@ -126,11 +135,11 @@ export class SortGame extends MiniGame {
     if (this.belt.length >= SORT.beltMax) {
       this.stats.dropped++;
       this.addScore(-2, 'soft');
-      this.floater(this.scale.width - 60, this.geo.beltY + 30, 'a parcel fell off!', PAL.bad);
+      this.floater(this.geo.right - 60, this.geo.beltY + 30, 'a parcel fell off!', FEEDBACK.wrong);
       return;
     }
     const p = nextParcel(this.t, this.stats.spread);
-    const t = crisp(this.add.text(this.scale.width + 30, this.geo.beltY, label(p), { ...TXT(18, PAL.paperInk), backgroundColor: '#fffbeb', padding: { x: 6, y: 4 } })).setOrigin(0.5);
+    const t = crisp(this.add.text(this.scale.width + 30, this.geo.beltY, label(p), { ...TXT(24, PAL.paperInk), backgroundColor: '#fffbeb', padding: { x: 6, y: 3 } })).setOrigin(0.5);
     this.belt.push({ p, t });
     this.layout();
   }
@@ -153,16 +162,20 @@ export class SortGame extends MiniGame {
     if (!b) return;
     const shelf = this.shelves[i];
     const right = shelfFor(b.p);
+    // Verdicts hang just above the shelves: clear of the belt's parcels and the shelves' keys.
+    const vx = this.near(shelf.x);
+    const vy = this.geo.shelfTop - 6;
     if (right !== i) {
       this.stats.wrong++;
-      this.addScore(-3);
-      this.floater(this.near(shelf.x), this.geo.shelfTop - 10, `${label(b.p)} lives on shelf ${right + 1}`, PAL.bad);
+      this.wrong();
+      this.addScore(POINTS.sort.wrong);
+      this.verdict(vx, vy, `✗ ${label(b.p)} lives on shelf ${right + 1}`, FEEDBACK.wrong, 1);
       return;
     }
     if (send(this.loads, i) === 'busy') {
       this.stats.throttled++;
       this.miss();
-      this.floater(this.near(shelf.x), this.geo.shelfTop - 10, 'too busy! wait…', PAL.bad);
+      this.verdict(vx, vy, '✗ Too busy! Wait…', FEEDBACK.wrong, 1);
       if (!this.stats.spread && this.spreadBtn && !this.tipShown) {
         this.tipShown = true;
         this.hint.setText('One shelf has all the 🍎. Tap 🔀 to spread the keys (or press S)').setColor('#fde047');
@@ -171,8 +184,9 @@ export class SortGame extends MiniGame {
     }
     const pts = sortPoints(this.time.now - (b.front ?? this.time.now));
     this.stats.sorted++;
+    this.hit();
     this.addScore(pts);
-    this.floater(this.near(shelf.x), this.geo.shelfTop - 10, `+${pts}`, PAL.good);
+    this.verdict(vx, vy, `✓ Shelf ${i + 1} +${pts}`, FEEDBACK.right, 1);
     this.belt.shift();
     this.dyna.play('dynamodb:file:SE');
     this.time.delayedCall(600, () => !this.over && this.dyna.play('dynamodb:idle:SE'));
@@ -205,11 +219,11 @@ export class SortGame extends MiniGame {
     });
     if (!this.hotShown && isHot(this.t)) {
       this.hotShown = true;
-      const { width: w, height: h } = this.scale;
+      const { width: w } = this.scale;
       this.floater(w / 2, this.geo.beltY + 60, `So many ${SORT.hotKey}!`, '#fde047');
       if (!this.stats.spread) {
         this.hint.setText('');
-        this.spreadBtn = this.pxButton(w / 2, h - 22, `🔀 Spread the ${SORT.hotKey} keys`, () => this.spread(), 0x6fe3a3, PAL.paperInk);
+        this.spreadBtn = this.pxButton(w / 2, this.geo.hintY, `🔀 Spread the ${SORT.hotKey} keys`, () => this.spread(), 0x6fe3a3, PAL.paperInk);
       }
       sfx('pop', { soft: true });
     }

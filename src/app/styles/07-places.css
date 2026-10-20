@@ -338,3 +338,42 @@ details.world[open] > summary::after {
 .crown-next li.got {
   color: var(--good-ink);
 }
+
+/* A building's agent: answer a question (HQ chat) or do a job you watch (Watch it done). */
+.agent-asks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+}
+
+/* What a building's sign marks mean (×3, ! 2), in words on its card (signLegend in src/ui/logic.ts). */
+.sign-legend {
+  margin: var(--s-2) 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9em;
+  color: var(--ink-soft);
+}
+.sign-legend .sign-mark {
+  display: inline-block;
+  min-width: 2.2em;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--info, #6aa7ff);
+  color: var(--bg);
+  font-weight: 900;
+  text-align: center;
+}
+/* Watch it done stays on the building's card: the task sent from here, right under its button. */
+.place-live-task {
+  margin-top: var(--s-3);
+}
+
+/* "Next level adds …" under a building's meter (the map's floating line stays off in Simple mode). */
+.tier-adds {
+  display: block;
+  margin-top: var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+}

@@ -46,6 +46,7 @@ const FURNITURE: Record<string, Piece[]> = {
   networking: [['pack:server_rack_SW', 9, 1], ['pack:lambda_sign_SW', 9, 3]],
   security: [['pack:server_rack_SW', 9, 1], ['pack:data_box_SW', 9, 3]],
   aiml: [['pack:server_rack_SW', 9, 1], ['pack:server_rack_SW', 9, 2], ['pack:lambda_sign_SW', 9, 4]],
+  management: [['pack:data_box_SW', 9, 1], ['pack:server_rack_SW', 9, 2], ['pack:data_box_SW', 9, 3], ['pack:lambda_sign_SW', 9, 4]],
 };
 const COMMON: Piece[] = [['pack:coffee_machine_SW', 9, 7], ['plant', 9, 8], ['plant', 1, 0], ['sofa', 7, 8]];
 const SPHERES: Piece[] = [

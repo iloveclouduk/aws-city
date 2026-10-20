@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { isDue, xpFor, type Grade } from '@/learning/srs';
+import { backIn, isDue, questPracticeDeck, type Grade } from '@/learning/srs';
 import { dayKey } from '@/state/progress';
-import { dueDeck, newCardsLeft, type NewCardLog } from '@/state/srs';
+import { dueDeck, isKnown, newCardsLeft, type NewCardLog } from '@/state/srs';
 import { isDiscovered, useCity } from '@/state/store';
 import { growthLine, growthOf } from '@/state/growth';
+import { REMEMBERED_STARS } from '@/state/mastery';
 import { cardsFor, type Flashcard } from '@/world/content';
 import { placeFor, TIER_NAMES } from '@/world/places';
 import { SERVICES, serviceById } from '@/world/taxonomy';
@@ -13,6 +14,7 @@ import { Portrait } from './Portrait';
 import { NEW_CARDS_KEY, readPref, writePref } from './logic';
 import { Plain } from './Term';
 import { EmptyState } from './EmptyState';
+import { bus } from '@/state/bus';
 
 /** Today's new-card count (this device). */
 const readNewLog = (): NewCardLog | undefined => {
@@ -38,16 +40,35 @@ export function Flashcards() {
   const discovered = useMemo(() => SERVICES.filter((s) => isDiscovered(progress, s.id)), [progress]);
   const [deck, setDeck] = useState<string>(() => (selected && serviceById(selected) && isDiscovered(progress, selected) ? selected : (discovered[0]?.id ?? 'due')));
   const [flipped, setFlipped] = useState(false);
+  // A quest's "Go →" selects its building and opens Learn while this is mounted: follow the selection to its deck.
+  const [following, setFollowing] = useState(selected);
+  if (selected !== following) {
+    setFollowing(selected);
+    if (selected && serviceById(selected) && isDiscovered(progress, selected) && selected !== deck) {
+      setDeck(selected);
+      setFlipped(false);
+    }
+  }
   const [done, setDone] = useState(0);
+  /** A "Didn't know" wobbles the card softly (juice; none under reduced motion, see 27-loops.css). */
+  const [wobble, setWobble] = useState(false);
   /** The last grade's reward, floated up over the card (keyed so it replays). */
-  const [reward, setReward] = useState<{ xp: number; key: number }>();
+  const [reward, setReward] = useState<{ xp: number; key: number; remembered?: boolean }>();
+  /** When the last graded card comes back ("in 3 days"), or that it was practice. */
+  const [back, setBack] = useState<string>();
+  /** Cards practised this sitting for a quest (they go to the back of the practice line). */
+  const [practiced, setPracticed] = useState<ReadonlySet<string>>(new Set());
 
-  // "All my decks": reviewed cards that are due, then at most 10 new ones a day. A single deck shows everything due.
-  const queue = useMemo((): Flashcard[] => {
-    if (deck === 'due') return dueDeck(progress, discovered.map((s) => s.id), newCardsLeft(readNewLog(), dayKey()));
-    return cardsFor(deck).filter((c) => isDue(progress.cards?.[c.id])).sort((a, b) => a.tier - b.tier);
-  }, [deck, progress, discovered]);
+  // "All my decks": reviewed cards that are due, then at most 10 new ones a day. A single deck shows everything due,
+  // topped up with practice cards while a quest's cards step for it needs more than that (src/learning/srs.ts).
+  const { queue, practice } = useMemo((): { queue: Flashcard[]; practice: ReadonlySet<string> } => {
+    if (deck === 'due') return { queue: dueDeck(progress, discovered.map((s) => s.id), newCardsLeft(readNewLog(), dayKey())), practice: new Set() };
+    const due = cardsFor(deck).filter((c) => isDue(progress.cards?.[c.id])).sort((a, b) => a.tier - b.tier);
+    const extra = questPracticeDeck(progress, deck, due.length, practiced);
+    return { queue: [...due, ...extra], practice: new Set(extra.map((c) => c.id)) };
+  }, [deck, progress, discovered, practiced]);
   const card = queue[0];
+  const practising = !!card && practice.has(card.id);
   const serviceId = card?.id.replace(/-\d+$/, '');
 
   const flip = () => {
@@ -66,12 +87,18 @@ export function Flashcards() {
 
   const grade = (g: Grade) => {
     if (!card) return;
-    const xp = xpFor(progress.cards?.[card.id], g);
     if (!progress.cards?.[card.id]) noteNewCard();
     if (g === 'again') feel.bad();
     else feel.good();
-    if (xp > 0) setReward({ xp, key: Date.now() });
-    reviewCard(card.id, g);
+    // Juice: a right answer sends a beam of light from the card into its building; a miss wobbles the card.
+    if (serviceId) bus.emit('answer', { serviceId, ok: g !== 'again' });
+    setWobble(g === 'again');
+    const isPractice = practice.has(card.id);
+    const { stars, remembered } = reviewCard(card.id, g, { practice: isPractice });
+    setReward(stars > 0 ? { xp: stars, key: Date.now(), remembered } : undefined);
+    if (isPractice) setPracticed((s) => new Set(s).add(card.id));
+    const after = useCity.getState().progress.cards?.[card.id];
+    setBack(isPractice ? 'That was practice for your quest: the card keeps its place in the schedule.' : after ? `That card comes back ${backIn(after)}.` : undefined);
     setFlipped(false);
     setDone((n) => n + 1);
   };
@@ -100,7 +127,8 @@ export function Flashcards() {
 
   const all = deck === 'due' ? discovered.flatMap((s) => cardsFor(s.id)) : cardsFor(deck);
   const total = all.length;
-  const learned = all.filter((c) => progress.cards?.[c.id] && !isDue(progress.cards[c.id])).length;
+  // Learned means known: answered Knew it / Easy (a "Didn't know" doesn't count until it's known again).
+  const learned = all.filter((c) => isKnown(progress.cards?.[c.id])).length;
   return (
     <div className="cards">
       <div className="row">
@@ -127,8 +155,14 @@ export function Flashcards() {
         </div>
         {done > 0 && <span className="muted">+{done} today</span>}
       </div>
+      {back && (
+        <p key={reward?.key ?? back} className="muted flash-back" role="status">
+          🔁 {back}
+          {reward?.remembered ? ` You’ve remembered it for a week: +${REMEMBERED_STARS} ⭐ bonus.` : ''}
+        </p>
+      )}
       {card ? (
-        <div className="flash-wrap">
+        <div className={`flash-wrap ${wobble ? 'juice-wobble' : ''}`} onAnimationEnd={() => setWobble(false)}>
           {/* Each face is a flip button laid under its text, so the answer's term buttons are never nested in a button. */}
           <div className={`flash ${flipped ? 'back' : ''}`}>
             <div className="flash-inner">
@@ -136,9 +170,12 @@ export function Flashcards() {
                 <button ref={(b) => void (faceHit.current.front = b)} className="flash-hit" onClick={flip} aria-label={`Question: ${card.q}. Press to reveal the answer`} />
                 <span className="flash-meta">
                   <AwsIcon serviceId={serviceId!} size={16} /> {placeFor(serviceId!)?.place} · {TIER_NAMES[card.tier]}
+                  {practising ? ' · practice for your quest' : ''}
                 </span>
+                {/* Terms here are marked, not buttons: a tap anywhere on the question flips it. Their definitions are
+                    one tap away on the answer side, under the question. */}
                 <span className="flash-text">
-                  <Plain text={card.q} except={serviceId} />
+                  <Plain text={card.q} except={serviceId} still />
                 </span>
                 <span className="flash-hint">tap or press F to reveal</span>
               </div>
@@ -146,6 +183,9 @@ export function Flashcards() {
                 <button ref={(b) => void (faceHit.current.back = b)} className="flash-hit" onClick={flip} aria-label="Answer shown. Press to see the question" />
                 <span className="flash-meta">
                   <Portrait id={serviceId!} size={20} /> {placeFor(serviceId!)?.agentName}
+                </span>
+                <span className="flash-q">
+                  <Plain text={card.q} except={serviceId} />
                 </span>
                 <span className="flash-text">
                   <Plain text={card.simple ?? card.a} except={serviceId} />
@@ -165,7 +205,7 @@ export function Flashcards() {
           </div>
           {reward && (
             <span key={reward.key} className="xp-float" aria-hidden="true">
-              +{reward.xp} ⭐
+              +{reward.xp} ⭐{reward.remembered ? ' remembered!' : ''}
             </span>
           )}
           {serviceId && <GrowLine serviceId={serviceId} bump={reward?.key} />}

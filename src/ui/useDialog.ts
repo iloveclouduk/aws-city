@@ -46,3 +46,23 @@ export function useDialog(open: boolean, box: RefObject<HTMLElement | null>, onC
     };
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 }
+
+/** The presses Phaser also hears on the window (its "outside the canvas" listeners), so it would act under a card. */
+const GAME_PRESSES = ['mousedown', 'mouseup', 'touchstart', 'touchend', 'touchcancel'] as const;
+
+/**
+ * A card over the city is modal for the game too: Phaser listens for mouse and touch presses on the whole window, so a
+ * tap on a card's backdrop (or on the card) would still select a building, pan the camera or walk Kai. Those presses
+ * stop at `el`; clicks (what React's buttons use) and pointer events (the glossary popovers) still go through.
+ */
+export function useShieldGame(open: boolean, el: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const node = el.current;
+    if (!open || !node) return;
+    const stop = (e: Event) => e.stopPropagation();
+    for (const type of GAME_PRESSES) node.addEventListener(type, stop);
+    return () => {
+      for (const type of GAME_PRESSES) node.removeEventListener(type, stop);
+    };
+  }, [open, el]);
+}

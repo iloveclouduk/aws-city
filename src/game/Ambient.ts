@@ -9,17 +9,20 @@
 import Phaser from 'phaser';
 import { isDiscovered, useCity } from '@/state/store';
 import { FLOWS } from '@/world/culture';
-import { landmarkLayout, type Tile } from '@/world/layout';
+import type { Tile } from '@/world/layout';
+import { legacyPlan, type CityPlan } from '@/world/plan';
 import { availability } from '@/world/regions';
 import { districtById, serviceById } from '@/world/taxonomy';
 import { RIVER, type Terrain } from '@/world/terrain';
 import { bus } from '@/state/bus';
 import { carrierSkin, DATA_CAP, type Cargo, type CarrierKind } from '@/world/carriers';
+import { courierLegs, isRushHour, learnTarget, LEARN_EVERY_MS, LEARN_RUSH_EVERY_MS, type CourierLeg } from '@/world/couriers';
 import { CITIZEN_CAP, surfaceFor, trafficLevel, VEHICLE_CAP, type Surface } from '@/world/traffic';
 import { addSprite, hasSprite, isPlaced } from './assets';
 import { Boats, BOAT_CAP } from './Boats';
 import { CITY_ISO, entityDepth, toScreen } from './iso';
 import { reducedMotion } from './motion';
+import { cityPerf, type CityPerf } from './cull';
 import { Vans } from './Ops';
 import { FlowTrickle, PACKET_CAP, type Packets } from './Packets';
 import { isZebra, RoadGraph, type Pt } from './RoadGraph';
@@ -32,9 +35,13 @@ const VIEW_PAD = 48;
 const LEVEL_EVERY_MS = 2000;
 const MOTION_EVERY_MS = 1000;
 const BUS_STOP_MS = 2000;
+/** Learning couriers drive a plain white car tinted their flow's colour: never a data skin, never a beacon. */
+const LEARN_SKIN = 'veh:car:white';
 
 export interface AmbientContext {
   packets: Packets;
+  /** The city's street plan (the legacy 3×3 city when left out). */
+  plan?: CityPlan;
   /** The landscape the city stands in (Landscape.terrain), once built. */
   terrain: () => Terrain | undefined;
   /** Where people are on foot (grid), so cars stop at the zebra crossings for them. */
@@ -43,17 +50,35 @@ export interface AmbientContext {
   busy: () => boolean;
   /** How many citizens stroll the city now (for stats; CityScene keeps them to CITIZEN_CAP). */
   citizens?: () => number;
+  /** Cargo jets visiting the airport (src/game/Airport.ts): at most one. */
+  cargo?: () => number;
   /** The surface changed (the window crossed the panel width): CityScene keeps its citizens to the new cap. */
   onSurface?: (s: Surface) => void;
+  /** The city's hour now (0–24, the scene's forced hour when set): rush hour sends more learning couriers. */
+  hour?: () => number;
+  /** Rush hour began (true) or ended (false): the scene plays its "Auto Scaling" moment. */
+  onRush?: (on: boolean) => void;
+  /** A learning courier was tapped (the scene shows its lesson). */
+  onLearnTap?: (leg: CourierLeg, at: { x: number; y: number }) => void;
+  /** A learning courier came into view (world px): the scene's one-time hint. */
+  onLearnSeen?: (at: { x: number; y: number }) => void;
 }
 
-export interface AmbientStats {
+export interface AmbientStats extends Partial<CityPerf> {
   surface: Surface;
   citizens: number;
   vehicles: number;
   /** Data carriers among the vehicles (real DataLinks and agent calls). */
   data: number;
+  /** Learning couriers among the vehicles (shared/flows.json legs), the cap now, and whether it's rush hour. */
+  learning: number;
+  learnCap: number;
+  rush: boolean;
+  /** Each learning courier now (world px) and its leg's title. */
+  learners: { x: number; y: number; title: string }[];
   boats: number;
+  /** Cargo jets at the airport now (0 or 1). */
+  cargo: number;
   packets: number;
   ambientPackets: number;
   clouds: number;
@@ -62,6 +87,9 @@ export interface AmbientStats {
   headlights: number;
   tweens: number;
   children: number;
+  /** Display children drawn now (visible), and the camera's zoom when counted. */
+  shown: number;
+  zoom: number;
   caps: { citizens: number; vehicles: number; data: number; boats: number; packets: number; clouds: number };
   /** The game loop's measured frame rate (Phaser's actualFps), for the smoke's FPS line. */
   fps: number;
@@ -99,11 +127,18 @@ export class Ambient {
   private levelAt = -Infinity;
   private motionAt = 0;
   private view = new Phaser.Geom.Rectangle();
+  private plan: CityPlan;
+  /** Learning traffic: the flow legs between buildings put up here, the next one to send, and when. */
+  private legs: CourierLeg[] = [];
+  private legTurn = 0;
+  private learnWait = 2_000;
+  private rush = false;
 
   constructor(
     private scene: Phaser.Scene,
     private ctx: AmbientContext,
   ) {
+    this.plan = ctx.plan ?? legacyPlan();
     this.surface = surfaceFor(scene.scale.width);
     this.boats = new Boats(scene);
     this.sky = new Sky(scene);
@@ -128,22 +163,25 @@ export class Ambient {
     if (!t || t === this.terrain) return;
     this.clearWorld();
     this.terrain = t;
-    const graph = new RoadGraph(t);
+    const plan = this.plan;
+    const graph = new RoadGraph(t, plan);
     this.traffic = new Traffic(this.scene, graph, {
       pedestrians: this.ctx.pedestrians,
       isBridge: (x, y) => t.kind(x, y) === 'bridge',
-      isZebra,
+      isZebra: (x, y) => isZebra(x, y, plan),
     });
     this.traffic.dataCap = DATA_CAP[this.surface];
     this.traffic.onTap = (cargo) => bus.emit('carrierTap', { cargo });
-    const dock = landmarkLayout('fulfilment');
+    this.traffic.onLearnTap = (leg, at) => this.ctx.onLearnTap?.(leg, at);
+    this.traffic.onLearnSeen = (at) => this.ctx.onLearnSeen?.(at);
+    const dock = plan.landmarkLayout('fulfilment');
     this.vans = new Vans(this.traffic, dock && isPlaced(dock) ? dock.workSpot : undefined);
     this.placeBusStops(t, graph);
     this.levelAt = -Infinity;
     this.syncLevel();
     this.traffic.setParked(this.still);
     if (!this.still) this.traffic.populate();
-    this.boats.build(t, BOAT_CAP[this.surface], this.still);
+    this.boats.build(t, BOAT_CAP[this.surface], this.still, plan.size);
     this.sky.build(t.gate, CLOUD_CAP[this.surface], this.still);
     this.trickle.reset();
     this.ctx.packets.clear();
@@ -175,6 +213,7 @@ export class Ambient {
       this.vans?.update(step);
       this.updateBus(step);
       this.trickle.update(step);
+      this.updateLearning(step);
     }
     this.boats.update(step, time, this.view);
     this.sky.update(step, this.view, cam.zoom);
@@ -202,7 +241,7 @@ export class Ambient {
     this.ctx.onSurface?.(s);
     this.levelAt = -Infinity;
     if (this.terrain) {
-      this.boats.build(this.terrain, BOAT_CAP[s], this.still);
+      this.boats.build(this.terrain, BOAT_CAP[s], this.still, this.plan.size);
       this.sky.build(this.terrain.gate, CLOUD_CAP[s], this.still);
     }
   }
@@ -218,16 +257,24 @@ export class Ambient {
       citizens: this.ctx.citizens?.() ?? 0,
       vehicles: this.traffic?.count ?? 0,
       data: this.traffic?.dataCount ?? 0,
+      learning: this.traffic?.learnCount ?? 0,
+      learnCap: this.traffic?.learnCap ?? 0,
+      rush: this.rush,
+      learners: this.traffic?.learners ?? [],
       boats: this.boats.count,
+      cargo: this.ctx.cargo?.() ?? 0,
       packets: this.ctx.packets.count,
       ambientPackets: this.ctx.packets.ambientCount,
       ...sky,
       headlights: this.traffic?.stats().lit ?? 0,
       tweens: this.scene.tweens.getTweens().length,
       children: this.scene.children.length,
+      shown: this.scene.children.list.reduce((n, c) => n + ((c as unknown as { visible?: boolean }).visible === false ? 0 : 1), 0),
+      zoom: this.scene.cameras.main.zoom,
       caps: { citizens: CITIZEN_CAP[this.surface], vehicles: VEHICLE_CAP[this.surface], data: DATA_CAP[this.surface], boats: BOAT_CAP[this.surface], packets: PACKET_CAP[this.surface], clouds: CLOUD_CAP[this.surface] },
       reducedMotion: this.still,
       fps: Math.round(this.scene.game.loop.actualFps),
+      ...cityPerf(),
     };
   }
 
@@ -271,16 +318,49 @@ export class Ambient {
     const s = useCity.getState();
     const region = s.cityRegion;
     this.traffic.setTarget(trafficLevel(s.inventory, s.billOn ? s.bill : undefined, region, this.surface), VEHICLE_CAP[this.surface]);
+    // Learning traffic: the flows between the buildings put up here; more couriers at rush hour (local time).
+    this.legs = courierLegs(FLOWS, (id) => !!this.spot(id));
+    const rush = isRushHour(this.ctx.hour?.() ?? new Date().getHours());
+    if (rush !== this.rush) {
+      this.rush = rush;
+      this.learnWait = Math.min(this.learnWait, 600);
+      this.ctx.onRush?.(rush);
+    }
+    this.traffic.learnCap = learnTarget(this.legs.length, this.surface, rush);
     // Data moving between Regions: planes overhead more often (the data itself drives out as tankers, RegionOverlay).
     const crossRegion = (s.inventory?.links ?? []).some((l) => l.from.region !== l.to.region && (l.from.region === region || l.to.region === region));
     this.sky.busyAir = crossRegion;
+  }
+
+  /** A learning courier now and then (more often at rush hour), each on the next leg in turn, inside its cap. */
+  private updateLearning(dt: number) {
+    const t = this.traffic;
+    if (!t || !this.legs.length) return;
+    this.learnWait -= dt;
+    if (this.learnWait > 0) return;
+    this.learnWait = (this.rush ? LEARN_RUSH_EVERY_MS : LEARN_EVERY_MS) * (0.75 + rand() * 0.5);
+    if (t.learnCount >= t.learnCap) return;
+    this.dispatchLearning(this.legs[this.legTurn++ % this.legs.length]);
+  }
+
+  /** Send one learning courier on a leg (also for the smoke). False when it can't drive now. */
+  dispatchLearning(leg: CourierLeg | undefined = this.legs[this.legTurn++ % Math.max(1, this.legs.length)]): boolean {
+    const t = this.traffic;
+    const a = leg && this.spot(leg.from);
+    const b = leg && this.spot(leg.to);
+    if (!t || this.still || !leg || !a || !b) return false;
+    const g = t.graph;
+    const nodes = g.route(g.node(a.x, a.y) ?? g.nearestNode(a), g.node(b.x, b.y) ?? g.nearestNode(b));
+    const s = serviceById(leg.from);
+    const color = s ? districtById(s.districtId)!.color : 0xff9900;
+    return t.spawnLearning(LEARN_SKIN, nodes, leg, color);
   }
 
   /** A landmark's work spot when its service is discovered and offered in this Region (the trickle's ends). */
   private spot(id: string): Tile | undefined {
     const s = useCity.getState();
     if (!isDiscovered(s.progress, id, s.cityRegion) || availability(id, s.cityRegion).status !== 'available') return undefined;
-    return landmarkLayout(id)?.workSpot;
+    return this.plan.landmarkLayout(id)?.workSpot;
   }
 
   /** Up to two bus stops on the promenade, beside the roads out to the bridges; the bus calls at both. */

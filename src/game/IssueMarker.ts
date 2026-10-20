@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import type { CityFinding } from '@/backend/contract';
-import { landmarkLayout } from '@/world/layout';
+import { legacyPlan, type CityPlan } from '@/world/plan';
 import { toScreen, type Iso } from './iso';
+import { hoverTip } from './HoverTip';
 import { reducedMotion } from './motion';
 import { crisp, TEXT_FONT } from './SpeechBubble';
 import { COLOR, CSS, FONT_SIZE } from './theme';
@@ -22,6 +23,8 @@ export const worstSeverity = (fs: Pick<CityFinding, 'severity'>[]) =>
 class IssueMarker {
   private cone: Phaser.GameObjects.Graphics;
   private tag: Phaser.GameObjects.Text;
+  /** Findings at this building (the tag's tooltip says how many). */
+  private count = 0;
   private bounce?: Phaser.Tweens.Tween;
   /** For ordering: worst severity, then how many. */
   rank = 0;
@@ -36,8 +39,9 @@ class IssueMarker {
     iso: Iso,
     readonly serviceId: string,
     onClick: (serviceId: string) => void,
+    plan: CityPlan = legacyPlan(),
   ) {
-    const f = landmarkLayout(serviceId)!.footprint;
+    const f = plan.landmarkLayout(serviceId)!.footprint;
     // The front corner tile of the footprint, so the cone stands at the street side of the building.
     const c = toScreen(iso, f.x + f.w - 1, f.y + f.h - 1);
     this.x = Math.round(c.x + iso.halfW * 0.6);
@@ -48,6 +52,8 @@ class IssueMarker {
     );
     this.tag.setInteractive({ useHandCursor: true });
     this.tag.on('pointerup', (p: Phaser.Input.Pointer) => p.getDistance() < 8 && onClick(serviceId));
+    // "!2" alone meant nothing to a newcomer: hovering says it in words.
+    hoverTip(this.tag, () => (this.count > 1 ? `${this.count} things to look at here. Tap to see them.` : 'Something to look at here. Tap to see it.'));
   }
 
   /** Show the tag; only the lead marker bounces (one moving thing draws the eye, six are noise). */
@@ -76,6 +82,7 @@ class IssueMarker {
     const mark = sev === 'high' ? '!!' : '!';
     this.tag.setText(findings.length > 1 ? `${mark} ${findings.length}` : mark).setBackgroundColor(`#${color.toString(16).padStart(6, '0')}`);
     this.rank = RANK[sev] * 100 + findings.length;
+    this.count = findings.length;
     this.smoke?.remove();
     this.smoke = undefined;
     if (sev === 'high' && !reducedMotion()) this.smoke = this.scene.time.addEvent({ delay: 650, loop: true, callback: () => this.puff() });
@@ -119,6 +126,7 @@ export class IssueMarkers {
     private scene: Phaser.Scene,
     private iso: Iso,
     private onClick: (serviceId: string) => void,
+    private plan: CityPlan = legacyPlan(),
   ) {}
 
   has(serviceId: string) {
@@ -127,12 +135,12 @@ export class IssueMarkers {
 
   sync(open: CityFinding[]) {
     const by = new Map<string, CityFinding[]>();
-    for (const f of open) if (landmarkLayout(f.serviceId)) by.set(f.serviceId, [...(by.get(f.serviceId) ?? []), f]);
+    for (const f of open) if (this.plan.landmarkLayout(f.serviceId)) by.set(f.serviceId, [...(by.get(f.serviceId) ?? []), f]);
     for (const [id, m] of this.markers) if (!by.has(id)) m.destroy(), this.markers.delete(id);
     for (const [id, fs] of by) {
       let m = this.markers.get(id);
       if (!m) {
-        m = new IssueMarker(this.scene, this.iso, id, this.onClick);
+        m = new IssueMarker(this.scene, this.iso, id, this.onClick, this.plan);
         m.setUiScale(this.ui);
         this.markers.set(id, m);
       }

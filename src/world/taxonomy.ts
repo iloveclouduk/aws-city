@@ -3,7 +3,7 @@
 
 import world from '../../shared/world.json' with { type: 'json' };
 
-export type DistrictId = 'storage' | 'compute' | 'database' | 'networking' | 'security' | 'aiml';
+export type DistrictId = 'storage' | 'compute' | 'database' | 'networking' | 'security' | 'aiml' | 'management';
 
 export interface District {
   id: DistrictId;
@@ -19,7 +19,11 @@ export interface Service {
   id: string;
   name: string;
   districtId: DistrictId;
-  /** Path segment after console.aws.amazon.com/ (e.g. "s3" matches /s3/buckets). */
+  /**
+   * Path segment after console.aws.amazon.com/ (e.g. "s3" matches /s3/buckets). The first one is what "Open the console"
+   * opens. "vpcconsole#TransitGateways:" is a hash route (/vpcconsole/home#TransitGateways:, and any hash it starts); a
+   * path that starts with a host ("lightsail.aws.amazon.com/ls/webapp") is a console AWS serves on its own host.
+   */
   consolePaths: string[];
   /** Path segment after docs.aws.amazon.com/ (e.g. "AmazonS3"). */
   docsPaths: string[];
@@ -78,9 +82,10 @@ export function matchUrl(rawUrl: string): PageMatch {
     let winner: { id: string; len: number } | undefined;
     for (const s of SERVICES) {
       for (const p of s[field]) {
-        const lower = p.toLowerCase();
+        const hashRoute = p.includes('#');
+        const lower = p.toLowerCase().replace('#', '/');
         const c = candidate.toLowerCase();
-        if ((c === lower || c.startsWith(lower + '/') || c.startsWith(lower + '?')) && (!winner || lower.length > winner.len)) {
+        if ((c === lower || c.startsWith(lower + '/') || c.startsWith(lower + '?') || (hashRoute && c.startsWith(lower))) && (!winner || lower.length > winner.len)) {
           winner = { id: s.id, len: lower.length };
         }
       }
@@ -95,7 +100,21 @@ export function matchUrl(rawUrl: string): PageMatch {
     return { kind: 'console', serviceId };
   }
   if (host === 'docs.aws.amazon.com') return { kind: 'docs', serviceId: best('docsPaths', path) };
+  // Consoles on their own host (Lightsail): only hosts a service names, and only under aws.amazon.com.
+  if (host.endsWith('.aws.amazon.com')) {
+    const serviceId = best('consolePaths', `${host}/${path}`);
+    if (serviceId) return { kind: 'console', serviceId };
+  }
   return { kind: 'other' };
+}
+
+/** The page "Open the console" opens for a service: its first console path (a hash route or its own host, see Service). */
+export function consoleUrl(serviceId: string): string {
+  const first = serviceById(serviceId)?.consolePaths[0];
+  if (!first) return 'https://console.aws.amazon.com/console/home';
+  const [base, route] = first.split('#');
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+\//.test(base)) return `https://${base}/home`;
+  return `https://console.aws.amazon.com/${base}/home${route ? `#${route}` : ''}`;
 }
 
 /** Keyword routing for free text (prompts, page titles). Returns best service id or undefined. */
@@ -114,7 +133,7 @@ export function matchText(text: string): string | undefined {
 export const FEATURED_REQUESTS: { agent: string; ask: string; prompt: string }[] = [
   { agent: 's3', ask: 'Got holiday photos? I can keep them somewhere cheap.', prompt: 'Store my holiday photos cheaply' },
   { agent: 'lambda', ask: 'Want something to happen every time a file arrives?', prompt: 'Run code when a file is uploaded' },
-  { agent: 'iam', ask: 'Wondering who can open your bucket? I check the badges.', prompt: 'Who can access my bucket?' },
+  { agent: 'iam', ask: 'Wondering who can open your bucket? I check the badges.', prompt: 'Who has permission to open my bucket?' },
 ];
 
 /** The console the Copilot opens when the player isn't on an AWS Console page yet. */

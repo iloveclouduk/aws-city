@@ -270,6 +270,16 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A quest's card count (3/5) sits outside the line so the ellipsis can't hide it. */
+.next.compact .next-count {
+  flex: none;
+  padding: 0 var(--s-2);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+}
 
 /* City health (Home): the citizens' daily summary and the learning streak. */
 .health {

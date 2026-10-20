@@ -1,10 +1,11 @@
 // The road network as a graph (pure, no Phaser), for the ambient traffic (src/game/Traffic.ts, plan B3) and the AZ link
 // packets (RegionOverlay: island to island over both bridges). Nodes are the
-// core's junctions (x % 13 == 0 && y % 13 == 0), the Region gate where the highway meets the core, the highway's far
+// core's junctions (where the city plan's streets cross: x % 13 == 0 && y % 13 == 0 in the legacy city), the Region gate where the highway meets the core, the highway's far
 // end (where traffic comes and goes) and the dead ends past the bridges (each AZ island's road ends in one); edges are the straight runs of road between
 // them. Each edge has two lanes, offset to the right of travel, and a junction joins an incoming lane to an outgoing one
 // with a short connector through the junction's box.
-import { GRID, isRoad as isCoreRoad, PLOT, ROAD, type Tile } from '@/world/layout';
+import type { Tile } from '@/world/layout';
+import { crossings, legacyPlan, type CityPlan } from '@/world/plan';
 import type { Terrain } from '@/world/terrain';
 
 /** A point in grid space (fractional: lanes run beside the tile centres). */
@@ -87,8 +88,8 @@ export class RoadGraph {
   private nodeAt = new Map<string, number>();
   private routes = new Map<string, number[]>();
 
-  constructor(t: RoadTerrain) {
-    for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) if (isCoreRoad({ x, y })) this.road.add(k(x, y));
+  constructor(t: RoadTerrain, plan: CityPlan = legacyPlan()) {
+    for (let y = 0; y < plan.size; y++) for (let x = 0; x < plan.size; x++) if (plan.isRoad({ x, y })) this.road.add(k(x, y));
     for (const r of t.roads) this.road.add(k(r.x, r.y));
     for (const b of t.bridges) for (const tt of b.tiles) this.road.add(k(tt.x, tt.y));
     for (const h of t.highway) this.road.add(k(h.x, h.y));
@@ -103,7 +104,7 @@ export class RoadGraph {
       return id;
     };
     // Nodes: junctions, the gate, the highway end, then any other tile where the road doesn't just carry on.
-    for (let y = 0; y < GRID; y += PLOT + ROAD) for (let x = 0; x < GRID; x += PLOT + ROAD) addNode(x, y, 'junction');
+    for (const c of crossings(plan.streets)) if (!this.nodeAt.has(k(c.x, c.y))) addNode(c.x, c.y, 'junction');
     this.gate = this.nodeAt.get(k(t.gate.x, t.gate.y)) ?? addNode(t.gate.x, t.gate.y, 'gate');
     this.highwayEnd = this.nodeAt.get(k(far.x, far.y)) ?? addNode(far.x, far.y, 'highwayEnd');
     for (const key of [...this.road].sort()) {
@@ -297,12 +298,9 @@ function lanePoints(tiles: readonly Tile[]): Pt[] {
 }
 
 /** A zebra crossing in the core: the road tile either side of a junction (src/game/CityMap.ts groundKey draws them). */
-export function isZebra(x: number, y: number) {
-  if (x < 0 || y < 0 || x >= GRID || y >= GRID) return false;
-  const m = PLOT + ROAD;
-  const rx = x % m === 0;
-  const ry = y % m === 0;
-  if (rx === ry) return false;
-  const along = rx ? y % m : x % m;
-  return along === 1 || along === m - 1;
+export function isZebra(x: number, y: number, plan: CityPlan = legacyPlan()) {
+  const r = plan.roadAt(x, y);
+  if (!r || r.axis === 'junction') return false;
+  const [dx, dy] = r.axis === 'y' ? [0, 1] : [1, 0];
+  return plan.roadAt(x + dx, y + dy)?.axis === 'junction' || plan.roadAt(x - dx, y - dy)?.axis === 'junction';
 }

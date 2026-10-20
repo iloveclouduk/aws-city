@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import type { CityFinding } from '@/backend/contract';
 import { CITIZENS, citizenSheet, citizenTag, type CitizenDef } from '@/world/citizens';
-import { DISTRICT_PLOTS, landmarkLayout, TOWN_SQUARE, type Rect, type Tile } from '@/world/layout';
+import type { Rect, Tile } from '@/world/layout';
+import { legacyPlan, type CityPlan } from '@/world/plan';
 import type { DistrictId } from '@/world/taxonomy';
 import { Agent, type AgentWorld } from './Agent';
 import { characterIndex, citizenIds, crowdSheet } from './assets';
@@ -41,6 +42,7 @@ export class Patrols {
     private scene: Phaser.Scene,
     private world: AgentWorld,
     private hooks: PatrolHooks,
+    private plan: CityPlan = legacyPlan(),
   ) {
     const generic = citizenIds();
     for (const def of CITIZENS) {
@@ -51,8 +53,8 @@ export class Patrols {
         sheet: crowdSheet(sheet),
         name: citizenTag(def),
         tagName: def.name,
-        tile: this.randomTile(this.areaFor(def)) ?? { x: TOWN_SQUARE.rect.x + 6, y: TOWN_SQUARE.rect.y + 10 },
-        home: TOWN_SQUARE.rect,
+        tile: this.randomTile(this.areaFor(def)) ?? { x: this.plan.square.x + 6, y: this.plan.square.y + 10 },
+        home: this.plan.square,
         speed: 1.9,
         wanders: false,
         showTag: false,
@@ -129,8 +131,8 @@ export class Patrols {
   /** Where a citizen patrols: its unlocked districts, else the town square. */
   private areaFor(def: CitizenDef): Rect {
     const open = this.hooks.unlocked();
-    const mine = def.districts.filter((d) => open.includes(d));
-    return mine.length ? DISTRICT_PLOTS[mine[Math.floor(Math.random() * mine.length)]].rect : TOWN_SQUARE.rect;
+    const mine = def.districts.filter((d) => open.includes(d) && this.plan.districts[d]);
+    return mine.length ? this.plan.districts[mine[Math.floor(Math.random() * mine.length)]]!.bbox : this.plan.square;
   }
 
   private randomTile(r: Rect): Tile | undefined {
@@ -149,7 +151,7 @@ export class Patrols {
 
   /** Next to the landmark's work spot, so the citizen doesn't stand on its agent. */
   private standSpot(serviceId: string): Tile | undefined {
-    const w = landmarkLayout(serviceId)?.workSpot;
+    const w = this.plan.landmarkLayout(serviceId)?.workSpot;
     if (!w) return undefined;
     for (const [dx, dy] of [[1, 0], [-1, 0], [1, 1], [-1, 1], [0, 1], [0, 0]]) {
       const t = { x: w.x + dx, y: w.y + dy };
@@ -169,7 +171,7 @@ export class Patrols {
     p.agent.goTo(spot, () => {
       if (p.visiting !== f.id) return;
       p.arrived = true;
-      const l = landmarkLayout(f.serviceId);
+      const l = this.plan.landmarkLayout(f.serviceId);
       if (l) p.agent.face({ x: l.footprint.x + Math.floor(l.footprint.w / 2), y: l.footprint.y + Math.floor(l.footprint.h / 2) });
       p.agent.emote('hi', 1400);
       p.agent.say('I spotted a problem. Tap me!', { tone: 'alert', priority: 'alert', holdMs: 4000 });

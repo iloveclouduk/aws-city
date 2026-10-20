@@ -1,15 +1,18 @@
 // The landscape round the city (src/world/terrain.ts drawn): the sea as one TileSprite with a moving glint layer, the
-// ring's static ground baked into two RenderTextures (Phaser doesn't cull off-screen images, so 4,000 ground tiles
-// as Images would cost every frame), and at most a few hundred depth-sorted prop Images. The AZ islands (terrain.ts) are
-// part of it: their pads and fences are baked, their data halls and substations are props.
+// ring's static ground baked into two RenderTextures (src/game/GroundBake.ts: Phaser doesn't cull off-screen images,
+// so 4,000 ground tiles as Images would cost every frame), and at most a few hundred depth-sorted prop Images, culled
+// to the view (src/game/cull.ts). The AZ islands (terrain.ts) are part of it: their pads and fences are baked, their
+// data halls and substations are props.
 //
-// Phaser 4: a RenderTexture's draws are buffered until .render() (node_modules/phaser/src/textures/DynamicTexture.js
-// render(); see .claude/references/cached-sources.md), and a lost WebGL context loses its contents, so the bake is
-// redone on 'restorewebgl'.
+// A lost WebGL context loses the bake's contents, so it's redone on 'restorewebgl'.
 import Phaser from 'phaser';
-import { isWater, outside, terrainFor, RING_MAX, RING_MIN, type Terrain, type TerrainKind } from '@/world/terrain';
+import { legacyPlan, type CityPlan } from '@/world/plan';
+import { isWater, outsideOf, ringOf, terrainFor, type Terrain, type TerrainKind } from '@/world/terrain';
 import type { Zone } from '@/world/regions';
-import { addSprite, CITY_ATLAS, hasSprite, SEA_GLINT_TEXTURE, SEA_TEXTURE, spriteAnchor } from './assets';
+import { addSprite, hasSprite, SEA_GLINT_TEXTURE, SEA_TEXTURE, spriteAnchor } from './assets';
+import { spriteBox } from './chunks';
+import { boxOfImage, type Culler } from './cull';
+import { GroundBake, type Stamp } from './GroundBake';
 import { CITY_ISO, cornerScreen, footprintDepth, toScreen } from './iso';
 import { reducedMotion } from './motion';
 import { keepTextInView } from './labels';
@@ -39,7 +42,7 @@ const DARK_TINT = 0x4a4f5e;
 export class Landscape {
   private sea?: Phaser.GameObjects.TileSprite;
   private glint?: Phaser.GameObjects.TileSprite;
-  private rts: Phaser.GameObjects.RenderTexture[] = [];
+  private ground?: GroundBake;
   private props: PropImage[] = [];
   private glows: Phaser.GameObjects.Image[] = [];
   /** The highway's destination signs ("Ireland → eu-west-1 · 7,321 km"): map details, off by default. */
@@ -57,8 +60,19 @@ export class Landscape {
   private dark = new Set<number>();
   terrain?: Terrain;
 
-  constructor(private scene: Phaser.Scene) {
+  constructor(
+    private scene: Phaser.Scene,
+    private culler?: Culler,
+    private plan: CityPlan = legacyPlan(),
+  ) {
     scene.game.renderer.on('restorewebgl', this.rebake);
+  }
+
+  /** The season's ground tint (src/world/seasons.ts SEASON_TINT), kept for a rebuild. */
+  private tint?: number;
+  setTint(color: number) {
+    this.tint = color;
+    this.ground?.setTint(color);
   }
 
   /** Build (or rebuild, on a Region change) the landscape. Same Region and zones: nothing to do. */
@@ -67,7 +81,7 @@ export class Landscape {
     if (key === this.key && this.terrain) return this.terrain;
     this.clear();
     this.key = key;
-    const t = (this.terrain = terrainFor(region, zones, linked));
+    const t = (this.terrain = terrainFor(region, zones, linked, this.plan));
     const b = t.bounds;
     if (this.scene.textures.exists(SEA_TEXTURE)) {
       this.sea = this.scene.add.tileSprite(b.x - SEA_MARGIN, b.y - SEA_MARGIN, b.w + 2 * SEA_MARGIN, b.h + 2 * SEA_MARGIN, SEA_TEXTURE).setOrigin(0).setDepth(SEA_DEPTH);
@@ -82,10 +96,16 @@ export class Landscape {
     }
     // Two halves (top and bottom of the map): each well under the 4096 px texture limit.
     const half = Math.ceil(b.h / 2 / 2) * 2;
-    for (const [y, h] of [[b.y, half], [b.y + half, b.h - half]] as const) {
-      this.rts.push(this.scene.add.renderTexture(b.x, y, b.w, h).setOrigin(0).setDepth(GROUND_DEPTH));
-    }
+    this.ground = new GroundBake(
+      this.scene,
+      [
+        { x: b.x, y: b.y, w: b.w, h: half },
+        { x: b.x, y: b.y + half, w: b.w, h: b.h - half },
+      ],
+      GROUND_DEPTH,
+    );
     this.bake();
+    if (this.tint !== undefined) this.ground.setTint(this.tint);
     this.placeProps(t);
     this.setNight(this.night);
     this.setUiScale(this.ui);
@@ -96,7 +116,9 @@ export class Landscape {
   stats() {
     return {
       props: this.props.length + this.props.filter((p) => p.lights).length + this.glows.length,
-      renderTextures: this.rts.map((r) => ({ w: r.width, h: r.height })),
+      renderTextures: this.ground?.sizes() ?? [],
+      bakeMs: this.ground?.lastMs ?? 0,
+      bakeTotalMs: this.ground?.totalMs ?? 0,
     };
   }
 
@@ -168,11 +190,11 @@ export class Landscape {
     this.sea?.destroy();
     this.glint?.destroy();
     this.sea = this.glint = undefined;
-    for (const r of this.rts) r.destroy();
-    this.rts = [];
-    for (const p of this.props) p.img.destroy(), p.lights?.destroy();
+    this.ground?.destroy();
+    this.ground = undefined;
+    for (const p of this.props) for (const o of [p.img, p.lights]) if (o) (this.culler?.remove(o), o.destroy());
     this.props = [];
-    for (const g of this.glows) g.destroy();
+    for (const g of this.glows) (this.culler?.remove(g), g.destroy());
     this.glows = [];
     this.dark.clear();
     for (const l of this.labels) l.destroy();
@@ -183,26 +205,21 @@ export class Landscape {
   }
 
   private rebake = () => {
-    if (this.rts.length) this.bake();
+    if (this.ground) this.bake();
   };
 
   /** Ground and edge slabs, painter's order (back rows first), into whichever half each stamp touches. */
   private bake() {
     const t = this.terrain;
-    if (!t) return;
-    for (const r of this.rts) r.clear();
+    if (!t || !this.ground) return;
+    const stamps: Stamp[] = [];
     const stamp = (name: string, x: number, y: number) => {
       const a = spriteAnchor(name);
-      if (!a) return;
-      const n = cornerScreen(CITY_ISO, x, y);
-      const left = n.x - a.ax;
-      const top = n.y - a.ay;
-      for (const r of this.rts) {
-        if (top + a.h <= r.y || top >= r.y + r.height || left + a.w <= r.x || left >= r.x + r.width) continue;
-        r.stamp(CITY_ATLAS, name, left - r.x, top - r.y, { originX: 0, originY: 0 });
-      }
+      if (a) stamps.push({ name, box: spriteBox(CITY_ISO, a, x, y) });
     };
     const slab = (k: TerrainKind) => (k === 'promenade' || k === 'highway' || k === 'island' ? 'quay' : k === 'beach' ? 'shore' : 'cliff');
+    const { min: RING_MIN, max: RING_MAX } = ringOf(this.plan.size);
+    const outside = outsideOf(this.plan.size);
     for (let s = 2 * RING_MIN; s <= 2 * RING_MAX; s++)
       for (let x = Math.max(RING_MIN, s - RING_MAX); x <= Math.min(RING_MAX, s - RING_MIN); x++) {
         const y = s - x;
@@ -218,7 +235,13 @@ export class Landscape {
     // The AZ islands' fences: static and knee-high, so they're baked too (back to front), not 28 Images an island.
     const fences = t.islands.flatMap((i) => i.fences).sort((a, b) => a.x + a.y - (b.x + b.y));
     for (const f of fences) stamp(f.sprite, f.x, f.y);
-    for (const r of this.rts) r.render();
+    this.ground.bake(stamps);
+  }
+
+  /** A static Image the culler shows only near the view. */
+  private cull(img: Phaser.GameObjects.Image) {
+    this.culler?.add(img, boxOfImage(img));
+    return img;
   }
 
   private placeProps(t: Terrain) {
@@ -228,15 +251,15 @@ export class Landscape {
       if (!hasSprite(p.sprite)) continue;
       const n = cornerScreen(CITY_ISO, p.x, p.y);
       const depth = footprintDepth(CITY_ISO, p);
-      const img = addSprite(this.scene, p.sprite, n.x, n.y).setDepth(depth);
+      const img = this.cull(addSprite(this.scene, p.sprite, n.x, n.y).setDepth(depth));
       let lights: Phaser.GameObjects.Image | undefined;
-      if (hasSprite(`${p.sprite}@lights`)) lights = addSprite(this.scene, `${p.sprite}@lights`, n.x, n.y).setDepth(70_001).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+      if (hasSprite(`${p.sprite}@lights`)) lights = this.cull(addSprite(this.scene, `${p.sprite}@lights`, n.x, n.y).setDepth(70_001).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0));
       const island = p.role === 'island' ? t.islands.findIndex((i) => p.x >= i.rect.x && p.y >= i.rect.y && p.x < i.rect.x + i.rect.w && p.y < i.rect.y + i.rect.h) : -1;
       const hall = island >= 0 && p.sprite.startsWith('pack:data_center') && hasSprite('pack:data_center:3');
       this.props.push({ img, lights, role: hall ? 'hall' : p.role, phase: hall ? island % 4 : phase++ % 3, ...(island >= 0 ? { island } : {}) });
       if (p.role === 'lighthouse' && hasSprite('glow')) {
         const c = toScreen(CITY_ISO, p.x, p.y);
-        this.glows.push(addSprite(this.scene, 'glow', c.x, c.y - 52).setDepth(70_002).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0));
+        this.glows.push(this.cull(addSprite(this.scene, 'glow', c.x, c.y - 52).setDepth(70_002).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)));
       }
       const d = p.role === 'sign' && p.to ? dests.get(p.to) : undefined;
       if (d) {

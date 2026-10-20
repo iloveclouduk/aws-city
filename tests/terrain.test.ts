@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import facts from '../shared/region-facts.json' with { type: 'json' };
 import { GRID } from '@/world/layout';
 import { neighbours, zonesFor } from '@/world/regions';
-import { GATE, MAX_PROPS, outside, RING_MAX, RING_MIN, RIVER, ROAD_LINES, terrainFor } from '@/world/terrain';
+import { GATE, MAX_PROPS, outside, outsideOf, RING_MAX, RING_MIN, RIVER, ringOf, ROAD_LINES, terrainFor } from '@/world/terrain';
+import { somePlans } from './support/plans';
 
 const REGION_CODES = Object.keys((facts as { regions: Record<string, unknown> }).regions);
 
@@ -21,16 +22,19 @@ describe('terrain round the city', () => {
 
   it.each(REGION_CODES)('%s builds: no terrain inside the core, a river all round, props within budget', (code) => {
     const t = terrainFor(code, zonesFor(code));
-    for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) expect(t.kind(x, y)).toBe('core');
+    // Wrong tiles are collected and checked once (an expect per tile made these the suite's slowest tests).
+    const wrong: string[] = [];
+    for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) if (t.kind(x, y) !== 'core') wrong.push(`${t.kind(x, y)} in the core at ${x},${y}`);
     for (const p of t.props) {
-      for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) expect(outside(x, y), `${p.sprite} at ${x},${y}`).toBeGreaterThan(0);
+      for (let y = p.y; y < p.y + p.h; y++) for (let x = p.x; x < p.x + p.w; x++) if (outside(x, y) <= 0) wrong.push(`${p.sprite} at ${x},${y}`);
     }
     for (let y = RING_MIN; y <= RING_MAX; y++)
       for (let x = RING_MIN; x <= RING_MAX; x++) {
         const d = outside(x, y);
-        if (d >= RIVER.from && d <= RIVER.to) expect(['river', 'bridge']).toContain(t.kind(x, y));
-        if (d === 0) expect(t.ground(x, y)).toBeUndefined();
+        if (d >= RIVER.from && d <= RIVER.to && !['river', 'bridge'].includes(t.kind(x, y))) wrong.push(`${t.kind(x, y)} in the river at ${x},${y}`);
+        if (d === 0 && t.ground(x, y) !== undefined) wrong.push(`ground in the core at ${x},${y}`);
       }
+    expect(wrong).toEqual([]);
     expect(t.props.length).toBeLessThanOrEqual(MAX_PROPS);
     expect(t.bounds.w).toBeGreaterThan(0);
     expect(t.bounds.h).toBeGreaterThan(0);
@@ -53,7 +57,7 @@ describe('terrain round the city', () => {
         for (const tile of b.tiles) expect(t.kind(tile.x, tile.y)).toBe('bridge');
       }
     }
-  });
+  }, 30_000); // builds every Region's terrain: ~1 s alone, several when every test file runs at once
 
   it.each(REGION_CODES)('%s: one fenced island per AZ, with its data halls, water round it and a bridge in', (code) => {
     const zones = zonesFor(code);
@@ -61,10 +65,12 @@ describe('terrain round the city', () => {
     expect(t.islands).toHaveLength(Math.min(6, zones.length));
     for (const isl of t.islands) {
       const r = isl.rect;
-      for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) expect(t.kind(x, y)).toBe('island');
+      const wrong: string[] = [];
+      for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) if (t.kind(x, y) !== 'island') wrong.push(`${t.kind(x, y)} at ${x},${y}`);
       // Water on the landward sides (the river is on the fourth).
-      for (let x = r.x; x < r.x + r.w; x++) expect(['sea', 'river']).toContain(t.kind(x, r.y - 1));
-      for (let y = r.y; y < r.y + r.h; y++) expect(['sea', 'river']).toContain(t.kind(r.x - 1, y));
+      for (let x = r.x; x < r.x + r.w; x++) if (!['sea', 'river'].includes(t.kind(x, r.y - 1))) wrong.push(`no water at ${x},${r.y - 1}`);
+      for (let y = r.y; y < r.y + r.h; y++) if (!['sea', 'river'].includes(t.kind(r.x - 1, y))) wrong.push(`no water at ${r.x - 1},${y}`);
+      expect(wrong, isl.slot).toEqual([]);
       const inside = (p: { x: number; y: number }) => p.x >= r.x && p.y >= r.y && p.x < r.x + r.w && p.y < r.y + r.h;
       const kit = t.props.filter(inside).map((p) => p.sprite);
       expect(kit.filter((s) => s.startsWith('pack:data_center')).length, isl.slot).toBeGreaterThanOrEqual(2);
@@ -110,5 +116,36 @@ describe('suburbs', () => {
       const tiles = Array.from({ length: h.w }, (_, i) => ({ x: h.x + i, y: h.y }));
       expect(tiles.some((p) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => road.has(`${p.x + a},${p.y + b}`))), `${h.sprite} at ${h.x},${h.y}`).toBe(true);
     }
+  });
+});
+
+describe.each(somePlans().map((s) => [s.name, s] as const))('terrain round the real street plan of %s', (_n, s) => {
+  const p = s.plan;
+  const t = terrainFor(s.region, zonesFor(s.region), [], p);
+  const out = outsideOf(p.size);
+  it('keeps the river all round the core, and the highway east from the plan’s gate', () => {
+    for (let i = -1; i <= p.size; i++)
+      for (const [x, y] of [[i, -3], [i, p.size + 2], [-3, i], [p.size + 2, i]]) expect(['river', 'bridge'], `${x},${y}`).toContain(t.kind(x, y));
+    expect(t.gate).toEqual(p.gate);
+    expect(t.highway.every((h) => h.y === p.gate.y && h.x >= p.size)).toBe(true);
+  });
+  it('takes land and sea beyond the river from the baked water mask', () => {
+    const { min, max } = ringOf(p.size);
+    let checked = 0;
+    for (let y = min; y <= max; y++)
+      for (let x = min; x <= max; x++) {
+        const d = out(x, y);
+        if (d <= RIVER.to + 1 || d >= 16 || Object.values(t.reserved).some((r) => x >= r.x - 1 && y >= r.y - 1 && x <= r.x + r.w && y <= r.y + r.h)) continue;
+        if (Math.abs(y - p.gate.y) <= 4 && x >= p.size) continue; // the highway and its verge
+        const k = t.kind(x, y);
+        if (k === 'bridge' || k === 'highway') continue;
+        expect(k === 'sea', `${x},${y}: ${k}`).toBe(p.masks!.water(x, y));
+        checked++;
+      }
+    expect(checked).toBeGreaterThan(1000);
+  });
+  it('puts each AZ island on its slot, the park and the airport off the core', () => {
+    expect(t.islands.map((i) => i.slot)).toEqual([...p.azSlots(zonesFor(s.region).length)]);
+    for (const r of [t.park, t.airport].filter(Boolean)) expect(out(r!.x, r!.y)).toBeGreaterThan(RIVER.to);
   });
 });

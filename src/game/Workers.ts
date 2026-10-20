@@ -63,7 +63,53 @@ export class Workers {
     }
   }
 
+  /** Rush hour's "Auto Scaling" helpers: when each goes home (scene time). */
+  private until = new Map<Agent, number>();
+
+  /**
+   * Auto Scaling at rush hour: `n` extra workers pop up at a service's building (only where its worker is on the street)
+   * and go home after `ms`. They take pedestrians' places like any worker (the scene trims the crowd). Returns how many.
+   */
+  surge(serviceId: string, n: number, ms: number, now: number): number {
+    const base = this.list.find((w) => this.posts.get(w)?.serviceId === serviceId && !this.until.has(w));
+    const post = base && this.posts.get(base);
+    if (!post) return 0;
+    let made = 0;
+    for (let i = 0; i < n; i++) {
+      const tile = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }].map((d) => ({ x: post.workSpot.x + d.x, y: post.workSpot.y + d.y }))[i % 4];
+      const w = new Agent(this.scene, this.world, {
+        id: `worker:${serviceId}:scale${i}`,
+        sheet: crowdSheet(serviceId),
+        name: `${post.name} (scaled out)`,
+        tile: this.world.walkable(tile.x, tile.y) ? tile : post.workSpot,
+        home: { x: post.workSpot.x - 3, y: post.workSpot.y - 3, w: 7, h: 7 },
+        workSpot: post.workSpot,
+        speed: 1.8,
+        wanders: false,
+      });
+      w.onClick(() => this.onTap(serviceId, w));
+      w.emote('jump', 900);
+      this.list.push(w);
+      this.posts.set(w, post);
+      this.nextErrand.set(w, now + 1000);
+      this.until.set(w, now + ms);
+      made++;
+    }
+    return made;
+  }
+
+  /** Auto Scaling helpers on the street now. */
+  get surged() {
+    return this.until.size;
+  }
+
+  /** Rush hour is over: the helpers scale in (go home now). */
+  scaleIn() {
+    for (const w of [...this.until.keys()]) this.drop(w);
+  }
+
   update(time: number, dt: number) {
+    for (const [w, t] of [...this.until]) if (time >= t && !w.isBusy) this.drop(w);
     for (const w of this.list) {
       w.update(time, dt);
       if (w.isBusy || time < (this.nextErrand.get(w) ?? 0)) continue;
@@ -93,6 +139,7 @@ export class Workers {
     this.list.splice(this.list.indexOf(w), 1);
     this.posts.delete(w);
     this.nextErrand.delete(w);
+    this.until.delete(w);
     w.destroy();
   }
 }

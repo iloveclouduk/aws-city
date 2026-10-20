@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { openConsole, snap, submitPrompt, type Layout } from '@/app/runtime';
+import { useEffect, useRef, useState } from 'react';
+import { canLookByAddress, grantLookout, lookByAddress, lookoutUnavailable, lookoutWorksHere, openConsole, snap, submitPrompt, type Layout } from '@/app/runtime';
 import { bus } from '@/state/bus';
 import { tierOf, useCity } from '@/state/store';
 import { buildingLevelName, crownSteps, LEGEND_NAMES, MAX_CROWNS, levelOf } from '@/state/mastery';
@@ -9,6 +9,9 @@ import { placeFor, SPECIAL_AGENTS, TIER_NAMES, TIER_XP } from '@/world/places';
 import { districtById, serviceById, servicesIn, type DistrictId } from '@/world/taxonomy';
 import { AwsIcon } from './AwsIcon';
 import { CultureCard, isCultureId } from './CulturePanels';
+import { WorkshopList, WorkshopStudio } from './Workshop';
+import { NorthHall } from './NorthHall';
+import { workshopsFor } from '@/world/workshops';
 import { feel } from './feedback';
 import { districtStyle, placeSuggestions, type PlaceSuggestion } from './logic';
 import { Portrait } from './Portrait';
@@ -17,15 +20,58 @@ import { RoleCard } from './RoleCard';
 import { ForLearners, Plain, Term } from './Term';
 import type { OpenTab } from './QuestLog';
 import { isGlobalService } from '@/world/regions';
+import { nextLevelPreview } from '@/world/preview';
 import { EmptyState } from './EmptyState';
 import { CompareCard } from './CompareCard';
 import { ReadingShelf } from './ReadingShelf';
 import { comparisonsFor } from '@/world/comparisons';
+import { agentOffer } from '@/state/watch';
+import { TaskCard } from './ActivityFeed';
+import { signLegend } from './logic';
+
+/**
+ * The Lookout's camera. In the side panel (or Firefox sidebar) it snaps the page beside it and shows what it last saw;
+ * in the full tab or Safari it can't see other tabs, so it says why and where it can.
+ */
+function LookoutSnap({ layout }: { layout?: Layout }) {
+  const state = useCity((s) => s.snap);
+  const last = useCity((s) => s.lastClassified);
+  // The demo's Lookout works from every surface: it looks at the practice console (runtime lookAtPractice).
+  if (!lookoutWorksHere(layout)) return <p className="muted small" role="note">📷 {lookoutUnavailable()}</p>;
+  return (
+    <div className="lookout-snap">
+      {state === 'needs-permission' ? (
+        <>
+          <button className="btn primary wide" onClick={grantLookout}>
+            📷 Allow the Lookout to see pages
+          </button>
+          {/* The demo's practice console can still be read without a photo, by its address. */}
+          {canLookByAddress() && (
+            <button className="btn ghost wide" onClick={() => (feel.tap(), lookByAddress())}>
+              No thanks, go by the address
+            </button>
+          )}
+        </>
+      ) : (
+        <button className="btn primary wide" disabled={state === 'snapping'} onClick={() => (feel.tap(), void snap())}>
+          {state === 'snapping' ? '📸 Looking…' : '📸 Show this page to the city'}
+        </button>
+      )}
+      {state === 'failed' && <p className="muted small">I couldn’t take that photo. Try again on an AWS page.</p>}
+      {last && (
+        <p className="small" role="status">
+          <b>Last look:</b> <Plain text={last.summary} />
+          {last.serviceIds.length > 0 && ` (${last.serviceIds.map((sid) => serviceById(sid)?.name ?? sid).join(', ')})`}
+        </p>
+      )}
+    </div>
+  );
+}
 
 /** "· best 42" on the Play button once the game has a score to beat. */
 const bestLine = (g?: { best: number; plays: number }) => (g && g.best > 0 ? ` · best ${g.best}` : '');
 
-const GAME_NAME = { fishing: 'Fishing', shield: 'Shield Wall', route53: 'Dance Hall', lambda: 'Food Stall', ec2: 'Rush Hour', dynamodb: 'Sorting Office' } as const;
+const GAME_NAME = { fishing: 'Fishing', shield: 'Shield Wall', route53: 'Dance Hall', lambda: 'Food Stall', ec2: 'Rush Hour', dynamodb: 'Sorting Office', redteam: 'Red Team Range', queue: 'Queue Juggler', iamgate: 'Permission Gate', edge: 'Edge Cache' } as const;
 
 export function LandmarkCard({ openTab, layout }: { openTab?: OpenTab; layout?: Layout }) {
   const id = useCity((s) => s.selected);
@@ -34,13 +80,27 @@ export function LandmarkCard({ openTab, layout }: { openTab?: OpenTab; layout?: 
   const setView = useCity((s) => s.setView);
   const selectPlace = useCity((s) => s.select);
   const [compare, setCompare] = useState<string>();
+  // Watch it done stays on this card: the task sent from here (the newest one, once it isn't the one that was newest
+  // when the button was pressed) shows right under the button, scrolled into view, instead of on another screen.
+  const [watchFrom, setWatchFrom] = useState<{ id: string; before?: string }>();
+  const newest = useCity((s) => (s.taskOrder[0] ? s.tasks[s.taskOrder[0]] : undefined));
+  const live = watchFrom && watchFrom.id === id && newest && newest.taskId !== watchFrom.before ? newest : undefined;
+  const liveBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = liveBox.current;
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [live?.taskId]);
+  const inventory = useCity((s) => s.inventory);
+  const findings = useCity((s) => s.findings);
   // The city follows the panel: whatever place is open here is what the camera shows.
   useEffect(() => {
-    if (id && (serviceById(id) || id === 'plaza' || id === 'lookout')) bus.emit('flyTo', { id });
+    if (id && (serviceById(id) || id === 'plaza' || id === 'lookout' || id === 'workshop')) bus.emit('flyTo', { id });
   }, [id]);
 
   if (!id) return <PickAPlace />;
   if (isCultureId(id)) return <CultureCard id={id} />;
+  if (id === 'workshop') return <WorkshopStudio />;
+  if (id === 'northhall') return <NorthHall />;
 
   if (id === 'plaza' || id === 'lookout') {
     const a = id === 'plaza' ? SPECIAL_AGENTS.concierge : SPECIAL_AGENTS.lookout;
@@ -60,12 +120,8 @@ export function LandmarkCard({ openTab, layout }: { openTab?: OpenTab; layout?: 
             ? 'Luke looks at the AWS page you have open and tells the city what you are working on.'
             : 'Connie runs the plaza. Every AWS service has its own page in the AWS console, and this is the way in.'}
         </p>
+        {id === 'lookout' && <LookoutSnap layout={layout} />}
         <div className="actions">
-          {id === 'lookout' && layout === 'panel' && (
-            <button className="btn primary wide" onClick={() => (feel.tap(), void snap())}>
-              📸 Show this page to the city
-            </button>
-          )}
           <button className="btn" onClick={() => openConsole('plaza')}>
             Open console ↗
           </button>
@@ -97,6 +153,7 @@ export function LandmarkCard({ openTab, layout }: { openTab?: OpenTab; layout?: 
   const next = TIER_XP[Math.min(tier + 1, 4)];
   const prev = TIER_XP[Math.max(tier, 0)];
   const pct = tier >= 4 ? 100 : Math.round(((xp - prev) / Math.max(1, next - prev)) * 100);
+  const nextAdds = tier >= 0 && tier < 4 ? nextLevelPreview(progress, id, cityRegion, tier)?.adds : undefined;
   const agent = place.agentName.split(' the ')[0];
   const short = svc.name.replace(/^(Amazon|AWS) /, '');
   const teach = () => {
@@ -111,10 +168,19 @@ export function LandmarkCard({ openTab, layout }: { openTab?: OpenTab; layout?: 
       : [
           ...(place.game ? [{ key: 'play', label: `🎮 Play ${GAME_NAME[place.game]}${bestLine(progress.games?.[place.game])}`, run: () => (feel.tap(), setView({ name: 'game', game: place.game! })) }] : []),
           { key: 'cards', label: '🃏 Learn with cards', run: () => (feel.tap(), openTab?.('learn')) },
-          { key: 'ask', label: `💡 Ask ${agent}`, run: teach },
         ]
           .slice(0, 2)
           .map((t, i) => ({ ...t, primary: i === 0 }));
+  // Two different things the agent does, said plainly: answer your question (the team's HQ chat), or do a job for you
+  // that you watch step by step (Watch it done, src/state/watch.ts).
+  const offer = agentOffer(id);
+  const hasHq = servicesIn(svc.districtId).length > 0;
+  const doIt = () => {
+    feel.send();
+    setWatchFrom({ id, before: useCity.getState().taskOrder[0] });
+    submitPrompt(offer?.prompt ?? `Show me ${svc.name} at work: ${place.teaches[Math.min(Math.max(tier, 0), 3)]}`);
+  };
+  const legend = signLegend({ inventory, findings, region: cityRegion, serviceId: id });
 
   return (
     <div className="card edge place" style={districtStyle(d.color)}>
@@ -145,6 +211,18 @@ export function LandmarkCard({ openTab, layout }: { openTab?: OpenTab; layout?: 
           <Plain text={place.simple ?? place.blurb} except={id} />
         </p>
       </section>
+      {legend.length > 0 && (
+        <ul className="sign-legend" aria-label="What its sign shows">
+          {legend.map((l) => (
+            <li key={l.mark}>
+              <span className="sign-mark" aria-hidden="true">
+                {l.mark}
+              </span>{' '}
+              {l.text}
+            </li>
+          ))}
+        </ul>
+      )}
       {tier < 0 ? (
         <p className="locked-note">🚧 Not built in this city yet. {agent} moves in when you ask about it, or when a quest brings you here.</p>
       ) : (
@@ -153,6 +231,8 @@ export function LandmarkCard({ openTab, layout }: { openTab?: OpenTab; layout?: 
             <i style={{ width: `${Math.max(4, pct)}%` }} />
           </div>
           <span className="muted">{tier < 4 ? `${xp} ⭐ · ${next - xp} more to grow to ${TIER_NAMES[tier + 1]}` : `${xp} ⭐ · Master`}</span>
+          {/* What the next level adds (the map shows it over the building only with Everything on). */}
+          {nextAdds && <span className="tier-adds">Next level adds “{nextAdds}”</span>}
           {tier >= 4 && <CrownNext progress={progress} id={id} level={level} />}
         </div>
       )}
@@ -165,6 +245,23 @@ export function LandmarkCard({ openTab, layout }: { openTab?: OpenTab; layout?: 
             </button>
           ))}
         </div>
+        {tier >= 0 && (
+          <div className="agent-asks" role="group" aria-label={`What ${agent} can do`}>
+            {hasHq && (
+              <button className="btn tiny" title={`Chat with the ${d.name} team in ${d.hq}: ask anything, get an answer`} onClick={() => (feel.tap(), setView({ name: 'interior', districtId: svc.districtId }))}>
+                💬 Ask a question
+              </button>
+            )}
+            <button className="btn tiny" title={offer?.story ?? `${agent} does a small job here and you watch every step`} onClick={doIt}>
+              🛠️ Watch it done
+            </button>
+          </div>
+        )}
+        {live && (
+          <div ref={liveBox} className="place-live-task">
+            <TaskCard key={live.taskId} task={live} openTab={openTab} />
+          </div>
+        )}
       </section>
       {comparisonsFor(id).length > 0 && (
         <section className="place-compare" aria-label="Which one should I pick?">
@@ -176,6 +273,12 @@ export function LandmarkCard({ openTab, layout }: { openTab?: OpenTab; layout?: 
               </button>
             ))}
           </div>
+        </section>
+      )}
+      {workshopsFor(id).length > 0 && (
+        <section className="place-workshops" aria-label="Hands-on workshops">
+          <h4 className="label">Hands-on workshops</h4>
+          <WorkshopList ids={workshopsFor(id).map((w) => w.id)} progress={progress.workshops} />
         </section>
       )}
       <ReadingShelf serviceId={id} />

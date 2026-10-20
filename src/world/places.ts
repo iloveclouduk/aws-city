@@ -37,7 +37,7 @@ export interface Place {
   game?: GameId;
 }
 
-export type GameId = 'fishing' | 'shield' | 'route53' | 'lambda' | 'ec2' | 'dynamodb';
+export type GameId = 'fishing' | 'shield' | 'route53' | 'lambda' | 'ec2' | 'dynamodb' | 'redteam' | 'queue' | 'iamgate' | 'edge';
 
 export const PLACES: Place[] = world.services.map((s) => ({
   serviceId: s.id,

@@ -3,10 +3,11 @@ import type { DataLink, FlowRate } from '@/backend/contract';
 import { bus } from '@/state/bus';
 import { useCity, type Inventory } from '@/state/store';
 import { REGIONS } from '@/world/culture';
-import { azCounts, azIndex, azsFor, GATE, GRID, landmarkLayout, type AzIsland } from '@/world/layout';
+import { azCounts, azIndex, azsFor, type AzIsland } from '@/world/layout';
+import { legacyPlan, type CityPlan } from '@/world/plan';
 import { perUnit, price, regionFacts, zonesFor } from '@/world/regions';
 import { CARRIER_FOR, carsPerMinute, type Cargo, type CarrierKind } from '@/world/carriers';
-import { RING_MAX, terrainFor, type Terrain } from '@/world/terrain';
+import { ringOf, terrainFor, type Terrain } from '@/world/terrain';
 import { click } from './audio';
 import { cornerScreen, toScreen, type Iso } from './iso';
 import { reducedMotion } from './motion';
@@ -21,8 +22,6 @@ const COLORS: Record<DataLink['kind'], number> = { replication: 0xc925d1, standb
 const LABEL_DEPTH = 40_100;
 /** The "AWS global network" fibre runs beside the highway, on its north verge (grid y offset from the highway's row). */
 const FIBRE_DY = -0.8;
-/** The middle of downtown: Region traffic with no AZ of its own starts from the junction nearest here. */
-const DOWNTOWN: Pt = { x: GRID / 2, y: GRID / 2 };
 /** How far a pointer may move between down and up and still count as a click (not a drag of the camera), px. */
 const CLICK_SLOP = 8;
 /**
@@ -72,6 +71,8 @@ export class RegionOverlay {
   private outageAzs = new Set<string>();
   /** "Show the map details": AZ IDs, resource counts, the network label, link notes and the Region line. Off by default. */
   private details = false;
+  /** AWS news shows (Everything mode): an island AWS reports trouble on says so in its label. */
+  private newsShown = true;
   /** The island under the pointer (its label shows the real names), and whether the Region sign is hovered. */
   private hoveredIsland = -1;
   private regionHover = false;
@@ -96,6 +97,7 @@ export class RegionOverlay {
     private iso: Iso,
     private packets: Packets,
     private terrain?: () => Terrain | undefined,
+    private plan: CityPlan = legacyPlan(),
   ) {
     // Over the baked ground, under everything standing: the fibre line beside the highway.
     this.g = scene.add.graphics().setDepth(1);
@@ -168,7 +170,7 @@ export class RegionOverlay {
           if (i !== undefined) targets.push({ key: `${r.id}:${az}`, perMin, to: this.islands[i].bridge.end, route: `Internet → Zone ${zoneLetter(this.islands[i], i)}` });
         }
       } else {
-        const l = landmarkLayout(r.serviceId);
+        const l = this.plan.landmarkLayout(r.serviceId);
         if (l) targets.push({ key: `${r.id}:`, perMin: r.perMin, to: l.workSpot, route: `Internet → ${r.label}` });
       }
       for (const t of targets) {
@@ -195,6 +197,14 @@ export class RegionOverlay {
     if (!on) for (const n of this.notes) n.destroy();
     if (!on) this.notes = [];
     this.syncVisibility();
+    this.counts = '';
+    this.syncCounts();
+  }
+
+  /** Simple mode hides AWS news (shows('news')): an island's label stays its plain name, the storm cloud still shows. */
+  setNewsShown(on: boolean) {
+    if (on === this.newsShown) return;
+    this.newsShown = on;
     this.counts = '';
     this.syncCounts();
   }
@@ -313,7 +323,7 @@ export class RegionOverlay {
     this.hits = [];
     this.counts = '';
     this.hoveredIsland = -1;
-    this.islands = azsFor(this.region, this.zones);
+    this.islands = azsFor(this.region, this.zones, this.plan.azSlots);
 
     // Each island: an invisible tap target over its diamond (the label is drawn by syncCounts); pointing at it shows
     // its real names.
@@ -338,16 +348,17 @@ export class RegionOverlay {
     const r = REGIONS.regions.find((x) => x.code === this.region);
     const f = regionFacts(this.region);
     const count = f?.azIds.length ? `${f.azIds.length} AZs` : this.islands.length ? `${this.islands.length} AZs` : '';
-    const name = this.label({ x: GRID + 0.6, y: GRID + 0.6 }, ['AWS Region', r ? `${r.city} · ${r.code}` : this.region, count].filter(Boolean).join(' · '), CSS.accent);
+    const name = this.label({ x: this.plan.size + 0.6, y: this.plan.size + 0.6 }, ['AWS Region', r ? `${r.city} · ${r.code}` : this.region, count].filter(Boolean).join(' · '), CSS.accent);
     name.setInteractive({ useHandCursor: true });
     this.tappable(name);
     this.nameLabel = name;
     this.nameAnchor = { x: name.x, y: name.y };
 
     // The AWS global network: a faint fibre beside the highway, from the gate to the horizon.
+    const GATE = this.plan.gate;
     const y = GATE.y + FIBRE_DY;
     const a = toScreen(this.iso, GATE.x + 1, y);
-    const b = toScreen(this.iso, RING_MAX, y);
+    const b = toScreen(this.iso, ringOf(this.plan.size).max, y);
     this.dashed(a, b, 0x7dd3fc, 0.45, 7, 4, 2);
     const mid = toScreen(this.iso, GATE.x + 9, y - 0.6);
     this.netLabel = this.text(mid.x, mid.y, 'AWS global network', CSS.infoInk, this.texts).setAlpha(0.85);
@@ -369,7 +380,7 @@ export class RegionOverlay {
   private syncCounts() {
     const inv: Inventory | undefined = useCity.getState().inventory;
     const per = azCounts(this.islands, inv, this.region);
-    const key = JSON.stringify([this.region, per, [...this.outageAzs], this.details, this.hoveredIsland]);
+    const key = JSON.stringify([this.region, per, [...this.outageAzs], this.details, this.hoveredIsland, this.newsShown]);
     if (key === this.counts && this.islandLabels.length) return;
     this.counts = key;
     for (const t of this.islandLabels) t.destroy();
@@ -378,7 +389,7 @@ export class RegionOverlay {
     this.islands.forEach((az, i) => {
       const n = per[i];
       const zone = `Zone ${zoneLetter(az, i)}`;
-      const outage = this.outageAzs.has(az.id);
+      const outage = this.newsShown && this.outageAzs.has(az.id);
       let text: string;
       if (this.details || this.hoveredIsland === i) {
         // The AZ ID, and the account's own name for it when the account told us (names differ between accounts).
@@ -399,10 +410,15 @@ export class RegionOverlay {
 
   // ── links ─────────────────────────────────────────────────────────────────
 
+  /** The middle of downtown: Region traffic with no AZ of its own starts from the junction nearest here. */
+  private get downtown(): Pt {
+    return { x: this.plan.size / 2, y: this.plan.size / 2 };
+  }
+
   private roads(): RoadGraph {
-    const t = this.terrain?.() ?? this.graphOf ?? terrainFor(this.region, zonesFor(this.region, this.zones));
+    const t = this.terrain?.() ?? this.graphOf ?? terrainFor(this.region, zonesFor(this.region, this.zones), [], this.plan);
     if (!this.graph || this.graphOf !== t) {
-      this.graph = new RoadGraph(t);
+      this.graph = new RoadGraph(t, this.plan);
       this.graphOf = t;
     }
     return this.graph;
@@ -443,21 +459,21 @@ export class RegionOverlay {
     if (!sameRegion) {
       const other = link.from.region === this.region ? link.to.region : link.from.region;
       const here = link.from.region === this.region ? fa : ta;
-      const start = here !== undefined ? this.islandNode(g, this.islands[here]) : g.nearestNode(DOWNTOWN);
-      const path = [...g.routeTiles(start, g.gate), ...fibre()];
+      const start = here !== undefined ? this.islandNode(g, this.islands[here]) : g.nearestNode(this.downtown);
+      const path = [...g.routeTiles(start, g.gate), ...fibre(this.plan)];
       if (path.length < 2) return;
       const out = price('dt.interregion', this.region);
       const usdOut = out?.byDestination?.[other] ?? out?.usd;
       const cost = out && usdOut !== undefined ? `\nData out to ${other}: ${perUnit({ ...out, usd: usdOut })}` : '';
       // The data drives out of the Region (and, two-way, back in) along the highway, beside the backbone's fibre.
-      const local = here !== undefined ? this.islands[here].bridge.end : DOWNTOWN;
+      const local = here !== undefined ? this.islands[here].bridge.end : this.downtown;
       const outbound = link.from.region === this.region;
       const cargo = (to: string): Cargo => ({ kind: carrier, label: link.label, route: to, cost: cost.trim() || undefined });
       const went = outbound || link.twoWay ? this.dispatch?.(carrier, local, 'highway', cargo(`→ ${other}`)) : false;
       const came = !outbound || link.twoWay ? this.dispatch?.(carrier, 'highway', local, cargo(`${other} →`)) : false;
       if (!went && !came) this.convoy(path, color, !!link.twoWay);
       // South of the highway: its destination signs stand on the north verge.
-      this.note({ x: GATE.x + 4, y: GATE.y + 2.4 }, `${link.label} ${link.twoWay ? '⇄' : '→'} ${other}${cost}`);
+      this.note({ x: this.plan.gate.x + 4, y: this.plan.gate.y + 2.4 }, `${link.label} ${link.twoWay ? '⇄' : '→'} ${other}${cost}`);
     }
   }
 
@@ -494,8 +510,9 @@ export class RegionOverlay {
 }
 
 /** Points along the fibre beside the highway, one a tile, from the gate out to the edge of the map. */
-const fibre = (): Pt[] => {
+const fibre = (plan: CityPlan): Pt[] => {
+  const GATE = plan.gate;
   const out: Pt[] = [{ x: GATE.x + 0.5, y: GATE.y + FIBRE_DY }];
-  for (let x = GATE.x + 1; x <= RING_MAX; x++) out.push({ x, y: GATE.y + FIBRE_DY });
+  for (let x = GATE.x + 1; x <= ringOf(plan.size).max; x++) out.push({ x, y: GATE.y + FIBRE_DY });
   return out;
 };

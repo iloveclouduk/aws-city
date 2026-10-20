@@ -1,4 +1,4 @@
-// re:Play Park in the city (src/world/park.ts lays it out): six rides on the terrain's park site, each open once its
+// re:Play Park in the city (src/world/park.ts lays it out): six rides on the terrain's park site (three more on its annex), each open once its
 // service's building reaches Practitioner here, else under wraps. Open rides turn (three frames, still under reduced
 // motion) and light up at night. Tapping an open ride rides it (Kai walks over, it spins fast, he hops off with a tip);
 // tapping a closed one opens its building's card; hovering a closed one says what opens it.
@@ -41,9 +41,9 @@ export class Park {
   ) {}
 
   /** Lays the park out on `site` for this progress; only rebuilds when a ride opened or closed (or the site moved). */
-  sync(site: Rect | undefined, p: Progress, region: string) {
-    const pieces = site ? parkLayout(site, p, region) : [];
-    const key = `${site ? `${site.x},${site.y}` : '-'}|${pieces.map((x) => x.sprite).join(',')}`;
+  sync(site: Rect | undefined, p: Progress, region: string, annex?: Rect) {
+    const pieces = site ? parkLayout(site, p, region, annex) : [];
+    const key = `${site ? `${site.x},${site.y}` : '-'}|${annex ? `${annex.x},${annex.y}` : '-'}|${pieces.map((x) => x.sprite).join(',')}`;
     if (key === this.key) return;
     this.key = key;
     this.clear();
@@ -56,7 +56,9 @@ export class Park {
       const lights = hasSprite(lit) ? addSprite(this.scene, lit, n.x, n.y).setDepth(70_001).setBlendMode(Phaser.BlendModes.ADD).setAlpha(this.night) : undefined;
       if (piece.ride) {
         const ride = piece.ride;
-        img.setInteractive({ useHandCursor: true, pixelPerfect: true });
+        // The whole sprite's box, not its pixels: a lattice drop tower or a thin track is mostly gaps, and a tap through a
+        // gap only walked Kai (or showed the hover label) instead of riding.
+        img.setInteractive({ useHandCursor: true });
         img.on('pointerup', (ptr: Phaser.Input.Pointer) => {
           if (ptr.getDistance() >= 8) return; // a drag pans the camera
           click();

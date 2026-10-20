@@ -46,9 +46,14 @@ describe('the streak', () => {
     expect(s).toEqual({ days: 3, last: '2027-01-01', best: 3 });
   });
 
-  it('resets to 1 after a missed day, keeping the best', () => {
-    const s = nextStreak({ days: 5, last: '2026-09-30', best: 5 }, '2026-10-02');
-    expect(s).toEqual({ days: 1, last: '2026-10-02', best: 5 });
+  it('forgives one missed day a week (the freeze), and resets after two, keeping the best', () => {
+    const frozen = nextStreak({ days: 5, last: '2026-09-30', best: 5 }, '2026-10-02');
+    expect(frozen).toEqual({ days: 6, last: '2026-10-02', best: 6, frozen: '2026-10-02' });
+    // the freeze is spent for a week: another missed day four days later resets
+    expect(nextStreak({ ...frozen, last: '2026-10-04' }, '2026-10-06')).toEqual({ days: 1, last: '2026-10-06', best: 6, frozen: '2026-10-02' });
+    // a week later it's back
+    expect(nextStreak({ ...frozen, last: '2026-10-08' }, '2026-10-10').days).toBe(7);
+    expect(nextStreak({ days: 5, last: '2026-09-30', best: 5 }, '2026-10-03')).toEqual({ days: 1, last: '2026-10-03', best: 5 });
   });
 
   it('keeps what was earned if the clock goes backwards', () => {
@@ -56,11 +61,13 @@ describe('the streak', () => {
     expect(nextStreak(s, '2026-10-08')).toBe(s);
   });
 
-  it('shows as alive today and yesterday, and as 0 once a day is missed', () => {
+  it('shows as alive today and yesterday, the day after while the freeze can cover it, and 0 after that', () => {
     const s = { days: 3, last: '2026-10-09', best: 5 };
     expect(currentStreak(s, '2026-10-09')).toBe(3);
     expect(currentStreak(s, '2026-10-10')).toBe(3);
-    expect(currentStreak(s, '2026-10-11')).toBe(0);
+    expect(currentStreak(s, '2026-10-11')).toBe(3);
+    expect(currentStreak({ ...s, frozen: '2026-10-07' }, '2026-10-11')).toBe(0);
+    expect(currentStreak(s, '2026-10-12')).toBe(0);
     expect(currentStreak(undefined, '2026-10-11')).toBe(0);
   });
 

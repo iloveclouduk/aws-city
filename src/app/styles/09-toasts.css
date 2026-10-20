@@ -82,3 +82,50 @@
     transform: scaleX(0);
   }
 }
+/* "Browsing grew it": the building's service icon pops up, with its growth line under the text. */
+.toast-building {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  animation: building-pop 520ms var(--ease-step) both;
+}
+.toast-building .aws-icon {
+  border-radius: var(--r-sm, 4px);
+  image-rendering: auto;
+}
+.toast-badge {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  font-size: var(--fs-md, 1rem);
+  line-height: 1;
+}
+.toast-detail {
+  display: block;
+  margin-top: 2px;
+  font-weight: 600;
+  font-size: var(--fs-sm, 0.85rem);
+  color: var(--ink-soft, var(--ink));
+  opacity: 0.85;
+}
+@keyframes building-pop {
+  0% {
+    transform: translateY(10px) scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(-3px) scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast-building {
+    animation: none;
+  }
+}

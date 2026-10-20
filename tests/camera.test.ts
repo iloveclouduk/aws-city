@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildingFocusY, CORE, fitZoom, frameTarget } from '@/game/camera';
+import { buildingFocusY, CORE, coreFor, fitZoom, frameTarget } from '@/game/camera';
 import { CITY_ISO, toScreen } from '@/game/iso';
 import { GRID, TOWN_SQUARE } from '@/world/layout';
+import { somePlans } from './support/plans';
 
 describe('camera framing', () => {
   it('the core is the 40-tile diamond (~1280×640 at zoom 1) plus a little room', () => {
@@ -53,5 +54,22 @@ describe('framing a building (buildingFocusY)', () => {
     const y = buildingFocusY(500, 100, 800, 4);
     expect(y).toBe(500 - 100 + 40);
     expect(500 - y).toBeLessThan(800 / 4 / 2);
+  });
+});
+
+describe.each(somePlans().map((s) => [s.name, s] as const))('framing the real streets of %s', (_n, s) => {
+  const p = s.plan;
+  it('a 64×64 core doesn’t fit a laptop or the panel: they open on the Town Square at zoom 1', () => {
+    for (const [w, h] of [[400, 560], [1400, 880]]) {
+      const f = frameTarget(w, h, p);
+      expect(f).toMatchObject({ zoom: 1, target: 'square' });
+      expect({ x: f.x, y: f.y }).toEqual(toScreen(CITY_ISO, p.square.x + 5.5, p.square.y + 5.5));
+    }
+  });
+  it('a 4K screen sees the whole core, on a whole-number zoom', () => {
+    const f = frameTarget(3840, 2160, p);
+    expect(f.target).toBe('core');
+    expect(Number.isInteger(f.zoom)).toBe(true);
+    expect(f).toMatchObject({ x: coreFor(64).x, y: coreFor(64).y });
   });
 });

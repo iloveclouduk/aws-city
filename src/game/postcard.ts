@@ -1,9 +1,9 @@
 // A postcard of the player's city: the canvas as it is now, with a caption bar (the city, its Region, their stars and
 // its landmark), saved as a PNG on their computer. Nothing is uploaded anywhere.
 
-/** The caption under the picture. */
-export const postcardCaption = (city: string, region: string, stars: number, landmark?: string) =>
-  `My AWS City · ${city} (${region}) · ⭐ ${stars.toLocaleString()}${landmark ? ` · ${landmark}` : ''}`;
+/** The caption under the picture; a city on a real street map carries its credit (ODbL: © OpenStreetMap contributors). */
+export const postcardCaption = (city: string, region: string, stars: number, landmark?: string, credit?: string) =>
+  `My AWS City · ${city} (${region}) · ⭐ ${stars.toLocaleString()}${landmark ? ` · ${landmark}` : ''}${credit ? ` · Streets ${credit}` : ''}`;
 
 /** A file name a player can find again: aws-city-tokyo-2026-10-12.png. */
 export const postcardName = (city: string, now = new Date()) =>

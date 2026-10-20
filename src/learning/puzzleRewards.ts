@@ -5,6 +5,8 @@
 // - a try below the pass mark: TRY_XP for each required service already in place, once per puzzle per day.
 // `best` only ever records a passing score (src/state/store.ts recordPuzzle), so a failed try can't block a later pass.
 import { PUZZLE_PASS } from '@/state/ladder';
+import { dayKey } from '@/state/progress';
+import { deviceLedger, takeDaily, type LedgerStore } from './dailyLedger';
 
 export const PASS_XP = 12;
 export const FIRST_PASS_BONUS = 10;
@@ -41,14 +43,8 @@ export function puzzleReward(
   return { kind: Object.keys(xp).length ? 'try' : 'none', xp };
 }
 
-/** Puzzles that already paid a try today (in memory: a reload is a fresh day's try, which is fine). */
-const tried = new Map<string, string>();
-/** True once per puzzle per day; marks it. */
-export function firstTryToday(puzzleId: string, day = new Date().toISOString().slice(0, 10), seen = tried) {
-  if (seen.get(puzzleId) === day) return false;
-  seen.set(puzzleId, day);
-  return true;
-}
+/** True once per puzzle per (local) day; marks it. Kept in the daily ledger, so a reload isn't a fresh try. */
+export const firstTryToday = (puzzleId: string, day = dayKey(), store: LedgerStore = deviceLedger) => takeDaily(`try:${puzzleId}`, 1, day, store);
 
 /** The pass rule in a sentence, with what's in the way. */
 export function passHint(result: { passed: boolean; score: number; missing: string[] }, names: (id: string) => string) {

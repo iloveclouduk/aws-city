@@ -46,6 +46,15 @@ export function connectionLabel(kind: BackendKind, status: ConnectionStatus, was
   }
 }
 
+/** Each mini-game's name (My City's best scores, the HUD while one is open). */
+export const GAME_NAMES: Record<string, string> = { fishing: 'S3 Fishing', shield: 'Shield Wall', route53: 'Dance Hall', lambda: 'Food Stall', ec2: 'Rush Hour', dynamodb: 'Sorting Office', redteam: 'Red Team Range', queue: 'Queue Juggler', iamgate: 'Permission Gate', edge: 'Edge Cache', launch: 'Launch Day' };
+
+/** A build's cost line in the practice account (the demo): it creates nothing, so it costs nothing. */
+export const PRACTICE_COST = 'Practice: free, nothing is created.';
+
+/** What a build preview says it costs: the plain practice line in the demo, else AWS's own estimate. */
+export const costLine = (note: string, kind: BackendKind) => (kind === 'mock' ? PRACTICE_COST : note);
+
 /** Can the player send commands right now? The mock backend is always usable. */
 export const isOnline = (kind: BackendKind, status: ConnectionStatus) => kind === 'mock' || status === 'connected';
 
@@ -107,8 +116,12 @@ export const UNLOCK_TOASTS_KEY = 'awscity.unlockToasts';
 /** One-time coach tips. */
 export const TIP_ASK_KEY = 'awscity.tip.ask';
 export const TIP_COPILOT_KEY = 'awscity.tip.copilot';
+/** The one-time note under the HUD's coin counter ("spend them in Decorate") was put away. */
+export const TIP_COINS_KEY = 'awscity.tip.coins';
 /** New flashcards started today: `{ day, n }` (the Due deck adds at most NEW_CARDS_PER_DAY a day). */
 export const NEW_CARDS_KEY = 'awscity.newCards';
+/** Which Today goals the day started with (src/state/progress.ts settleToday): `{ day, ids }`. */
+export const TODAY_SET_KEY = 'awscity.todaySet';
 
 /** A JSON string-array pref as a Set (anything unreadable is empty). */
 export function readSet(key: string): Set<string> {
@@ -210,4 +223,33 @@ export function citySummary(s: {
   if (s.outage) parts.push('AWS reports a problem in this Region');
   if (s.flowOn) parts.push('live traffic on');
   return `${parts.join(', ')}. Press ] for the next building.`;
+}
+
+/**
+ * What a building's sign marks mean, in words, for its card: "×3" (resources of your account that live here, as
+ * CityScene.syncInventory counts them) and "!"/"!!" with a number (open City care findings on this service; "!!" when one
+ * is high). Empty when the sign shows neither.
+ */
+export function signLegend({
+  inventory,
+  findings,
+  region,
+  serviceId,
+}: {
+  inventory?: { homeRegion?: string; counts?: Record<string, number>; items?: { region?: string; serviceId?: string | null }[] };
+  findings: Record<string, { serviceId: string; status: string; severity: string }>;
+  region: string;
+  serviceId: string;
+}): { mark: string; text: string }[] {
+  const out: { mark: string; text: string }[] = [];
+  const home = !inventory?.homeRegion || inventory.homeRegion === region;
+  const n = home ? (inventory?.counts?.[serviceId] ?? 0) : (inventory?.items ?? []).filter((it) => it.region === region && it.serviceId === serviceId).length;
+  if (n > 0) out.push({ mark: `×${n}`, text: `on its sign: ${n === 1 ? 'one of your AWS resources lives' : `${n} of your AWS resources live`} here.` });
+  const open = home ? Object.values(findings).filter((f) => f.serviceId === serviceId && f.status === 'open') : [];
+  if (open.length) {
+    const high = open.some((f) => f.severity === 'high');
+    const mark = `${high ? '!!' : '!'}${open.length > 1 ? ` ${open.length}` : ''}`;
+    out.push({ mark, text: `on its sign: ${open.length === 1 ? 'one thing' : `${open.length} things`} to check in City care${high ? ' (one is urgent)' : ''}.` });
+  }
+  return out;
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { openDocs } from '@/app/runtime';
 import type { AwsIncident, AwsNewsItem } from '@/backend/contract';
 import { useCity } from '@/state/store';
-import { ago, incidentLine, severityRank } from '@/world/incidents';
+import { ago, incidentLine, plainIncidentLead, severityRank } from '@/world/incidents';
 import { feel } from './feedback';
 
 type Item = { kind: 'incident'; incident: AwsIncident } | { kind: 'news'; item: AwsNewsItem };
@@ -58,7 +58,8 @@ export function NewsTicker() {
   const item = items[at % n];
   const tone = item.kind === 'news' ? 'news' : item.incident.status === 'resolved' ? 'resolved' : item.incident.severity;
   const icon = item.kind === 'news' ? '🚀' : item.incident.status === 'resolved' ? '✅' : item.incident.severity === 'disruption' ? '⛈️' : item.incident.severity === 'degradation' ? '🌧️' : 'ℹ️';
-  const text = item.kind === 'news' ? item.item.title : incidentLine(item.incident);
+  // An incident leads with plain words (a drill is practice; AWS's trouble isn't the player's), then AWS's exact line.
+  const text = item.kind === 'news' ? item.item.title : `${plainIncidentLead(item.incident)} · ${incidentLine(item.incident)}`;
   const when = item.kind === 'news' ? ago(item.item.date) : ago(item.incident.updated);
 
   return (

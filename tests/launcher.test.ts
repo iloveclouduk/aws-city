@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { frame, INTRO_SECONDS, vehicle } from '../scripts/launcher/banner.mjs';
-import { renderDashboard, wrap, type DashState } from '../scripts/launcher/dashboard.mjs';
+import { frame, introGrowth, introLines, INTRO_SECONDS, sceneLayout, sceneLines, STILL_T } from '../scripts/launcher/banner.mjs';
+import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { depsPlan, explainNpmError, installMessage, readDepsFacts } from '../scripts/launcher/boot.mjs';
+import { panelReserve, renderPanel, wrap, type PanelState } from '../scripts/launcher/panel.mjs';
+import { buildEnv, sourceEntries, sourceStamp, stampOf } from '../scripts/launcher/stamp.mjs';
 import {
   browserFromArg,
+  choiceLabel,
   detectBrowsers,
   elapsed,
   explainAwsError,
   explainDownloadError,
   extensionsPage,
   helpText,
+  introPlays,
   listProfiles,
   parseArgs,
   parseBuildProgress,
@@ -16,6 +23,7 @@ import {
   parsePastedKeys,
   pickProfile,
   progressBar,
+  startPlan,
   upsertProfile,
 } from '../scripts/launcher/lib.mjs';
 
@@ -63,9 +71,11 @@ describe('npm start helpers', () => {
 
 describe('npm start options (the stage one-liner)', () => {
   it('skips the questions with --demo / --live and --browser', () => {
-    expect(parseArgs([])).toEqual({ help: false, intro: true });
-    expect(parseArgs(['--demo', '--browser', 'chrome'])).toEqual({ help: false, intro: true, mode: 'demo', browser: 'chrome' });
+    expect(parseArgs([])).toEqual({ help: false });
+    expect(parseArgs(['--demo', '--browser', 'chrome'])).toEqual({ help: false, mode: 'demo', browser: 'chrome' });
     expect(parseArgs(['--live', '--browser=firefox', '--no-intro'])).toEqual({ help: false, intro: false, mode: 'live', browser: 'firefox' });
+    expect(parseArgs(['--demo', '--intro', '--rebuild'])).toEqual({ help: false, intro: true, rebuild: true, mode: 'demo' });
+    expect(parseArgs(['--live', '--profile', 'workshop', '--region=eu-west-1'])).toEqual({ help: false, mode: 'live', profile: 'workshop', region: 'eu-west-1' });
     expect(parseArgs(['-b', 'Edge']).browser).toBe('edge');
     expect(parseArgs(['--browser', 'city']).browser).toBe('cft');
     expect(parseArgs(['--browser', 'safari']).browser).toBe('safari');
@@ -81,16 +91,20 @@ describe('npm start options (the stage one-liner)', () => {
     expect(parseArgs(['--browser', '--demo']).error).toMatch(/needs a name/);
     expect(parseArgs(['--browser', 'netscape']).error).toMatch(/Unknown browser "netscape"/);
     expect(parseArgs(['--demo', '--live']).error).toMatch(/Pick one/);
+    expect(parseArgs(['--region', 'nowhere']).error).toMatch(/"nowhere" isn't one/);
+    expect(parseArgs(['--profile']).error).toMatch(/needs the name/);
+    expect(parseArgs(['--demo', '--profile', 'x']).error).toMatch(/for real AWS/);
   });
 
   it('understands npm start --demo without the -- (npm keeps those flags as npm_config_*)', () => {
     const npm = { npm_lifecycle_event: 'start' };
-    expect(parseArgs([], { ...npm, npm_config_demo: 'true' })).toEqual({ help: false, intro: true, mode: 'demo' });
+    expect(parseArgs([], { ...npm, npm_config_demo: 'true' })).toEqual({ help: false, mode: 'demo' });
+    expect(parseArgs([], { ...npm, npm_config_rebuild: 'true' })).toEqual({ help: false, rebuild: true });
     expect(parseArgs([], { ...npm, npm_config_live: 'true', npm_config_browser: 'firefox' })).toMatchObject({ mode: 'live', browser: 'firefox' });
     // `npm start --demo --browser chrome` loses "chrome": say how to pass it instead of guessing.
     expect(parseArgs([], { ...npm, npm_config_demo: 'true', npm_config_browser: 'true' }).error).toMatch(/npm start -- --demo --browser chrome/);
     // Only for npm start, and argv wins.
-    expect(parseArgs([], { npm_config_demo: 'true' })).toEqual({ help: false, intro: true });
+    expect(parseArgs([], { npm_config_demo: 'true' })).toEqual({ help: false });
     expect(parseArgs(['--live'], { ...npm, npm_config_demo: 'true' }).mode).toBe('live');
   });
 
@@ -98,6 +112,120 @@ describe('npm start options (the stage one-liner)', () => {
     const help = helpText();
     for (const id of ['cft', 'chrome', 'edge', 'brave', 'firefox', 'safari']) expect(help).toContain(`  ${id} `);
     expect(help).toContain('npm start -- --demo --browser chrome');
+    for (const flag of ['--rebuild', '--no-intro', '--profile', '--region']) expect(help).toContain(flag);
+  });
+});
+
+describe('what the launcher asks', () => {
+  const installed = ['cft', 'chrome', 'firefox'];
+  it('asks nothing when the options say what to do (last browser unless --browser)', () => {
+    expect(startPlan({ help: false, mode: 'demo' }, { browser: 'firefox' }, { installed })).toEqual({ kind: 'go', mode: 'demo', browser: 'firefox' });
+    expect(startPlan({ help: false, mode: 'live', browser: 'chrome' }, { browser: 'firefox' }, { installed })).toEqual({ kind: 'go', mode: 'live', browser: 'chrome' });
+    // a remembered browser that has since been removed falls back to the AWS City browser
+    expect(startPlan({ help: false, mode: 'demo' }, { browser: 'safari' }, { installed })).toMatchObject({ browser: 'cft' });
+  });
+
+  it('offers "Play again?" after the first time, and the two questions before it', () => {
+    expect(startPlan({ help: false }, { mode: 'demo', browser: 'cft' }, { installed })).toEqual({ kind: 'again', mode: 'demo', browser: 'cft' });
+    expect(startPlan({ help: false }, { mode: 'live', browser: 'chrome' }, { installed })).toEqual({ kind: 'again', mode: 'live', browser: 'chrome' });
+    expect(startPlan({ help: false }, {}, { installed })).toEqual({ kind: 'ask', browser: undefined });
+    // a deploy isn't something to "play again"
+    expect(startPlan({ help: false }, { mode: 'deploy' }, { installed }).kind).toBe('ask');
+  });
+
+  it('never waits for an answer without a terminal', () => {
+    expect(startPlan({ help: false }, {}, { interactive: false, installed })).toEqual({ kind: 'go', mode: 'demo', browser: 'cft' });
+    expect(startPlan({ help: false }, { mode: 'live', browser: 'chrome' }, { interactive: false, installed })).toEqual({ kind: 'go', mode: 'live', browser: 'chrome' });
+  });
+
+  it('plays the intro on every run, unless --no-intro', () => {
+    expect(introPlays({ help: false })).toBe(true);
+    expect(introPlays(parseArgs([]))).toBe(true);
+    expect(introPlays({ help: false, intro: true })).toBe(true);
+    expect(introPlays(parseArgs(['--no-intro']))).toBe(false);
+    expect(introPlays(parseArgs([], { npm_lifecycle_event: 'start', npm_config_intro: 'false' }))).toBe(false);
+  });
+
+  it('names the choice in a few words', () => {
+    expect(choiceLabel('demo', 'cft')).toBe('demo · Chrome for Testing');
+    expect(choiceLabel('live', 'firefox', 'eu-west-1')).toBe('real AWS · Firefox · eu-west-1');
+  });
+});
+
+describe('boot: installing packages before the launcher', () => {
+  const lock = { hasModules: true, missing: [], hasLock: true, lockMtime: 10_000, hiddenMtime: 10_000 };
+  it('installs on a fresh clone, a half-finished install or a changed package list', () => {
+    expect(depsPlan({ ...lock, hasModules: false })).toEqual({ install: true, reason: 'missing', args: ['ci', '--no-audit', '--no-fund', '--loglevel=error'] });
+    expect(depsPlan({ ...lock, missing: ['@clack/prompts'] })).toMatchObject({ install: true, reason: 'incomplete' });
+    expect(depsPlan({ ...lock, lockMtime: 60_000 })).toMatchObject({ install: true, reason: 'changed' });
+    expect(depsPlan({ ...lock, hiddenMtime: undefined })).toMatchObject({ install: true, reason: 'changed' });
+    expect(depsPlan({ ...lock, hasModules: false, hasLock: false })).toMatchObject({ args: ['install', '--no-audit', '--no-fund', '--loglevel=error'] });
+  });
+
+  it('does nothing when the packages match the lockfile (npm writes both together)', () => {
+    expect(depsPlan(lock)).toEqual({ install: false });
+    expect(depsPlan({ ...lock, lockMtime: 11_500 })).toEqual({ install: false });
+    expect(depsPlan({ ...lock, hasLock: false, hiddenMtime: undefined })).toEqual({ install: false });
+  });
+
+  it('reads those facts from a folder', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'boot-'));
+    try {
+      expect(readDepsFacts(dir)).toMatchObject({ hasModules: false, hasLock: false });
+      writeFileSync(path.join(dir, 'package-lock.json'), '{}');
+      for (const p of ['@clack/prompts', 'picocolors', 'playwright', 'wxt']) {
+        mkdirSync(path.join(dir, 'node_modules', p), { recursive: true });
+        writeFileSync(path.join(dir, 'node_modules', p, 'package.json'), '{}');
+      }
+      writeFileSync(path.join(dir, 'node_modules/.package-lock.json'), '{}');
+      expect(depsPlan(readDepsFacts(dir))).toEqual({ install: false });
+      utimesSync(path.join(dir, 'package-lock.json'), new Date(), new Date(Date.now() + 60_000)); // a pull brought a new lockfile
+      expect(depsPlan(readDepsFacts(dir))).toMatchObject({ install: true, reason: 'changed' });
+      rmSync(path.join(dir, 'node_modules/wxt'), { recursive: true });
+      expect(readDepsFacts(dir).missing).toEqual(['wxt']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('explains npm failures in plain words', () => {
+    expect(explainNpmError('', 'ENOENT')).toMatch(/npm isn’t installed/);
+    expect(explainNpmError('npm ERR! code ENOTFOUND registry.npmjs.org')).toMatch(/internet/);
+    expect(explainNpmError('ENOSPC: no space left on device')).toMatch(/disk is full/);
+    expect(explainNpmError('npm ERR! code EACCES')).toMatch(/permission denied/);
+    expect(explainNpmError('npm error `npm ci` can only install packages when your package.json and package-lock.json are in sync')).toMatch(/npm install once/);
+    expect(explainNpmError('something odd')).toBe('npm couldn’t install the packages.');
+    expect(installMessage('missing')).toMatch(/first time/);
+  });
+});
+
+describe('skipping the build when nothing changed', () => {
+  it('changes when a file, its size or time, or the build settings change', () => {
+    const files: [string, number, number][] = [['src/a.ts', 10, 1000], ['shared/b.json', 20, 2000]];
+    const base = stampOf(files, { target: 'chrome' });
+    expect(stampOf([...files].reverse(), { target: 'chrome' })).toBe(base); // order doesn't matter
+    expect(stampOf([['src/a.ts', 11, 1000], files[1]], { target: 'chrome' })).not.toBe(base);
+    expect(stampOf([['src/a.ts', 10, 1001], files[1]], { target: 'chrome' })).not.toBe(base);
+    expect(stampOf(files.slice(0, 1), { target: 'chrome' })).not.toBe(base);
+    expect(stampOf(files, { target: 'firefox' })).not.toBe(base);
+    expect(stampOf(files, { target: 'chrome', WXT_BACKEND: 'aws' })).not.toBe(base);
+    expect(buildEnv({ WXT_BACKEND: 'aws', VITE_X: '1', HOME: '/h' })).toEqual({ WXT_BACKEND: 'aws', VITE_X: '1' });
+  });
+
+  it('fingerprints a real folder: same twice, different after an edit', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'stamp-'));
+    try {
+      mkdirSync(path.join(dir, 'src/deep'), { recursive: true });
+      writeFileSync(path.join(dir, 'src/deep/a.ts'), 'x');
+      writeFileSync(path.join(dir, 'wxt.config.ts'), 'y');
+      expect(sourceEntries(dir).map(([p]) => p).sort()).toEqual(['src/deep/a.ts', 'wxt.config.ts']);
+      const before = sourceStamp(dir, 'chrome');
+      expect(sourceStamp(dir, 'chrome')).toBe(before);
+      writeFileSync(path.join(dir, 'src/deep/a.ts'), 'xx');
+      expect(sourceStamp(dir, 'chrome')).not.toBe(before);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -123,10 +251,14 @@ describe('the title scene', () => {
   const visible = (l: string) => l.replace(/\x1b\[[0-9;]*m/g, '');
 
   it('never draws past the terminal edge, at any moment, wide or narrow', () => {
+    // One expect per width and layout (the widest line of every moment), not one per line: same coverage, a fraction of the time.
     for (const width of [10, 20, 40, 60, 80, 84, 86, 100, 120, 200])
-      for (let t = 0; t <= INTRO_SECONDS; t += 0.2)
-        for (const compact of [undefined, true]) for (const line of frame(t, width, { compact })) expect([...visible(line)].length).toBeLessThanOrEqual(width);
-  });
+      for (const compact of [undefined, true]) {
+        let widest = 0;
+        for (let t = 0; t <= INTRO_SECONDS; t += 0.2) for (const line of frame(t, width, { compact })) widest = Math.max(widest, [...visible(line)].length);
+        expect(widest, `${width} columns${compact ? ', compact' : ''}`).toBeLessThanOrEqual(width);
+      }
+  }, 30_000); // ~280 frames: ~1.5 s alone, several when every test file runs at once
 
   it('never cuts the tagline: the long one only where it fits', () => {
     for (const width of [40, 60, 80, 84, 86, 120]) {
@@ -145,30 +277,79 @@ describe('the title scene', () => {
     expect(small.length).toBeLessThan(frame(INTRO_SECONDS, 120).length);
   });
 
-  it('is the same picture for the same moment, and the traffic moves', () => {
-    expect(frame(1.5, 120)).toEqual(frame(1.5, 120));
-    const road = (t: number) => frame(t, 120, { color: false }).find((l) => l.includes('Bedrock'));
-    expect(road(1.5)).toBeDefined();
-    expect(road(1.5)).not.toEqual(road(1.6));
+  it('is the same still picture every run: the city by night, no road, no cars, no fireworks', () => {
+    for (const cols of [80, 120, 200]) {
+      const layout = sceneLayout(cols, 60);
+      expect(layout).not.toBeNull();
+      const still = sceneLines(cols, layout!, { color: false });
+      expect(sceneLines(cols, layout!, { color: false })).toEqual(still);
+      expect(sceneLines(cols, layout!)).toEqual(sceneLines(cols, layout!));
+      const text = still.join('\n');
+      expect(text).toContain('RDS');
+      // no fireworks (✶ •), no vehicles (the old road's Bedrock car, arrows), and the waterfront is the last row
+      expect(text).not.toMatch(/[✶•▶◀]|Bedrock/);
+      expect(still.at(-2)).toMatch(/^ *▀+/);
+    }
   });
 
-  it('draws vehicles with a nose and a tail, not floating arrows', () => {
-    for (const w of [80, 120]) for (const t of [0.5, 1.5, 2.6]) expect(frame(t, w, { color: false }).join('')).not.toMatch(/[▶◀]/);
-    for (const kind of ['car', 'sports', 'truck', 'bus', 'van'] as const) {
-      const [top, bottom] = vehicle(kind, ' EC2 ', '#ED7100', '#111111');
-      expect(top.length).toBe(bottom.length);
-      // facing right: the headlight (warm) is in the nose, the tail light (red) at the back
-      expect(bottom.at(-1)).toMatchObject({ ch: '▐', fg: '#FFE38A' });
-      expect(bottom[0]).toMatchObject({ ch: '▌', fg: '#FF4D4D' });
-      expect(bottom.filter((c) => c?.ch === '●').length).toBeGreaterThanOrEqual(2);
-      // mirrored for the left lane: lamps swap ends, the label still reads left to right
-      const [ltop, lbottom] = vehicle(kind, ' EC2 ', '#ED7100', '#111111', false);
-      expect(lbottom[0]).toMatchObject({ ch: '▌', fg: '#FFE38A' });
-      expect(lbottom.at(-1)).toMatchObject({ ch: '▐', fg: '#FF4D4D' });
-      expect(ltop.map((c) => c?.ch ?? '').join('')).toContain(' EC2 ');
-      // not a saucer: the profile is not its own mirror image
-      expect(top.map((c) => c?.ch ?? '.').join('')).not.toBe(ltop.map((c) => c?.ch ?? '.').join(''));
+  it('the intro takes about 2 s, wipes the title in, raises the city and ends on the exact still picture', () => {
+    expect(INTRO_SECONDS).toBeGreaterThanOrEqual(1.5);
+    expect(INTRO_SECONDS).toBeLessThanOrEqual(2.5);
+    expect(STILL_T).toBe(INTRO_SECONDS);
+    expect(introGrowth(STILL_T)).toBe(1);
+    for (const cols of [80, 120, 200]) {
+      const layout = sceneLayout(cols, 60)!;
+      // the last frame is the still, in colour and plain (so nothing jumps when the animation stops)
+      expect(introLines(STILL_T, cols, layout)).toEqual(sceneLines(cols, layout));
+      expect(introLines(STILL_T + 5, cols, layout)).toEqual(sceneLines(cols, layout));
+      // it starts empty (no title, no roofs) and every frame is the still's height
+      const first = introLines(0, cols, layout, { color: false });
+      expect(first.join('')).not.toMatch(/[█▄▀]{3}.*[╗╝]/);
+      for (let t = 0; t <= STILL_T; t += 0.25) expect(introLines(t, cols, layout).length).toBe(layout.rows - 2);
+      // half-way the title is partly written and the city partly built; no fireworks or vehicles at any moment
+      const mid = introLines(0.6, cols, layout, { color: false }).join('\n');
+      expect(mid.length).toBeGreaterThan(first.join('\n').length);
+      for (let t = 0; t <= STILL_T; t += 0.1) expect(introLines(t, cols, layout, { color: false }).join('')).not.toMatch(/[✶•▶◀]/);
     }
+  });
+
+  it('fits above the panel from 80×24 to 200×60, at the left edge, or gives way to the one-line skyline', () => {
+    const plainWidth = (l: string) => [...visible(l)].length;
+    const panelState = (n: number): PanelState => ({
+      subtitle: 'demo · Chrome for Testing',
+      steps: Array.from({ length: n }, (_, i) => ({ id: `s${i}`, title: `Step ${i}`, status: i ? 'pending' : 'done' })),
+      info: ['1. Turn on "Developer mode" (top right), then click "Load unpacked" and pick the folder.', 'Click once in the city for sound.'],
+      status: 'The city is open',
+      keys: [['c', 'city'], ['p', 'practice console'], ['a', 'AWS console'], ['l', 'server log'], ['r', 'reopen'], ['q', 'quit']],
+    });
+    const seen: Record<string, string> = {};
+    for (const [cols, rows] of [[80, 24], [100, 30], [120, 40], [160, 50], [200, 60]])
+      for (const n of [3, 6]) {
+        const layout = sceneLayout(cols, rows, panelReserve(n));
+        seen[`${cols}x${rows}/${n}`] = layout ? (layout.compact ? 'compact' : 'big') : 'none';
+        const panel = renderPanel(panelState(n), 1, cols, rows - (layout?.rows ?? 0), { color: false, mini: !layout });
+        expect((layout?.rows ?? 0) + panel.length, `${cols}×${rows}`).toBeLessThan(rows);
+        expect(panel.join('\n')).toContain('q quit');
+        for (const l of panel) expect(plainWidth(l)).toBeLessThan(cols);
+        if (!layout) {
+          expect(panel[0]).toMatch(/^ {2}\S{8} {2}AWS City/);
+          continue;
+        }
+        expect(panel[0].trim()).toMatch(/^AWS City {3}demo/);
+        const lines = sceneLines(cols, layout);
+        expect(lines.length).toBe(layout.rows - 2);
+        for (const l of lines) expect(plainWidth(l)).toBeLessThan(cols);
+        // left-aligned: the scene starts at the first column (its sky), its waterfront too, and the panel's text
+        // is indented two columns, whatever the width
+        expect(sceneLines(cols, layout, { color: false }).at(-2)).toMatch(/^▀/);
+        // the sky starts at column 1 (no centring margin before it) and the scene is never wider than it draws
+        expect(lines.filter((l) => l.startsWith('\x1b[')).length).toBeGreaterThan(lines.length / 2);
+        expect(Math.max(...lines.map(plainWidth))).toBe(Math.min(cols, 110) - 1);
+        expect(panel[0]).toMatch(/^ {2}AWS City/);
+        for (const l of panel.filter(Boolean)) expect(visible(l)).toMatch(/^ {2}/);
+      }
+    expect(seen).toMatchObject({ '80x24/3': 'compact', '80x24/6': 'none', '120x40/6': 'big', '200x60/6': 'big' });
+    expect(sceneLayout(200, 60)).not.toHaveProperty('left');
   });
 
   it('plain mode has no colour codes', () => {
@@ -196,61 +377,74 @@ describe('build progress', () => {
   });
 });
 
-describe('the dashboard', () => {
+describe('the panel', () => {
   const visible = (l: string) => [...l.replace(/\x1b\[[0-9;]*m/g, '')].length;
-  const state = (over: Partial<DashState> = {}): DashState => ({
+  const state = (over: Partial<PanelState> = {}): PanelState => ({
+    subtitle: 'demo · Chrome for Testing',
     steps: [
-      { id: 'a', title: 'Check AWS sign-in', status: 'done', detail: 'account 123456789012 (aws-city)', started: 0, ended: 800 },
-      { id: 'b', title: 'Build the city', status: 'running', detail: 'laying the roads (2/3)', progress: 0.66, started: 1000 },
+      { id: 'a', title: 'AWS sign-in', status: 'done', detail: 'account 123456789012 (aws-city)', started: 0, ended: 800 },
+      { id: 'b', title: 'Build the city', status: 'running', detail: 'laying the roads (2/3)', progress: 0.5, started: 1000 },
       { id: 'c', title: 'Start the server', status: 'pending' },
-      { id: 'd', title: 'Open it', status: 'failed', detail: 'the browser did not start' },
+      { id: 'd', title: 'Open the city', status: 'failed', detail: 'the browser did not start' },
     ],
     status: 'Building: laying the roads',
     keys: [['t', 'try again'], ['q', 'quit']],
     ...over,
   });
-
-  it('fits any terminal from 80x24 to 200x60', () => {
-    for (const [cols, rows] of [[80, 24], [100, 30], [120, 45], [200, 60]])
-      for (const st of [state(), state({ info: ['Where: a new window', 'Side panel: pin it'], showLogs: true, logs: ['socket open'] })]) {
-        const out = renderDashboard(st, 3, cols, rows, { now: 5000 });
-        expect(out.length).toBeLessThanOrEqual(rows);
-        for (const l of out) expect(visible(l)).toBeLessThanOrEqual(cols);
-      }
+  const busy = state({
+    info: ['1. Turn on "Developer mode" (top right), then click "Load unpacked" and pick the folder. It is a long line.', 'Click once in the city for sound.'],
+    infoTitle: "You're in",
+    showLogs: true,
+    logs: Array.from({ length: 12 }, (_, i) => `server line ${i}`),
+    keys: [['c', 'city'], ['p', 'practice console'], ['a', 'AWS console'], ['l', 'server log'], ['r', 'reopen'], ['q', 'quit']],
   });
 
-  it('says what every step is doing, with times, and keeps the keys on screen', () => {
-    const out = renderDashboard(state(), 3, 120, 45, { color: false, now: 5000 }).join('\n');
-    expect(out).toMatch(/✓ Check AWS sign-in\s+account 123456789012/);
-    expect(out).toMatch(/[◐◓◑◒] Build the city\s+▰+▱+\s+laying the roads \(2\/3\)\s+4\.0 s/);
-    expect(out).toContain('○ Start the server');
-    expect(out).toContain('✗ Open it');
-    expect(out).toContain('› Building: laying the roads');
-    expect(out).toContain('[t] try again   [q] quit');
+  it('fits every terminal from 80×24 to 200×60, and never takes the last row', () => {
+    for (const [cols, rows] of [[80, 24], [80, 12], [100, 30], [120, 45], [200, 60]])
+      for (const st of [state(), busy])
+        for (const color of [true, false]) {
+          const out = renderPanel(st, 3, cols, rows, { color, now: 5000 });
+          expect(out.length).toBeLessThan(rows);
+          for (const l of out) expect(visible(l)).toBeLessThan(cols);
+        }
   });
 
-  it('builds a crane for every unfinished step, and the full skyline once all are done', () => {
-    const cranes = (st: DashState) => (renderDashboard(st, 3, 120, 45, { color: false }).join('').match(/┏/g) ?? []).length;
-    expect(cranes(state())).toBe(3);
-    expect(cranes(state({ steps: state().steps.map((s) => ({ ...s, status: 'done' as const })) }))).toBe(0);
-  });
-
-  it('wraps the "what next" lines and the keys instead of cutting them at 80 columns', () => {
-    const info = ['Click once in the city to wake the sound (browsers keep a page quiet until you click). It is a long line.'];
-    const keys: [string, string][] = [['c', 'city tab'], ['p', 'S3 practice page'], ['a', 'AWS console'], ['l', 'server log'], ['r', 'reopen'], ['q', 'quit']];
-    const out = renderDashboard(state({ info, keys }), 3, 80, 40, { color: false, now: 5000 });
+  it('is a calm block: a header, the checklist with times, one status line and the keys', () => {
+    const out = renderPanel(state(), 3, 120, 45, { color: false, now: 5000 });
+    expect(out[0]).toMatch(/^ {2}\S{8} {2}AWS City {3}demo · Chrome for Testing$/);
     const text = out.join('\n');
-    expect(text).toContain('[q] quit');
-    expect(text.replace(/[│\s]+/g, ' ')).toContain('until you click). It is a long line.');
-    for (const l of out) expect(visible(l)).toBeLessThanOrEqual(80);
-    expect(wrap('one two three four', 9)).toEqual(['one two', '  three', '  four']);
+    expect(text).toMatch(/✓ AWS sign-in\s+account 123456789012 \(aws-city\)\s+0\.8 s/);
+    expect(text).toMatch(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] Build the city\s+▰▰▰▰▱▱▱▱ laying the roads \(2\/3\)\s+4\.0 s/);
+    expect(text).toMatch(/· Start the server$/m);
+    expect(text).toMatch(/✗ Open the city\s+the browser did not start/);
+    expect(text).toContain('› Building: laying the roads');
+    expect(out.at(-1)).toBe('  t try again · q quit');
+    expect(out.length).toBeLessThanOrEqual(10); // no full-screen picture
   });
 
-  it('switches to the compact city when the terminal is short', () => {
-    expect(renderDashboard(state(), 3, 120, 28, { color: false })[0]).toContain('▄▀█');
+  it('keeps the steps, status and keys when the terminal is short (logs go first, then the extra lines)', () => {
+    const out = renderPanel(busy, 3, 80, 14, { color: false, now: 5000 }).join('\n');
+    for (const s of ['AWS sign-in', 'Build the city', 'Start the server', 'Open the city', '› Building', 'q quit']) expect(out).toContain(s);
+    expect(out).not.toContain('server line');
+    const tall = renderPanel(busy, 3, 120, 45, { color: false, now: 5000 }).join('\n');
+    expect(tall).toContain('server line 11');
+    expect(tall).not.toContain('server line 5');
+  });
+
+  it('wraps the "next" lines and the keys instead of cutting them at 80 columns', () => {
+    const out = renderPanel(busy, 3, 80, 40, { color: false, now: 5000 });
+    const text = out.join('\n');
+    expect(text).toContain('q quit');
+    expect(text.replace(/\s+/g, ' ')).toContain('pick the folder. It is a long line.');
+    expect(wrap('one two three four', 9)).toEqual(['one two', 'three', 'four']);
+    expect(wrap('1. one two three', 9)).toEqual(['1. one', '   two', '   three']);
+  });
+
+  it('plain mode has no colour codes', () => {
+    expect(renderPanel(busy, 3, 120, 45, { color: false }).join('')).not.toMatch(/\x1b/);
+    expect(renderPanel(busy, 3, 120, 45, { color: true }).join('')).toMatch(/\x1b/);
   });
 });
-
 
 describe('an AWS City window that is already open', async () => {
   const { lockPid, alreadyOpenPid, meaningfulLines, ALREADY_OPEN } = await import('../scripts/launcher/lib.mjs');

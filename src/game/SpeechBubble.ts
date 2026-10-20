@@ -13,7 +13,7 @@ export interface SayOptions {
   holdMs?: number;
   /** Small line above the text, e.g. "Step 2/5" (shown after the speaker's name). */
   caption?: string;
-  tone?: 'speech' | 'step' | 'done' | 'alert';
+  tone?: 'speech' | 'step' | 'done' | 'alert' | 'gold';
   typewriter?: boolean;
   /** Who gets the floor (src/game/calm.ts mayShowBubble). Defaults to 'normal'. */
   priority?: BubblePriority;

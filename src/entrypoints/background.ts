@@ -2,6 +2,7 @@ import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
 import { installToolbar, SURFACE, type ToolbarApi } from '@/app/surface';
 import { matchUrl } from '@/world/taxonomy';
+import { isPracticeUrl, PRACTICE_PATH, practiceServiceOf } from '@/console/practice';
 import { FOCUS_STORAGE_KEY, type PageFocus, type RuntimeMessage } from '@/state/types';
 
 export default defineBackground(() => {
@@ -25,7 +26,9 @@ export default defineBackground(() => {
     if (!tab?.url || !tab.active) return;
     const focused = windowId ?? (await focusedWindowId());
     if (focused !== undefined && tab.windowId !== focused) return;
-    const m = matchUrl(tab.url);
+    // The practice console (our own page) counts as a console page of the service it shows: the demo's Copilot,
+    // Lookout and browsing growth all work on it. Every other extension page is never an AWS page.
+    const m = isPracticeUrl(tab.url, browser.runtime.getURL(PRACTICE_PATH)) ? { kind: 'console' as const, serviceId: practiceServiceOf(tab.url) } : matchUrl(tab.url);
     const focus: PageFocus = { url: tab.url, title: tab.title ?? '', kind: m.kind, serviceId: m.serviceId, tabId, windowId: tab.windowId };
     // session storage lets a freshly opened panel read the current page immediately.
     await browser.storage.session.set({ [FOCUS_STORAGE_KEY]: focus });

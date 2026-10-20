@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { isFootprint, type Tile } from '@/world/layout';
+import type { Tile } from '@/world/layout';
+import { legacyPlan, type CityPlan } from '@/world/plan';
 import { entityDepth, toScreen, type Iso } from './iso';
 import { findPath, RouteCache } from './pathfinding';
 import type { Pt } from './RoadGraph';
@@ -50,6 +51,8 @@ export class Packets {
     private iso: Iso,
     private grid: number,
     private travel: (x: number, y: number) => boolean,
+    /** The city's street plan: a packet never crosses a landmark's footprint. */
+    private plan: CityPlan = legacyPlan(),
   ) {
     if (!scene.textures.exists('packet')) {
       const g = scene.make.graphics({ x: 0, y: 0 }, false);
@@ -77,7 +80,7 @@ export class Packets {
   private path(from: Tile, to: Tile) {
     const near = (x: number, y: number, t: Tile) => Math.abs(x - t.x) + Math.abs(y - t.y) <= APPROACH;
     return this.routes.get(from, to, () =>
-      findPath(from, to, this.grid, this.grid, (x, y) => this.travel(x, y) || ((near(x, y, from) || near(x, y, to)) && !isFootprint(x, y))),
+      findPath(from, to, this.grid, this.grid, (x, y) => this.travel(x, y) || ((near(x, y, from) || near(x, y, to)) && !this.plan.isFootprint(x, y))),
     );
   }
 

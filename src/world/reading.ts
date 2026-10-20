@@ -37,7 +37,8 @@ export interface ReadingLink {
 const data = readingJson as unknown as {
   partners: Record<PartnerId, Partner>;
   books: Book[];
-  services: Record<string, { cheatSheet?: string; articles?: string }>;
+  /** `guide`: a Tutorials Dojo article, for a service too new to have a cheat sheet. */
+  services: Record<string, { cheatSheet?: string; guide?: string; articles?: string }>;
 };
 
 export const PARTNERS = data.partners;
@@ -61,6 +62,7 @@ export function readingFor(serviceId: string): ReadingLink[] {
   const s = READING[serviceId] ?? {};
   const out: ReadingLink[] = [];
   if (s.cheatSheet) out.push({ partner: 'tutorialsdojo', label: 'Cheat sheet', url: s.cheatSheet, free: true });
+  if (s.guide) out.push({ partner: 'tutorialsdojo', label: 'Guide', url: s.guide, free: true });
   if (s.articles) out.push({ partner: 'awsfundamentals', label: 'Articles', url: s.articles, free: true });
   for (const b of BOOKS.filter((b) => b.services.includes(serviceId))) {
     out.push({ partner: b.publisher === "O'Reilly" ? 'oreilly' : 'awsfundamentals', label: `${b.title} (book)`, url: b.url, free: b.free, by: b.authors });

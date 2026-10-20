@@ -12,6 +12,15 @@
 .app-panel.stage-tall {
   grid-template-rows: auto minmax(200px, 54%) minmax(0, 1fr);
 }
+/* A mini-game in the side panel takes all the height under the HUD (Phaser resizes to its parent); the HUD's back
+   button and the game's own "← City" bring the panel back. */
+.app-panel.view-game {
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: 'hud' 'stage';
+}
+.app-panel.view-game .side {
+  display: none;
+}
 .app-full {
   grid-template-columns: minmax(0, 1fr) 400px;
   grid-template-rows: auto 1fr;

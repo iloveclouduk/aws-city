@@ -12,8 +12,8 @@ import { Icon } from "./icons";
 import { offlineReason } from "./logic";
 
 /**
- * The composer: one row that never crowds the panel. In the side panel, the console button switches the
- * prompt to the Console Copilot (the agent works in your open AWS console tab).
+ * The composer: one row that never crowds the panel. In the side panel, the "Do it in my console" switch above it
+ * turns the prompt into the Console Copilot (the agent works in your open AWS console tab).
  */
 export function PromptBar({ layout }: { layout: Layout }) {
   const [text, setText] = useState("");
@@ -34,13 +34,26 @@ export function PromptBar({ layout }: { layout: Layout }) {
     setText("");
     setSent((n) => n + 1);
   };
-  const consoleTitle = inConsole
-    ? "Console Copilot on: the agent works in your AWS console tab"
-    : onConsole
-      ? "Do it in my AWS console tab"
-      : "Do it in my AWS console (open a console tab first)";
+  const consoleTip = onConsole
+    ? "An agent clicks through your open AWS console tab and explains each step. It asks before changing anything."
+    : "An agent clicks through your AWS console tab and explains each step. Open a console tab first.";
   return (
     <>
+      {layout === "panel" && (
+        // A real switch: a name you can read, its state for screen readers, Space/Enter from the keyboard (a button).
+        <button
+          type="button"
+          role="switch"
+          aria-checked={inConsole}
+          className={`btn tiny ghost console-btn ${inConsole ? "on" : ""}`}
+          title={consoleTip}
+          onClick={() => (feel.tap(), setInConsole((v) => !v))}
+        >
+          <Icon name="console" size={10} />
+          <span>Do it in my console</span>
+          <span className={`switch ${inConsole ? "on" : ""}`} aria-hidden="true" />
+        </button>
+      )}
       {/* Say the mode out loud (not only in a tooltip), and why sending is off. */}
       {inConsole && (
         <p className="composer-note on" role="status">
@@ -56,18 +69,6 @@ export function PromptBar({ layout }: { layout: Layout }) {
           send();
         }}
       >
-        {layout === "panel" && (
-          <button
-            type="button"
-            className={`btn icon ghost console-btn ${inConsole ? "on" : ""}`}
-            aria-pressed={inConsole}
-            title={consoleTitle}
-            aria-label={consoleTitle}
-            onClick={() => setInConsole((v) => !v)}
-          >
-            <Icon name="console" />
-          </button>
-        )}
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}

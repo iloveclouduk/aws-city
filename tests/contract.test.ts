@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { mergeProgress } from '@/state/progress';
 import { MockBackend } from '@/backend/MockBackend';
 import { bearerSubprotocols, CONTRACT_VERSION, isServerEvent, type AwsHealthEvent, type CityFinding, type ServerEvent } from '@/backend/contract';
 import { DEMO, demoBill, demoFindings, demoFlow, demoHealth, demoInventory, demoNews } from '@/backend/mockAccount';
@@ -333,11 +335,49 @@ describe('MockBackend speaks the contract', () => {
     });
   });
 
+  describe('live city and leaderboards (v2.11)', () => {
+    it('the demo answers with practice presence and boards, never as real players', async () => {
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const mock = new MockBackend({ speed: 200 });
+      const events: ServerEvent[] = [];
+      mock.onEvent((e) => events.push(e));
+      mock.connect();
+      mock.putProgress({ version: 2, landmarks: {}, profile: { public: true, name: 'Kind Otter' }, updatedAt: '2026-10-17T00:00:00.000Z' });
+      mock.send({ action: 'presence.beat', region: 'us-west-2', rank: 'Town' });
+      mock.send({ action: 'score.submit', board: 'shield', score: 500 });
+      await sleep(500);
+      const presence = events.find((e) => e.type === 'presence.state');
+      const board = events.find((e) => e.type === 'leaderboard.state');
+      expect(presence && isServerEvent(presence)).toBe(true);
+      expect(presence).toMatchObject({ region: 'us-west-2', practice: true, mayors: expect.arrayContaining([{ name: 'Kind Otter', rank: 'Town' }]) });
+      expect(board).toMatchObject({ board: 'shield', practice: true, entries: expect.arrayContaining([{ name: 'Kind Otter', score: 500, you: true }]) });
+      mock.disconnect();
+    });
+  });
+
+  describe('workshops (v2.10)', () => {
+    it('workshop.verify answers with workshop.verified, which passes the frame guard', async () => {
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const mock = new MockBackend({ speed: 200 });
+      const events: ServerEvent[] = [];
+      mock.onEvent((e) => events.push(e));
+      mock.connect();
+      mock.send({ action: 'workshop.verify', workshopId: 'dynamodb-first-table', stepId: 'create', values: { table: 'orders' } });
+      mock.send({ action: 'workshop.verify', workshopId: 'dynamodb-first-table', stepId: 'create' });
+      await sleep(900);
+      const answers = events.filter((e) => e.type === 'workshop.verified');
+      expect(answers).toHaveLength(2);
+      for (const a of answers) expect(isServerEvent(a)).toBe(true);
+      expect(answers.map((a) => a.type === 'workshop.verified' && a.ok).sort()).toEqual([false, true]);
+      mock.disconnect();
+    });
+  });
+
   describe('AWS public status (v2.6)', () => {
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-    it('is contract 2.9 (2.6 added these), and both new events pass the frame guard', () => {
-      expect(CONTRACT_VERSION).toBe(2.9);
+    it('is contract 2.16 (2.6 added these), and both new events pass the frame guard', () => {
+      expect(CONTRACT_VERSION).toBe('2.16');
       expect(isServerEvent(demoHealth())).toBe(true);
       expect(isServerEvent(demoNews())).toBe(true);
     });
@@ -403,5 +443,103 @@ describe('MockBackend speaks the contract', () => {
   it('rejects frames with unknown types', () => {
     expect(isServerEvent({ type: 'nope' })).toBe(false);
     expect(isServerEvent(null)).toBe(false);
+  });
+});
+
+describe('City Clients and build mode (v2.13)', () => {
+  const base = { version: 2 as const, landmarks: {}, updatedAt: '2026-10-19T10:00:00.000Z' };
+  it('merges a business as the higher level, the union of tasks done and the earlier date per level', () => {
+    const a = { ...base, clients: { bank: { level: 1, done: ['bank-1-ledger', 'bank-2-stream'], at: { '1': '2026-10-19' } } } };
+    const b = { ...base, updatedAt: '2026-10-19T11:00:00.000Z', clients: { bank: { level: 0, done: ['bank-1-replica'], at: { '1': '2026-10-18' } }, shop: { level: 0, done: ['shop-1-photos'] } } };
+    const m = mergeProgress(a, b);
+    expect(m.clients).toEqual({ bank: { level: 1, done: ['bank-1-ledger', 'bank-1-replica', 'bank-2-stream'], at: { '1': '2026-10-18' } }, shop: { level: 0, done: ['shop-1-photos'] } });
+    expect(mergeProgress(b, a)).toEqual({ ...m });
+  });
+
+  it('keeps the newer copy of each city\'s decorations when a copy predates v2.16, so a removed prop stays removed', () => {
+    const old = { updatedAt: '2026-10-19T10:00:00.000Z', props: [{ id: 'd1', kind: 'tree0', x: 1, y: 2, at: '2026-10-19' }] };
+    const newer = { updatedAt: '2026-10-19T12:00:00.000Z', props: [] };
+    const m = mergeProgress({ ...base, decor: { 'us-west-2': old, 'eu-west-1': old } }, { ...base, decor: { 'us-west-2': newer } });
+    expect(m.decor).toEqual({ 'us-west-2': newer, 'eu-west-1': old });
+  });
+
+  it('v2.16: merges decorations prop by prop, so two surfaces buying at once keep both, and a removal stays removed', () => {
+    const prop = (id: string, x: number) => ({ id, kind: 'deco:oak', x, y: 2, at: '2026-10-19' });
+    const start = { updatedAt: '2026-10-19T10:00:00.000Z', props: [prop('d1', 1)], gone: [] };
+    // The panel buys d2 and removes d1; the tab, a moment later, buys d3.
+    const panel = { updatedAt: '2026-10-19T11:00:00.000Z', props: [prop('d2', 2)], gone: ['d1'] };
+    const tab = { updatedAt: '2026-10-19T11:00:01.000Z', props: [prop('d1', 1), prop('d3', 3)], gone: [] };
+    const m = mergeProgress({ ...base, decor: { 'us-west-2': panel } }, { ...base, decor: { 'us-west-2': tab } });
+    expect(m.decor?.['us-west-2']).toEqual({ updatedAt: tab.updatedAt, props: [prop('d3', 3), prop('d2', 2)], gone: ['d1'] });
+    expect(mergeProgress({ ...base, decor: { 'us-west-2': tab } }, { ...base, decor: { 'us-west-2': panel } }).decor).toEqual(m.decor);
+    // A prop moved on the newer copy stands where it moved to.
+    const moved = { ...start, updatedAt: '2026-10-19T12:00:00.000Z', props: [prop('d1', 9)] };
+    expect(mergeProgress({ ...base, decor: { 'us-west-2': start } }, { ...base, decor: { 'us-west-2': moved } }).decor?.['us-west-2']?.props).toEqual([prop('d1', 9)]);
+  });
+
+  it('the docs mirror the new fields and say to deploy the server first', () => {
+    const doc = readFileSync('docs/backend-contract.md', 'utf8');
+    expect(doc.startsWith(`# Backend contract v${CONTRACT_VERSION}`)).toBe(true);
+    expect(doc).toContain('Progress.clients?');
+    expect(doc).toContain('Progress.decor?');
+    expect(doc).toMatch(/v2\.13 client needs a v2\.13 server[^]*Deploy the server first/);
+  });
+});
+
+describe('City Coins (v2.14)', () => {
+  const base = { version: 2 as const, landmarks: {}, updatedAt: '2026-10-19T10:00:00.000Z' };
+  it('merges a wallet as the higher of each counter, in either order', () => {
+    const a = { ...base, wallet: { earned: 120, spent: 40, log: [{ day: '2026-10-19', coins: 30 }] } };
+    const b = { ...base, updatedAt: '2026-10-19T11:00:00.000Z', wallet: { earned: 100, spent: 55, log: [{ day: '2026-10-19', coins: 36 }] } };
+    expect(mergeProgress(a, b).wallet).toEqual({ earned: 120, spent: 55, log: [{ day: '2026-10-19', coins: 36 }] });
+    expect(mergeProgress(b, a).wallet).toEqual(mergeProgress(a, b).wallet);
+  });
+
+  it('the docs mirror the wallet and say to deploy the server first', () => {
+    const doc = readFileSync('docs/backend-contract.md', 'utf8');
+    expect(doc).toContain('Progress.wallet?');
+    expect(doc).toMatch(/v2\.14 client needs a v2\.14 server[^]*Deploy the server first/);
+  });
+});
+
+describe('Loops that bring you back (v2.15)', () => {
+  const base = { version: 2 as const, landmarks: {}, updatedAt: '2026-10-19T10:00:00.000Z' };
+  it('merges lights, seasons, drops and the codex so nothing earned in either copy is lost, in either order', () => {
+    const a = {
+      ...base,
+      lights: { days: ['2026-10-17', '2026-10-19'], total: 8, freezes: 1, usedFreezes: ['2026-10-18'] },
+      seasons: { 'harvest-streams': { points: 30, claimed: [0, 1], last: '2026-10-19' } },
+      drops: { last: '2026-10-18', owned: ['snowman'] },
+      codex: { combos: { 'edge-arch': '2026-10-19' } },
+    };
+    const b = {
+      ...base,
+      updatedAt: '2026-10-19T11:00:00.000Z',
+      lights: { days: ['2026-10-16', '2026-10-17'], total: 7, freezes: 2 },
+      seasons: { 'harvest-streams': { points: 20, claimed: [2] }, 'snowy-security': { points: 10, claimed: [] } },
+      drops: { last: '2026-10-19', owned: ['glow-rose'] },
+      codex: { combos: { 'edge-arch': '2026-10-18', 'event-plaza': '2026-10-19' } },
+    };
+    const m = mergeProgress(a, b);
+    // v2.16: freezes from the higher of each counter (a: 2 earned, 1 used; b: 2 earned): 1 held.
+    expect(m.lights).toEqual({ days: ['2026-10-16', '2026-10-17', '2026-10-19'], total: 8, freezes: 1, freezesEarned: 2, freezesUsed: 1, usedFreezes: ['2026-10-18'] });
+    expect(m.seasons).toEqual({ 'harvest-streams': { points: 30, claimed: [0, 1, 2], last: '2026-10-19' }, 'snowy-security': { points: 10, claimed: [] } });
+    expect(m.drops).toEqual({ last: '2026-10-19', owned: ['glow-rose', 'snowman'] });
+    expect(m.codex).toEqual({ combos: { 'edge-arch': '2026-10-18', 'event-plaza': '2026-10-19' } });
+    expect(mergeProgress(b, a)).toEqual({ ...m, updatedAt: m.updatedAt });
+  });
+
+  it('the docs mirror the new fields and say to deploy the server first', () => {
+    const doc = readFileSync('docs/backend-contract.md', 'utf8');
+    for (const f of ['Progress.lights?', 'Progress.seasons?', 'Progress.drops?', 'Progress.codex?']) expect(doc).toContain(f);
+    expect(doc).toMatch(/v2\.15 client needs a v2\.15 server[^]*Deploy the server first/);
+  });
+});
+
+describe('Merges that never lose a freeze, a refund or a removal (v2.16)', () => {
+  it('the docs mirror the new fields and say to deploy the server first', () => {
+    const doc = readFileSync('docs/backend-contract.md', 'utf8');
+    for (const f of ['freezesEarned?', 'extra?', 'drops.overtime?', 'bought?', 'spares?', 'refundedBy?', 'gone?']) expect(doc).toContain(f);
+    expect(doc).toMatch(/v2\.16 client needs a v2\.16 server[^]*Deploy the server first/);
   });
 });

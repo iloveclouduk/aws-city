@@ -1,5 +1,6 @@
 import { Listeners, type AgentBackend, type ConnectionStatus } from './AgentBackend';
-import type { ChatAsk, CityFinding, ClientCommand, DeployDecision, DeployPlan, FindingExplain, FindingFixCommand, PageClassify, Progress, ServerEvent, TaskSubmit } from './contract';
+import type { ChatAsk, CityFinding, ClientCommand, DeployDecision, DeployPlan, FindingExplain, FindingFixCommand, LeaderboardStateEvent, PageClassify, PresenceStateEvent, Progress, ServerEvent, TaskSubmit } from './contract';
+import { isoWeekUtc } from '@/state/events';
 import { AMBIENT_CHATTER } from '@/world/dialogue';
 import { offlineAnswer } from './mockAnswer';
 import { DEMO, demoBill, demoFlow, demoExplain, demoFindings, demoHealth, demoInventory, demoNews, demoResourceType } from './mockAccount';
@@ -8,7 +9,8 @@ import { ConsoleMock } from './consoleMock';
 import { SERVICES, matchText, serviceById, servicesIn, type DistrictId } from '@/world/taxonomy';
 import { placeFor } from '@/world/places';
 import { QUESTS } from '@/world/content';
-import { checkExplain, EXPLAIN_MARK, explainService } from '@/state/explain';
+import { checkExplain, checkKeywords, EXPLAIN_MARK, explainFeedback, explainService } from '@/state/explain';
+import { ALL_TASKS } from '@/world/clients';
 
 /**
  * In-browser fake of the AWS City server. Emits exactly the events the real one will (contract v2),
@@ -131,6 +133,32 @@ export interface MockOptions {
   knownAgents?: () => string[];
   /** Speed multiplier for tests. */
   speed?: number;
+}
+
+/** The demo's made-up mayors for the practice live city and leaderboards. */
+const PRACTICE_MAYORS = [
+  { name: 'Practice Puffin', rank: 'City' },
+  { name: 'Practice Badger', rank: 'Town' },
+  { name: 'Practice Heron', rank: 'Town' },
+  { name: 'Practice Koala', rank: 'Village' },
+];
+
+/** Practice templates already deployed once (kept on this device, so a reload doesn't pay them again). */
+const DEPLOYED_KEY = 'awscity.mockDeployed';
+function deployedBefore(): Set<string> {
+  try {
+    const v: unknown = JSON.parse(globalThis.localStorage?.getItem(DEPLOYED_KEY) ?? '[]');
+    return new Set(Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+function markDeployed(id: string) {
+  try {
+    globalThis.localStorage?.setItem(DEPLOYED_KEY, JSON.stringify([...deployedBefore(), id]));
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 export class MockBackend implements AgentBackend {
@@ -314,24 +342,31 @@ export class MockBackend implements AgentBackend {
       this.emit({ type: 'agent.message', from: 'concierge', to: 'user', text: `Sounds like a job for ${place?.agentName ?? serviceId}!` });
       await this.sleep(500);
       this.emit({ type: 'agent.message', from: 'concierge', to: serviceId, text: `New request: “${prompt.slice(0, 60)}”` });
+      // Watch it done (src/ui/ActivityFeed.tsx TaskCard): the card lists exactly what the city shows, in the same order,
+      // the helper's visit included, so each step lights up as the agent does it.
+      const helperName = script.helper ? (placeFor(script.helper.agentId)?.agentName ?? script.helper.agentId).split(' the ')[0] : '';
+      const helperStep = script.helper ? `Asking ${helperName} for help` : undefined;
+      const planned = script.steps.flatMap((st, i) => (i === 1 && helperStep ? [st.text, helperStep] : [st.text]));
       this.emit({
         type: 'task.plan',
         taskId,
         agentId: serviceId,
         targetServiceId: serviceId,
-        steps: [`Heading to ${place?.place ?? serviceId}`, ...script.steps.map((s) => s.text)],
+        steps: [`Heading to ${place?.place ?? serviceId}`, ...planned],
       });
       this.emit({ type: 'task.step', taskId, index: 0, text: `Heading to ${place?.place ?? serviceId}`, status: 'running' });
       await this.sleep(4500); // give the agent time to walk over
       this.emit({ type: 'task.step', taskId, index: 0, text: `Arrived at ${place?.place ?? serviceId}`, status: 'done' });
 
+      let index = 0;
       for (let i = 0; i < script.steps.length; i++) {
         const step = script.steps[i];
-        const index = i + 1;
+        index++;
         // Memory: agents skip steps the player has already been through on this kind of task.
         const memKey = `${serviceId}:${i}`;
         if (this.remembered.has(memKey) && i < script.steps.length - 1) {
           this.emit({ type: 'task.step', taskId, index, text: `${step.text} (you know this — skipping)`, status: 'skipped' });
+          if (i === 1 && helperStep) this.emit({ type: 'task.step', taskId, index: ++index, text: `${helperStep} (you know this — skipping)`, status: 'skipped' });
           continue;
         }
         this.remembered.add(memKey);
@@ -340,12 +375,15 @@ export class MockBackend implements AgentBackend {
         else await this.sleep(1600);
         this.emit({ type: 'task.step', taskId, index, text: step.text, status: 'done' });
 
-        if (i === 1 && script.helper) {
+        if (i === 1 && script.helper && helperStep) {
           const h = script.helper;
+          index++;
+          this.emit({ type: 'task.step', taskId, index, text: helperStep, status: 'running' });
           this.emit({ type: 'agent.message', from: serviceId, to: h.agentId, text: h.ask });
           await this.work(h.agentId, h.aws.split(':')[0], h.aws, 1500);
           this.emit({ type: 'agent.message', from: h.agentId, to: serviceId, text: h.reply });
           await this.sleep(600);
+          this.emit({ type: 'task.step', taskId, index, text: `${helperName}: ${h.reply}`, status: 'done' });
         }
       }
 
@@ -387,14 +425,14 @@ export class MockBackend implements AgentBackend {
   /** The demo's reply to "Explain it back": the same rules-only check the card shows, said kindly. */
   private async explainBack(requestId: string, districtId: string, question: string) {
     const q = QUESTS.find((x) => question.includes(`“${x.title}”`));
-    const serviceId = q ? explainService(q) : (servicesIn(districtId as DistrictId)[0] ?? SERVICES[0]).id;
+    // A side job's explain-back is answered by the job's own building, against the job's own key ideas (never the
+    // district's first agent: a CloudFront question once got VPC's reply).
+    const job = q ? undefined : ALL_TASKS.find((r) => r.task.type === 'explain' && question.includes(`side job “${r.task.title}”`))?.task;
+    const serviceId = q ? explainService(q) : (job?.services[0] ?? (servicesIn(districtId as DistrictId)[0] ?? SERVICES[0]).id);
     const answer = /My answer, in my own words: “([\s\S]*)” Please reply/.exec(question)?.[1] ?? '';
-    const c = checkExplain(serviceId, answer);
+    const c = job?.type === 'explain' ? checkKeywords(job.explain.keywords, answer, job.explain.minWords) : checkExplain(serviceId, answer);
     const p = placeFor(serviceId);
-    const text =
-      (c.mentioned.length ? `Nice: you talked about ${c.mentioned.slice(0, 3).join(', ')}, which is the heart of it. ` : 'Good start, and thanks for trying it in your own words. ') +
-      (c.missed.length ? `To make it complete, add how ${c.missed[0]} fits in. ` : '') +
-      `In one line: ${p?.simple ?? ''}`;
+    const text = explainFeedback(c, p?.simple);
     this.emit({ type: 'agent.state', agentId: serviceId, state: 'working', service: 'bedrock', detail: 'Reading your answer' });
     await this.sleep(600);
     const words = text.split(' ');
@@ -487,6 +525,29 @@ export class MockBackend implements AgentBackend {
         // changes from minute to minute.
         if (cmd.on) return void this.sleep(600).then(() => this.flowOn && this.startFlow());
         return;
+      case 'presence.beat':
+        return void this.sleep(300).then(() => this.emit(this.practicePresence(cmd.region, cmd.rank)));
+      case 'score.submit':
+        this.practiceBest.set(cmd.board, Math.max(cmd.score, this.practiceBest.get(cmd.board) ?? 0));
+        return void this.sleep(300).then(() => this.emit(this.practiceBoard(cmd.board)));
+      case 'leaderboard.get':
+        return void this.sleep(300).then(() => this.emit(this.practiceBoard(cmd.board)));
+      case 'workshop.verify': {
+        // The server polls the account here (server/src/workshops/checks.ts); the practice account plays along with
+        // whatever name the player typed, after a short look. Nothing here is real, so the store pays it as practice
+        // (src/learning/workshopRewards.ts honestMode) and the reply says so.
+        const { workshopId, stepId, values } = cmd;
+        const name = Object.values(values ?? {}).find((v) => v.trim());
+        return void this.sleep(700).then(() =>
+          this.emit({
+            type: 'workshop.verified',
+            workshopId,
+            stepId,
+            ok: !!name,
+            detail: name ? `The practice account found ${name}. This is the demo, so it counts as practice: real checks need your own account.` : 'Type the name you used, so the city can look for it.',
+          }),
+        );
+      }
       case 'bill.enable':
         this.billOn = cmd.on;
         // The server reads Cost Explorer here (at most once a day); the demo has a small learner's bill ready.
@@ -528,7 +589,10 @@ export class MockBackend implements AgentBackend {
     const outputs: Record<string, string> = {};
     for (const o of t.outputs) outputs[o] = o.endsWith('URL') || o.endsWith('Url') ? `https://${templateId}.example.aws-city.dev` : `aws-city-${templateId}-${o.toLowerCase()}`;
     this.emit({ type: 'deploy.status', deployId, status: 'complete', outputs, message: `${t.title} is live in the practice account.` });
-    this.emit({ type: 'task.done', taskId: deployId, ok: true, result: `${t.title} deployed`, xp: t.serviceIds.map((serviceId) => ({ serviceId, amount: 25 })) });
+    // A template pays its stars on its first deploy only: deploy, tear down, deploy again is no star farm.
+    const first = !deployedBefore().has(t.id);
+    if (first) markDeployed(t.id);
+    this.emit({ type: 'task.done', taskId: deployId, ok: true, result: `${t.title} deployed`, xp: first ? t.serviceIds.map((serviceId) => ({ serviceId, amount: 25 })) : [] });
   }
 
   private async teardown(deployId: string) {
@@ -545,10 +609,32 @@ export class MockBackend implements AgentBackend {
     return key;
   }
 
+  /** v2.11 practice boards: the player's best this session per board, and their public profile. */
+  private practiceBest = new Map<string, number>();
+  private profile?: Progress['profile'];
+
+  /** The demo's live city: a few made-up mayors (labelled practice, never shown as real players). */
+  private practicePresence(region: string, rank?: string): PresenceStateEvent {
+    const others = PRACTICE_MAYORS.slice(0, 3);
+    const me = this.profile?.public && rank ? [{ name: this.profile.name, rank }] : [];
+    return { type: 'presence.state', region, online: others.length + 1, mayors: [...me, ...others], practice: true };
+  }
+
+  private practiceBoard(board: string): LeaderboardStateEvent {
+    const base = board.startsWith('mayors:') ? 120 : 60;
+    const entries: LeaderboardStateEvent['entries'] = PRACTICE_MAYORS.map((m, i) => ({ name: m.name, score: base * (4 - i) }));
+    // The runtime submits only while the profile is public, so a score here is the player's (named once progress syncs).
+    const mine = this.practiceBest.get(board);
+    if (mine !== undefined) entries.push({ name: this.profile?.name ?? 'You', score: mine, you: true });
+    return { type: 'leaderboard.state', board, week: isoWeekUtc(), entries: entries.sort((a, b) => b.score - a.score).slice(0, 10), practice: true };
+  }
+
   async getProgress(): Promise<Progress | null> {
     return null; // mock has no server state; the local cache in chrome.storage is used
   }
   putProgress(p: Progress) {
+    // The practice leaderboards show the player's own row under their public name (the demo keeps nothing else).
+    this.profile = p.profile;
     // The demo keeps no copy; it only notices the first finished quest, which lets the practice drill run.
     if (this.drillReady || !Object.values(p.quests ?? {}).some((q) => q.status === 'done')) return;
     this.drillReady = true;

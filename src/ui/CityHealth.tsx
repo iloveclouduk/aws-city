@@ -1,5 +1,6 @@
 import { cityHealth, openFindings, severityRank, useCity, type FindingView } from '@/state/store';
-import { currentStreak, dayKey, type DayLog } from '@/state/progress';
+import { dayKey, type DayLog } from '@/state/progress';
+import { lightsOf, lightsView } from '@/state/lights';
 import { citizenById } from '@/world/citizens';
 import { placeFor } from '@/world/places';
 import { serviceById } from '@/world/taxonomy';
@@ -29,32 +30,35 @@ export function urgent(open: FindingView[]) {
 }
 
 /**
- * One line on Home: the city's health (from open findings), who found what, and your learning streak.
+ * One line on Home: the city's health (from open findings), who found what, and your City Lights.
  * Tapping it opens the most urgent finding.
  */
 export function CityHealth() {
   const findings = useCity((s) => s.findings);
   const streak = useCity((s) => s.progress.streak);
+  const lights = useCity((s) => s.progress.lights);
   const log = useCity((s) => s.today);
   const openCard = useCity((s) => s.openFinding);
   const day = dayKey();
 
   const all = Object.values(findings);
   const open = openFindings(findings);
-  const days = currentStreak(streak, day);
   const done = todayText(log, day);
   // Nothing to say yet: no city to look after and no learning so far.
-  if (!all.length && !streak && !done) return null;
+  if (!all.length && !streak && !lights && !done) return null;
 
   const { score, label } = cityHealth(open);
   const tone = score >= 80 ? 'good' : score >= 50 ? 'warn' : 'bad';
   const lead = urgent(open);
-  const streakText = days ? `🔥 ${days}-day streak` : streak ? `Streak ended · best ${streak.best}` : 'No streak yet';
+  // City Lights (src/state/lights.ts): a window per learning day; a break dims one, it never ends anything.
+  const lit = lightsView(lightsOf({ lights, streak }), day);
+  const streakText = lit.total ? `💡 ${lit.glowing} ${lit.glowing === 1 ? 'window' : 'windows'} lit` : 'No windows lit yet';
   const say = lead ? lead.text : open.length ? label : all.length ? 'Everything is fixed' : label;
   const body = (
     <>
+      {/* Named, not a bare number: it's the city's health out of 100 (open problems lower it). */}
       <span className={`health-score ${tone}`} aria-label={`City health ${score} out of 100`}>
-        {score}
+        Health {score}
       </span>
       <span className="health-sum">
         <b>{say}</b> · {streakText}

@@ -9,6 +9,7 @@ import { CITIZEN_LEVELS, CITIZENS, WA_RULES } from '@/world/citizens';
 import { ALL_TERMS, GLOSSARY, serviceTerms, splitTerms, type GlossaryEntry, type TermToken } from '@/world/glossary';
 import { PLACES } from '@/world/places';
 import { SERVICES } from '@/world/taxonomy';
+import { workshopById } from '@/world/workshops';
 import world from '../shared/world.json' with { type: 'json' };
 
 const ids = new Set(SERVICES.map((s) => s.id));
@@ -51,7 +52,43 @@ describe('learning content is complete and consistent', () => {
         if (st.kind === 'deploy') expect(templates.has(st.templateId), q.id).toBe(true);
       }
     }
-    expect(QUESTS.filter((q) => q.steps.some((s) => s.kind === 'deploy')).length).toBe(TEMPLATES.length);
+    // Every template is used: a quest deploys it, or a drawing names it as what it becomes (`templateId`).
+    const used = new Set([
+      ...QUESTS.flatMap((q) => q.steps.flatMap((s) => (s.kind === 'deploy' ? [s.templateId] : []))),
+      ...PUZZLES.flatMap((p) => (p.templateId ? [p.templateId] : [])),
+    ]);
+    for (const p of PUZZLES) if (p.templateId) expect(templates.has(p.templateId), `${p.id}: ${p.templateId}`).toBe(true);
+    expect(TEMPLATES.map((t) => t.id).filter((id) => !used.has(id))).toEqual([]);
+  });
+
+  it("a quest's drawing only asks for services the quests have taught so far, and every drawing is in a quest", () => {
+    // Quests in array order: a puzzle's required services were visited or carded earlier in the same quest or in an earlier one.
+    const taught = new Set<string>();
+    const missing: string[] = [];
+    for (const q of QUESTS)
+      for (const st of q.steps) {
+        if (st.kind === 'visit' || st.kind === 'cards') taught.add(st.serviceId);
+        // A workshop step comes after its building was visited or carded, in this quest or an earlier one.
+        if (st.kind === 'workshop') {
+          const w = workshopById(st.workshopId);
+          if (!w) missing.push(`${q.id} → unknown workshop ${st.workshopId}`);
+          else if (!taught.has(w.serviceId)) missing.push(`${q.id} → workshop ${w.id} needs ${w.serviceId} taught first`);
+        }
+        if (st.kind !== 'puzzle') continue;
+        const p = PUZZLES.find((x) => x.id === st.puzzleId)!;
+        for (const s of p.required) if (!taught.has(s)) missing.push(`${q.id} → ${p.id} needs ${s}`);
+      }
+    expect(missing).toEqual([]);
+    // Six buildings are learned hands on in their quests (one workshop step each, any step counts).
+    const hands = QUESTS.flatMap((q) => q.steps.flatMap((st) => (st.kind === 'workshop' ? [workshopById(st.workshopId)!.serviceId] : [])));
+    expect(new Set(hands)).toEqual(new Set(['s3', 'lambda', 'dynamodb', 'cloudfront', 'ec2', 'rds']));
+    expect(hands.length).toBe(new Set(hands).size);
+    const inQuest = new Set(QUESTS.flatMap((q) => q.steps.flatMap((st) => (st.kind === 'puzzle' ? [st.puzzleId] : []))));
+    expect(PUZZLES.map((p) => p.id).filter((id) => !inQuest.has(id))).toEqual([]);
+    // Every service is required by at least one drawing. A service with good reason not to be: list it here with that reason.
+    const NO_PUZZLE: Record<string, string> = {};
+    const drawn = new Set(PUZZLES.flatMap((p) => p.required));
+    expect([...ids].filter((id) => !drawn.has(id) && !NO_PUZZLE[id])).toEqual([]);
   });
 
   it('every service has a quest, and choose steps have one right answer, a reason for each option, and unique ids', () => {

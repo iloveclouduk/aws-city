@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { Rect } from '@/world/layout';
 import { addSprite, hasSprite } from './assets';
 import { cornerScreen, footprintDepth, type Iso } from './iso';
+import { hoverTip } from './HoverTip';
 import { inView } from './labels';
 import { reducedMotion } from './motion';
 import { FADED } from './occlusion';
@@ -31,6 +32,9 @@ export class Landmark {
   private icon?: Phaser.GameObjects.Image;
   /** How many of this service's resources the account has (city.inventory), beside the sign. */
   private badge?: Phaser.GameObjects.Text;
+  /** What a tap on the building does (the badge beside its sign does the same). */
+  private clickFn?: () => void;
+  private badgeN = 0;
   /** A fence round the lot when AWS doesn't offer this service in the city's Region. */
   private fence?: Phaser.GameObjects.Graphics;
   private closed?: string;
@@ -43,6 +47,8 @@ export class Landmark {
   /** Where the sign belongs (world px), before it's kept inside the view. */
   private anchor = { x: 0, y: 0 };
   private bouncing = false;
+  /** A crown is dropping onto the tip: celebrate() leaves it alone (a relative bounce would land it 30 px up). */
+  private dropping = false;
   /** The level the sign shows (1–4 tiers, 5–7 with crowns, src/state/mastery.ts); defaults to the tier. */
   private level?: number;
   /** Gold crowns on the knowledge tower's tip (art/tiles/legend_art.py), and their night glow. */
@@ -82,6 +88,7 @@ export class Landmark {
   }
 
   onClick(fn: () => void) {
+    this.clickFn = fn;
     for (const o of [this.img, this.sign.setInteractive({ useHandCursor: true })]) {
       o.on('pointerup', (p: Phaser.Input.Pointer) => p.getDistance() < 8 && fn());
     }
@@ -109,7 +116,12 @@ export class Landmark {
           .setOrigin(0, 1)
           .setDepth(40_002),
       );
+      // Said in words on hover: "×3" alone meant nothing to a newcomer. A tap opens the building like its sign.
+      const badge = this.badge.setInteractive({ useHandCursor: true });
+      badge.on('pointerup', (p: Phaser.Input.Pointer) => p.getDistance() < 8 && this.clickFn?.());
+      hoverTip(badge, () => `${this.badgeN} of your real AWS resources ${this.badgeN === 1 ? 'runs' : 'run'} here`);
     }
+    this.badgeN = n;
     this.badge.setText(`×${n}`).setVisible(this.sign.visible);
     this.setUiScale(this.ui);
   }
@@ -144,6 +156,7 @@ export class Landmark {
     this.crown?.destroy();
     this.crownLights?.destroy();
     this.crown = this.crownLights = undefined;
+    this.dropping = false;
     const crowns = level - 4;
     if (crowns >= 1 && hasSprite(`legend:${crowns}`)) {
       const top = this.img.getTopCenter();
@@ -172,13 +185,22 @@ export class Landmark {
   crownDrop() {
     if (!this.crown || reducedMotion()) return;
     const y = this.crown.y;
-    this.scene.tweens.add({ targets: [this.crown, this.crownLights].filter(Boolean), y: { from: y - 30, to: y }, duration: 700, ease: 'Bounce.easeOut' });
+    this.dropping = true;
+    this.scene.tweens.add({
+      targets: [this.crown, this.crownLights].filter(Boolean),
+      y: { from: y - 30, to: y },
+      duration: 700,
+      ease: 'Bounce.easeOut',
+      onComplete: () => {
+        this.dropping = false;
+      },
+    });
   }
 
   private label() {
     const level = this.level ?? this.spec.tier;
     const lv = this.spec.showStars && level >= 1 ? ` · Lv ${level}${level > 4 ? ' 👑' : ''}` : '';
-    return (this.spec.tier === 0 ? '🚧 ' : '') + this.spec.label + lv + (this.due ? ` · 🃏 ${this.due}` : '');
+    return (this.spec.tier === 0 ? '🚧 ' : '') + this.spec.label + lv + (this.due ? ` · 🃏 ${this.due} due` : '');
   }
 
   /** Flashcards due for review at this building: a count on its sign (shown with the name, under the label budget). */
@@ -321,7 +343,7 @@ export class Landmark {
   celebrate() {
     this.bouncing = true;
     this.scene.tweens.add({
-      targets: [this.img, this.lights, this.crown, this.crownLights, this.sign, this.icon].filter(Boolean),
+      targets: [this.img, this.lights, ...(this.dropping ? [] : [this.crown, this.crownLights]), this.sign, this.icon].filter(Boolean),
       y: '-=6',
       yoyo: true,
       duration: 160,

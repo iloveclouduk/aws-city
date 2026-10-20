@@ -9,21 +9,34 @@ import { feel } from './feedback';
 import { Portrait } from './Portrait';
 import { Plain } from './Term';
 import { useLadderInput } from './useLadder';
-import { useDialog } from './useDialog';
+import { useDialog, useShieldGame } from './useDialog';
+import { WorkshopDone } from './WorkshopDone';
+
+/** The big moments' cards: a finished quest, and a finished workshop (src/ui/WorkshopDone.tsx). */
+export function Celebrate({ openTab }: { openTab?: (t: 'home') => void } = {}) {
+  return (
+    <>
+      <QuestDone openTab={openTab} />
+      <WorkshopDone />
+    </>
+  );
+}
 
 /**
  * The one big moment a quest gets: Connie cheers, says which buildings grew and how many stars you earned, what opens
  * next, and offers the next quest. It replaces the toast, so finishing a quest makes one celebration, not five.
  */
-export function Celebrate() {
+function QuestDone({ openTab }: { openTab?: (t: 'home') => void }) {
   const id = useCity((s) => s.celebration);
   const close = useCity((s) => s.celebrate);
   const quests = useCity((s) => s.progress.quests);
   const start = useCity((s) => s.startQuest);
   const input = useLadderInput();
   const box = useRef<HTMLElement>(null);
+  const scrim = useRef<HTMLDivElement>(null);
   const q = id ? questById(id) : undefined;
   useDialog(!!q, box, () => close(undefined));
+  useShieldGame(!!q, scrim);
   if (!q) return null;
 
   const grew = q.serviceIds.map((sid) => placeFor(sid)?.place).filter((p): p is string => !!p);
@@ -35,10 +48,12 @@ export function Celebrate() {
     feel.questStart();
     start(next.id);
     notifyQuest(next.id);
+    // The next quest's first step is on the City tab's list (a quest often ends in Learn or Deploy).
+    openTab?.('home');
   };
 
   return (
-    <div className="finding-scrim app-modal celebrate-scrim" role="presentation" onClick={(e) => e.target === e.currentTarget && close(undefined)}>
+    <div ref={scrim} className="finding-scrim app-modal celebrate-scrim" role="presentation" onClick={(e) => e.target === e.currentTarget && close(undefined)}>
       <section ref={box} className="finding-card celebrate" role="dialog" aria-modal="true" aria-labelledby="celebrate-title">
         <div className="celebrate-burst" aria-hidden="true">
           🏆

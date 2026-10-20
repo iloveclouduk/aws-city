@@ -1,3 +1,6 @@
+import { ruleById } from '@/world/citizens';
+import { WaReview } from './WaReview';
+import { CostNote } from './DeployPanel';
 import { useEffect, useRef, useState } from 'react';
 import { decideDeploy, explainFinding, fixFinding, openDocs, wasExplained } from '@/app/runtime';
 import { bus } from '@/state/bus';
@@ -56,10 +59,10 @@ function Teach({ f, c, need, openTab, close }: { f: FindingView; c: CitizenDef; 
       <div className="teach-head">
         <b>Teach {c.name} first</b>
         <span className="muted">
-          {xp}/{target} ⭐ to {levelName(need)}
+          🎓 {xp}/{target} lessons to {levelName(need)}
         </span>
       </div>
-      <div className="meter" role="progressbar" aria-valuemin={0} aria-valuemax={target} aria-valuenow={xp} aria-label={`${c.name}: ${xp} of ${target} stars to ${levelName(need)}`}>
+      <div className="meter" role="progressbar" aria-valuemin={0} aria-valuemax={target} aria-valuenow={xp} aria-label={`${c.name}: ${xp} of ${target} lessons to ${levelName(need)}`}>
         <i style={{ width: `${pct}%` }} />
       </div>
       <div className="teach-actions">
@@ -73,7 +76,7 @@ function Teach({ f, c, need, openTab, close }: { f: FindingView; c: CitizenDef; 
               openTab('cards');
             }}
           >
-            Review 5 {serviceById(svc)!.name.replace(/^(Amazon|AWS) /, '')} cards (+{5 * CITIZEN_XP.card} ⭐)
+            Review 5 {serviceById(svc)!.name.replace(/^(Amazon|AWS) /, '')} cards (+{5 * CITIZEN_XP.card} 🎓)
           </button>
         )}
         {puzzle && (
@@ -86,7 +89,7 @@ function Teach({ f, c, need, openTab, close }: { f: FindingView; c: CitizenDef; 
               openTab('arch');
             }}
           >
-            Try a {PILLAR_LABEL[c.pillar].toLowerCase()} puzzle (+{CITIZEN_XP.puzzle} ⭐)
+            Try a {PILLAR_LABEL[c.pillar].toLowerCase()} puzzle (+{CITIZEN_XP.puzzle} 🎓)
           </button>
         )}
         {!wasExplained(f.id) && (
@@ -97,7 +100,7 @@ function Teach({ f, c, need, openTab, close }: { f: FindingView; c: CitizenDef; 
               explainFinding(f.id);
             }}
           >
-            Ask {c.name} to explain (+{CITIZEN_XP.explain} ⭐)
+            Ask {c.name} to explain (+{CITIZEN_XP.explain} 🎓)
           </button>
         )}
       </div>
@@ -150,7 +153,7 @@ function Approve({ d, offline, preview }: { d: DeployView; offline?: string; pre
           </ul>
         </ForLearners>
       )}
-      {d.costNote && <p className="muted">💰 {d.costNote}</p>}
+      {d.costNote && <CostNote note={d.costNote} />}
       {d.rollback && <p className="muted">↩ {d.rollback}</p>}
       {d.confirmText && (
         <div className="confirm-type">
@@ -377,6 +380,11 @@ export function FindingCard({ openTab }: { openTab: Go }) {
           <button className="chip-link" onClick={() => learn('docs')} title={f.url}>
             AWS docs ↗
           </button>
+          {ruleById(f.ruleId)?.bp && (
+            <button className="chip-link" onClick={() => openDocs(ruleById(f.ruleId)!.bp!.url)} title={`Well-Architected best practice ${ruleById(f.ruleId)!.bp!.id}: ${ruleById(f.ruleId)!.bp!.title}`}>
+              Well-Architected {ruleById(f.ruleId)!.bp!.id} ↗
+            </button>
+          )}
         </div>
       </section>
     </div>
@@ -401,6 +409,7 @@ export function CityCare() {
     <section className="care" aria-label="City care">
       <h4 className="label">City care{home && home !== here ? <span className="muted"> · checked in {home}</span> : null}</h4>
       {!list.length && <p className="muted">All clear. {fixed === 1 ? 'One issue is' : `${fixed} issues are`} fixed.</p>}
+      <WaReview />
       {shown.map((f) => (
         <button
           key={f.id}

@@ -10,6 +10,7 @@ import Phaser from 'phaser';
 import { addSprite, hasSprite, spriteAnchor } from './assets';
 import { CITY_ISO, dirFor, entityDepth, toScreen } from './iso';
 import type { Cargo } from '@/world/carriers';
+import type { CourierLeg } from '@/world/couriers';
 import { pointAt, type Lane, type Pt, type RoadGraph } from './RoadGraph';
 import { rand } from './rng';
 
@@ -24,6 +25,11 @@ const REROUTE_MS = 5000;
 const GIVE_UP_MS = 15_000;
 /** Longest a vehicle waits at one zebra crossing. */
 const YIELD_MAX_MS = 4000;
+/** Learning couriers' trails: over the baked ground (1.5) and the river's props, under anything standing (x + y ≥ 2). */
+const TRAIL_DEPTH = 1.8;
+/** Dash and gap length of a courier's trail, world px. */
+const DASH_PX = 6;
+const GAP_PX = 4;
 /** How far a pointer may move between down and up and still count as a tap on a carrier (not a camera drag), px. */
 const TAP_SLOP = 8;
 
@@ -65,6 +71,10 @@ interface Vehicle {
   done?: () => void;
   /** A data carrier: what it carries. It drives its route and is gone at the end of it (never wanders home). */
   cargo?: Cargo;
+  /** A learning courier (src/world/couriers.ts): the flow leg it shows, its colour and its dashed trail (screen px). */
+  learn?: { leg: CourierLeg; color: number; trail: { x: number; y: number }[]; seen?: boolean };
+  /** A learning courier's glowing parcel on its roof (pooled Graphics), so it reads apart from the ambient cars. */
+  parcel?: Phaser.GameObjects.Graphics;
 }
 
 export interface TrafficOpts {
@@ -92,6 +102,16 @@ export class Traffic {
   dataCap = 6;
   /** A data carrier was tapped. */
   onTap?: (cargo: Cargo) => void;
+  /** Learning couriers at once, at most (LEARN_CAP / LEARN_RUSH_CAP for the surface and hour). */
+  learnCap = 3;
+  /** A learning courier was tapped: its leg, and where it is (world px). */
+  onLearnTap?: (leg: CourierLeg, at: { x: number; y: number }) => void;
+  /** The learning couriers' dashed trails: one Graphics, redrawn only when a courier sets off or arrives. */
+  private trails?: Phaser.GameObjects.Graphics;
+  /** Spare parcels (one rides on each learning courier). */
+  private parcels: Phaser.GameObjects.Graphics[] = [];
+  /** A learning courier came into view (the scene's one-time "tap me" hint): where it is (world px). */
+  onLearnSeen?: (at: { x: number; y: number }) => void;
 
   constructor(
     private scene: Phaser.Scene,
@@ -109,6 +129,98 @@ export class Traffic {
 
   get dataCount() {
     return this.vehicles.filter((v) => v.cargo).length;
+  }
+
+  get learnCount() {
+    return this.vehicles.filter((v) => v.learn).length;
+  }
+
+  /** Where each learning courier is now (world px) and the leg it drives, for the smoke. */
+  get learners() {
+    return this.vehicles.filter((v) => v.learn).map((v) => ({ x: Math.round(v.img.x), y: Math.round(v.img.y), title: v.learn!.leg.title }));
+  }
+
+  /**
+   * A learning courier along `nodes`: a plain car (`skin`) tinted the flow's colour, with a dashed trail over the road
+   * it will take, gone at the end. Never a data skin, never a beacon. Inside the vehicle cap: when the roads are full an
+   * ambient car gives way (never a carrier or another courier). False when it can't go now.
+   */
+  spawnLearning(skin: string, nodes: number[], leg: CourierLeg, color: number) {
+    if (this.parked || nodes.length < 2 || this.learnCount >= this.learnCap || !hasSprite(`${skin}:SE`)) return false;
+    const lane = this.graph.laneBetween(nodes[0], nodes[1]);
+    if (!lane || !this.roomAt(lane, 0)) return false;
+    if (this.vehicles.length >= this.cap) {
+      const ambient = this.vehicles.filter((v) => !v.cargo && !v.learn && !v.box && v.kind !== 'van' && v.kind !== 'bus');
+      const victim = ambient.find((v) => !v.img.visible) ?? ambient[0];
+      if (!victim) return false;
+      this.remove(victim);
+    }
+    const trail: { x: number; y: number }[] = [];
+    for (let i = 0; i + 1 < nodes.length; i++) {
+      const l = this.graph.laneBetween(nodes[i], nodes[i + 1]);
+      for (const p of l?.pts ?? []) trail.push(toScreen(CITY_ISO, p.x, p.y));
+    }
+    const v = this.add('car', lane, 0, skin);
+    v.route = nodes;
+    v.ri = 1;
+    v.learn = { leg, color, trail };
+    v.parcel = this.parcel(color);
+    v.img.setTint(color);
+    v.img.setInteractive({ useHandCursor: true });
+    v.img.on('pointerup', (p: Phaser.Input.Pointer) => p.getDistance() < TAP_SLOP && this.onLearnTap?.(leg, { x: v.img.x, y: v.img.y }));
+    this.chooseNext(v);
+    this.drawTrails();
+    return true;
+  }
+
+  /** A glowing parcel in the courier's colour: a soft halo, a gold box with a dark rim and a ribbon (drawn once). */
+  private parcel(color: number) {
+    const g = this.parcels.pop() ?? this.scene.add.graphics();
+    g.clear();
+    g.fillStyle(color, 0.35).fillCircle(0, 0, 9);
+    g.fillStyle(0xffffff, 0.35).fillCircle(0, 0, 6);
+    g.fillStyle(0x232f3e, 1).fillRect(-5, -4, 10, 8);
+    g.fillStyle(0xffc84a, 1).fillRect(-4, -3, 8, 6);
+    g.fillStyle(color, 1).fillRect(-1, -3, 2, 6);
+    return g.setVisible(false);
+  }
+
+  /**
+   * Dashes along each courier's road, just over the ground (under every prop and walker): a pale under-stroke so they
+   * read on dark asphalt, then the flow's colour. Clearly not a data carrier (those have no trail and wear a beacon).
+   */
+  private drawTrails() {
+    const g = (this.trails ??= this.scene.add.graphics().setDepth(TRAIL_DEPTH));
+    g.clear();
+    const dashes = (pts: { x: number; y: number }[]) => {
+      let on = true;
+      let left = DASH_PX;
+      for (let i = 1; i < pts.length; i++) {
+        let a = pts[i - 1];
+        const b = pts[i];
+        let seg = Math.hypot(b.x - a.x, b.y - a.y);
+        while (seg > 0) {
+          const step = Math.min(left, seg);
+          const t = step / seg;
+          const m = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+          if (on) g.lineBetween(a.x, a.y, m.x, m.y);
+          a = m;
+          seg -= step;
+          left -= step;
+          if (left <= 0) {
+            on = !on;
+            left = on ? DASH_PX : GAP_PX;
+          }
+        }
+      }
+    };
+    for (const v of this.vehicles) {
+      if (!v.learn) continue;
+      g.lineStyle(5, 0xffffff, 0.7);
+      dashes(v.learn.trail);
+      g.lineStyle(3, v.learn.color, 1);
+      dashes(v.learn.trail);
+    }
   }
 
   /** How many vehicles to keep on the roads (trafficLevel), and the surface's hard cap. */
@@ -217,6 +329,10 @@ export class Traffic {
     this.clear();
     for (const i of this.spare) i.destroy();
     for (const l of this.lights) l.destroy();
+    for (const g of this.parcels) g.destroy();
+    this.parcels = [];
+    this.trails?.destroy();
+    this.trails = undefined;
     this.spare = [];
     this.lights = [];
   }
@@ -268,7 +384,7 @@ export class Traffic {
     const node = v.lane.to;
     if (node === this.graph.highwayEnd && (v.route || v.trips <= 0)) return this.remove(v);
     // A carrier has delivered: it's gone where its data went (an island's road end, the highway).
-    if (v.cargo && v.route && node === v.route[v.route.length - 1]) return this.remove(v);
+    if ((v.cargo || v.learn) && v.route && node === v.route[v.route.length - 1]) return this.remove(v);
     v.s = v.lane.len;
     if (!v.next) this.chooseNext(v);
     const next = v.next;
@@ -301,7 +417,7 @@ export class Traffic {
       while (v.ri < v.route.length && v.route[v.ri] !== node) v.ri++;
       const to = v.route[v.ri + 1];
       v.next = to === undefined ? undefined : this.graph.laneBetween(node, to);
-      if (!v.next && node !== this.graph.highwayEnd && !v.cargo) this.headHome(v);
+      if (!v.next && node !== this.graph.highwayEnd && !v.cargo && !v.learn) this.headHome(v);
       return;
     }
     if (v.trips <= 0) return this.headHome(v);
@@ -358,10 +474,24 @@ export class Traffic {
     this.vehicles.splice(i, 1);
     if (v.box) this.boxes.delete(v.box.node);
     // Images are pooled: a carrier's tap target must not follow its Image into an ambient car.
-    if (v.cargo) v.img.disableInteractive().removeAllListeners('pointerup');
+    if (v.learn) v.img.clearTint();
+    if (v.parcel) {
+      v.parcel.setVisible(false);
+      this.parcels.push(v.parcel);
+      v.parcel = undefined;
+    }
+    if (v.cargo || v.learn) {
+      v.img.removeAllListeners('pointerup');
+      try {
+        v.img.disableInteractive();
+      } catch {
+        // A scene restarting for another street plan has destroyed the Image already: nothing left to undo.
+      }
+    }
     v.img.setVisible(false);
     this.spare.push(v.img);
     v.done?.();
+    if (v.learn) this.drawTrails();
   }
 
   /** Parked at seeded curbs: a little further out than the lane, on the core's quieter roads. */
@@ -398,6 +528,7 @@ export class Traffic {
       const c = toScreen(CITY_ISO, x, y);
       const on = view.contains(c.x, c.y);
       v.img.setVisible(on);
+      v.parcel?.setVisible(on);
       if (!on) continue;
       if (Math.abs(p.dx) + Math.abs(p.dy) > 1e-6) v.dir = dirFor(p.dx, p.dy);
       const frame = `${v.skin}:${v.dir}`;
@@ -411,6 +542,15 @@ export class Traffic {
       let depth = entityDepth(c.y) + 0.5;
       if (deck) depth = Math.max(depth, entityDepth(toScreen(CITY_ISO, tx, ty).y) + 1);
       v.img.setDepth(depth);
+      if (v.parcel) {
+        // On the roof, bobbing a little and glowing (no tweens: drawn with the car).
+        const t = this.scene.time.now / 300 + v.s;
+        v.parcel.setPosition(Math.round(c.x), Math.round(c.y) - 16 - (deck ? BRIDGE_DECK_PX : 0) + Math.round(Math.sin(t))).setAlpha(0.8 + 0.2 * Math.sin(t * 1.7)).setDepth(depth + 0.01);
+        if (!v.learn!.seen) {
+          v.learn!.seen = true;
+          this.onLearnSeen?.({ x: c.x, y: c.y });
+        }
+      }
       if (wantLights && lit < MAX_HEADLIGHTS && hasSprite('headlight')) {
         const d = Math.hypot(p.dx, p.dy) || 1;
         const h = toScreen(CITY_ISO, x + (p.dx / d) * 0.55, y + (p.dy / d) * 0.55);

@@ -330,6 +330,12 @@ export class ServerBackend implements AgentBackend {
       case 'finding.undo':
       // v2.5: the bill switch (the server reads Cost Explorer at most once a day while it's on).
       case 'bill.enable':
+      // v2.10: a workshop step checked with a read-only look at the account.
+      case 'workshop.verify':
+      // v2.11: the live city and leaderboards.
+      case 'presence.beat':
+      case 'score.submit':
+      case 'leaderboard.get':
         return this.raw(cmd);
       case 'deploy.plan': {
         const bp = GUARDED_BLUEPRINTS.find((b) => b.id === cmd.templateId) ?? GUARDED_BLUEPRINTS.find((b) => b.id === GUARDED_EQUIV[cmd.templateId]);

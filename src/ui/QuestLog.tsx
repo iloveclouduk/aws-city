@@ -1,20 +1,25 @@
-import { planDeploy, releaseCare, startQuest as notifyQuest, submitPrompt } from '@/app/runtime';
-import type { Unlock } from '@/state/ladder';
+import { startConsoleCopilot } from '@/app/runtime';
+import { planDeploy, startQuest as notifyQuest, submitPrompt } from '@/app/runtime';
+import { bus } from '@/state/bus';
+import { stepButton, type NextPlan } from '@/state/next';
 import { useCity } from '@/state/store';
-import { walkTo } from '@/state/walk';
+import { walkTo, walkToStation } from '@/state/walk';
 import { QUESTS, type Quest, type QuestStep } from '@/world/content';
 import { districtById } from '@/world/taxonomy';
 import { feel } from './feedback';
 import { districtStyle } from './logic';
 import { Portrait } from './Portrait';
 import { Plain } from './Term';
-import { addOpened, useLocked } from './useLadder';
 
-const KIND: Record<QuestStep['kind'], string> = { visit: 'Visit', cards: 'Flashcards', puzzle: 'Architecture', ask: 'Ask the agents', deploy: 'Deploy', choose: 'Your call' };
+const KIND: Record<QuestStep['kind'], string> = { visit: 'Visit', cards: 'Flashcards', puzzle: 'Puzzle', ask: 'Ask the agents', deploy: 'Deploy', choose: 'Your call', workshop: 'Workshop', console: 'In the console', design: 'Drawing board' };
 
-export type OpenTab = (t: 'learn' | 'arch' | 'deploy' | 'feed' | 'quests' | 'map') => void;
+/**
+ * Where a button sends the player. 'feed', 'quests' and 'map' are the City tab (today's shift, the quests, the places);
+ * 'cards', 'arch' and 'sandbox' are Learn's Cards, Puzzles and Drawing board.
+ */
+export type OpenTab = (t: 'learn' | 'arch' | 'sandbox' | 'deploy' | 'jobs' | 'feed' | 'quests' | 'map' | 'cards') => void;
 
-/** What "Go →" does for a quest step (shared by the Quests tab and the tracker strip). */
+/** What a quest step's button does (its label, src/state/next.ts stepButton, says the same thing). */
 export function runQuestStep(step: QuestStep, openTab: OpenTab) {
   switch (step.kind) {
     case 'visit':
@@ -39,39 +44,55 @@ export function runQuestStep(step: QuestStep, openTab: OpenTab) {
     case 'choose':
       useCity.getState().openChoice(step.id);
       break;
+    case 'workshop':
+      useCity.getState().openWorkshop(step.workshopId);
+      break;
+    case 'console':
+      // The Copilot works in a console tab: it opens one first if none is focused.
+      void startConsoleCopilot(step.goal);
+      openTab('feed');
+      break;
+    case 'design':
+      openTab('sandbox');
+      break;
   }
 }
 
-/** A locked area opens now and stays open (src/state/ladder.ts `opened`): a quest's "Go →", a building tap. */
-export function openArea(area: Unlock['area'], openTab: OpenTab) {
-  addOpened(area);
-  switch (area) {
-    case 'learn':
-      return openTab('learn');
-    case 'learnBuild':
-      return openTab('arch');
-    case 'deploy':
-      return openTab('deploy');
-    case 'care':
-      releaseCare();
-      return openTab('feed');
-    case 'map':
-    case 'day1':
-    case 'worldList':
-      return openTab('map');
-    case 'news':
-      return;
+/** Runs Home's next action (src/state/next.ts): each kind does exactly what its label says. */
+export function runPlan(plan: NextPlan, openTab: OpenTab) {
+  const s = useCity.getState();
+  switch (plan.kind) {
+    case 'step':
+      return runQuestStep(plan.step, openTab);
+    case 'review':
+    case 'upgrade':
+    case 'grow':
+      s.select(plan.serviceId);
+      return openTab('cards');
+    case 'quest':
+      feel.questStart();
+      s.startQuest(plan.questId);
+      return notifyQuest(plan.questId);
+    case 'job':
+      return walkToStation(plan.taskId);
+    case 'workshop':
+      return s.openWorkshop(plan.workshopId);
+    case 'build':
+      s.select(plan.serviceId);
+      bus.emit('flyTo', { id: plan.serviceId });
+      return bus.emit('select', { id: plan.serviceId });
+    case 'tokens':
+      bus.emit('flyTo', { id: 'plaza' });
+      return s.toast('✨', 'Golden tokens glint when Kai walks near them. Try the side streets.');
+    case 'explore':
+      return bus.emit('flyTo', { id: 'plaza' });
   }
 }
 
-/**
- * Quest lines: the active quest (open), one "Up next" card, the rest folded as titles, finished ones folded.
- * Below them, one line saying what unlocks next.
- */
+/** Quest lines (in the City tab's "More to do"): the active quest (open), one "Up next" card, the rest folded. */
 export function QuestLog({ openTab }: { openTab: OpenTab }) {
   const quests = useCity((s) => s.progress.quests) ?? NONE;
   const start = useCity((s) => s.startQuest);
-  const locked = useLocked();
   const act = (step: QuestStep) => runQuestStep(step, openTab);
 
   const active = QUESTS.filter((q) => quests[q.id]?.status === 'active');
@@ -119,9 +140,9 @@ export function QuestLog({ openTab }: { openTab: OpenTab }) {
             <p className="quest-intro">
               <Plain text={upNext.intro} />
             </p>
-            {/* One filled button per screen: the active step's Go, else this. */}
+            {/* Home's big button is the one filled button on screen: this one is plain. */}
             <button
-              className={`btn ${active.length ? '' : 'primary'}`}
+              className="btn"
               onClick={() => {
                 feel.questStart();
                 start(upNext.id);
@@ -157,12 +178,6 @@ export function QuestLog({ openTab }: { openTab: OpenTab }) {
           <QuestSteps steps={q.steps} at={q.steps.length} />
         </details>
       ))}
-      {/* Only the next unlock, as a hint (no buttons: everything else comes in its own time, or via ⋯ → Peek at everything). */}
-      {locked[0] && (
-        <p className="coming-next" aria-label="Coming up next">
-          <span aria-hidden="true">🔓</span> <b>Coming up next: {locked[0].label}.</b> {locked[0].how}.
-        </p>
-      )}
     </div>
   );
 }
@@ -198,8 +213,8 @@ function QuestSteps({ steps, at, count, onGo }: { steps: QuestStep[]; at: number
               {s.kind === 'cards' && state === 'running' ? ` (${count ?? 0}/${s.count})` : ''}
             </span>
             {state === 'running' && onGo && (
-              <button className="btn tiny primary" onClick={() => onGo(s)}>
-                Go →
+              <button className="btn tiny" onClick={() => (feel.tap(), onGo(s))}>
+                {stepButton(s)}
               </button>
             )}
           </li>

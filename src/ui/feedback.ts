@@ -3,14 +3,24 @@
 // hooks for "this just changed" animations. These answer the player's own presses.
 import { useEffect, useRef, useState } from 'react';
 import { blip, chime, click, sfx } from '@/game/audio';
+import { nextRun, pitchOf, type AnswerRun } from '@/game/juice';
+
+/** Right answers in a row (src/game/juice.ts): each one chimes a step higher; a miss or a long pause starts over. */
+let run: AnswerRun | undefined;
 
 export const feel = {
   /** Any ordinary press. */
   tap: () => click(),
   /** A prompt or question leaves for the agents. */
   send: () => blip('concierge'),
-  good: () => chime(true),
-  bad: () => chime(false),
+  good: () => {
+    run = nextRun(run, true, Date.now());
+    chime(true, pitchOf(run.n));
+  },
+  bad: () => {
+    run = nextRun(run, false, Date.now());
+    chime(false);
+  },
   flip: () => sfx('card', { own: true }),
   win: () => sfx('levelup', { own: true }),
   /** Starting a quest: a soft rising chime (the quest jingle is for finishing one, CityScene onQuestDone). */

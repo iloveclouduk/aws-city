@@ -173,3 +173,68 @@
 .menu details > button {
   width: 100%;
 }
+
+/* ── minimap (M) and the OpenStreetMap credit (src/ui/Minimap.tsx) ── */
+.minimap-btn {
+  position: absolute;
+  right: var(--s-3);
+  bottom: var(--s-3);
+  z-index: 5;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--ink-hi);
+  background: color-mix(in srgb, var(--bg-deep) 85%, transparent);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+}
+.minimap-btn:hover,
+.minimap-btn.on {
+  border-color: var(--accent-line);
+}
+.app-panel .minimap-btn {
+  right: calc(var(--s-3) + 40px);
+}
+.minimap {
+  position: absolute;
+  right: var(--s-3);
+  bottom: calc(var(--s-3) + 40px);
+  z-index: 5;
+  padding: 4px;
+  line-height: 0;
+  background: color-mix(in srgb, var(--bg-deep) 80%, transparent);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+}
+.minimap canvas {
+  cursor: crosshair;
+  image-rendering: pixelated;
+  touch-action: none;
+}
+.map-credit {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 5;
+  padding: 1px 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--bg-deep) 70%, transparent);
+  border-top-right-radius: var(--r-sm, 4px);
+}
+.map-credit a,
+.menu-credit a {
+  color: inherit;
+  text-decoration: underline;
+}
+.stage:has(.map-credit) .world-btn {
+  bottom: calc(var(--s-3) + 14px);
+}
+.menu-credit {
+  padding: var(--s-1, 4px) var(--s-3);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}

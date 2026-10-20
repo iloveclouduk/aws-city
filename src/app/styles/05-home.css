@@ -224,8 +224,193 @@
   color: var(--muted);
   text-decoration: line-through;
 }
+/* A goal that opened after the day's were set: dashed, with a small "bonus" tag; it doesn't count in "2/3 done". */
+.today-goal.bonus {
+  border-style: dashed;
+}
+.today-bonus {
+  padding: 0 var(--s-2);
+  border-radius: var(--r-pill);
+  background: var(--sunken);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-decoration: none;
+}
 .today-goal-cert {
   margin: var(--s-3) 0 0;
   font-size: var(--fs-sm);
   color: var(--ink-soft);
+}
+
+/* ── The City tab: today's shift on top (one big button), then "More to do" folded, then the places ── */
+.shift {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.shift-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+.shift-head h3 {
+  flex: 1;
+  margin: 0;
+  font-size: var(--fs-lg);
+  color: var(--ink-hi);
+}
+.ring {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+.ring-track,
+.ring-fill {
+  fill: none;
+  stroke-width: 4;
+}
+.ring-track {
+  stroke: var(--sunken);
+}
+.ring-fill {
+  stroke: var(--good);
+  stroke-linecap: round;
+  transition: stroke-dasharray var(--dur-3) var(--ease-out);
+}
+.next-go {
+  flex-direction: column;
+  gap: 0;
+  min-height: 44px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.25;
+}
+.next-go-label {
+  font-size: var(--fs-md);
+}
+.next-go-where {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  opacity: 0.8;
+}
+/* After the shift: the summary card is the moment; the next step stays, quietly. */
+.next.calm {
+  background: none;
+}
+.shift-done {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-5);
+  background: var(--panel);
+  border: 1px solid var(--good);
+  border-radius: var(--r-lg);
+  color: var(--ink);
+}
+.shift-done b {
+  font-size: var(--fs-md);
+  color: var(--ink-hi);
+}
+.order-board ul,
+.ready ul {
+  list-style: none;
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.order,
+.ready-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.order-text,
+.ready-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+}
+.order-text b,
+.ready-text b {
+  color: var(--ink-hi);
+  overflow-wrap: anywhere;
+}
+.order .btn,
+.ready-row .btn {
+  flex-shrink: 0;
+  max-width: 48%;
+  white-space: normal;
+  line-height: 1.2;
+}
+.more-fold > summary,
+.quests-fold > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: var(--s-3) 0;
+}
+.more-fold > summary::-webkit-details-marker,
+.quests-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.more-fold > summary::after,
+.quests-fold > summary::after {
+  content: ' ▸';
+}
+.more-fold[open] > summary::after,
+.quests-fold[open] > summary::after {
+  content: ' ▾';
+}
+.more-fold {
+  border-top: 1px solid var(--line);
+}
+.more-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.more-body > .today-goal {
+  align-self: flex-start;
+}
+.quests-fold[open] > summary {
+  margin-bottom: var(--s-3);
+}
+.city-places {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  border-top: 1px solid var(--line);
+  padding-top: var(--s-4);
+}
+/* The Jobs tab: the order board, then every business (or one business's jobs). */
+.clients-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.clients-tab-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+.clients-tab-head h3 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  color: var(--ink-hi);
+}
+/* The quest's name over the big button: readable on any panel (its district shows as the small square). */
+.next .eyebrow {
+  color: var(--ink-hi);
 }
