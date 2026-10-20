@@ -56,9 +56,34 @@ export const PRODUCTS = {
   q: ['Amazon Q Developer', 'Amazon Q Business'],
   rekognition: ['Amazon Rekognition'],
   textract: ['Amazon Textract'],
+  securityagent: ['AWS Security Agent'],
+  apprunner: ['AWS App Runner'],
+  batch: ['AWS Batch'],
+  lightsail: ['Amazon Lightsail'],
+  backup: ['AWS Backup'],
+  kinesis: ['Amazon Kinesis Data Streams'],
+  opensearch: ['Amazon OpenSearch Service'],
+  documentdb: ['Amazon DocumentDB (with MongoDB compatibility)'],
+  transitgateway: ['AWS Transit Gateway'],
+  globalaccelerator: ['AWS Global Accelerator'],
+  secretsmanager: ['AWS Secrets Manager'],
+  inspector: ['Amazon Inspector'],
+  securityhub: ['AWS Security Hub'],
+  macie: ['Amazon Macie'],
+  polly: ['Amazon Polly'],
+  comprehend: ['Amazon Comprehend'],
+  stepfunctions: ['AWS Step Functions'],
+  cloudformation: ['AWS CloudFormation'],
+  systemsmanager: ['AWS Systems Manager'],
+  config: ['AWS Config'],
+  organizations: ['AWS Organizations'],
+  appsync: ['AWS AppSync'],
 };
-/** Global services: one control plane for the whole partition, so every city has them. */
-export const GLOBAL = ['iam', 'route53', 'cloudfront'];
+/**
+ * Global services: one control plane for the whole partition, so every city has them. They take the Global Gate's
+ * lots in this order (src/world/layout.ts), so add a new one at the end: nobody already there moves.
+ */
+export const GLOBAL = ['route53', 'cloudfront', 'iam', 'globalaccelerator'];
 const RANK = ['isAvailableIn', 'isPlannedIn', 'isBeingPlannedIn', 'isNotExpandingIn'];
 /**
  * Where the regional-availability tool lags or answers a different question, the service's own docs page wins.
@@ -69,6 +94,22 @@ const OVERRIDES = [
   { service: 'q', product: 'Amazon Q Developer', page: 'https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/regions.html', by: 'names', optInNote: 'Free tier only in opt-in Regions' },
   // Neptune's own Regions list is newer than the tool's rows for some Regions.
   { service: 'neptune', product: 'Amazon Neptune', page: 'https://docs.aws.amazon.com/neptune/latest/userguide/limits.html', by: 'codes' },
+  // The tool has no row for Security Agent yet: its own page is the only source (pageOnly). A Region it doesn't list is
+  // 'not-listed' (no plans announced either way), never 'not-planned'.
+  { service: 'securityagent', product: 'AWS Security Agent', page: 'https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html', by: 'codes', pageOnly: true },
+  // No rows for Macie or Polly in the tool either: their endpoints pages list the Region codes.
+  { service: 'macie', product: 'Amazon Macie', page: 'https://docs.aws.amazon.com/general/latest/gr/macie.html', by: 'codes', pageOnly: true },
+  { service: 'polly', product: 'Amazon Polly', page: 'https://docs.aws.amazon.com/general/latest/gr/pol.html', by: 'codes', pageOnly: true },
+  // Organizations is global (its entities live in no Region, like IAM's) yet stands as a Civic Centre landmark, not at
+  // the Global Gate. Its Region support page lists every commercial and GovCloud Region it serves.
+  { service: 'organizations', product: 'AWS Organizations', page: 'https://docs.aws.amazon.com/organizations/latest/userguide/region-support.html', by: 'codes' },
+];
+/**
+ * A caveat the service's own page states for every Region it's in. The page is read on each run and must still say it
+ * (`says`), or the build stops: a stale caveat is worse than none.
+ */
+const NOTES = [
+  { service: 'apprunner', page: 'https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html', says: /no longer open to new customers/i, note: 'Closed to new customers; existing customers carry on' },
 ];
 /** CloudFront isn't in GovCloud: you use it from a standard account with GovCloud as the origin. */
 const GOVCLOUD_CLOUDFRONT = 'https://docs.aws.amazon.com/govcloud-us/latest/UserGuide/setting-up-cloudfront.html';
@@ -131,7 +172,7 @@ const partitionOf = (code) => (code.startsWith('us-gov-') ? 'aws-us-gov' : code.
 
 // ── Service availability: 10 Regions per call (the tool's limit), a few products at a time (it caps the filter list) ──
 const FILTERS_PER_CALL = 8;
-const productNames = [...new Set(Object.values(PRODUCTS).flat())];
+const productNames = [...new Set(Object.entries(PRODUCTS).flatMap(([id, names]) => (OVERRIDES.some((o) => o.service === id && o.pageOnly) ? [] : names)))];
 const availability = {};
 const codes = regions.regions.map((r) => r.code);
 for (let i = 0; i < codes.length; i += 10) {
@@ -163,6 +204,7 @@ for (const o of OVERRIDES) {
   }
   o.regions = yes;
 }
+for (const n of NOTES) if (!n.says.test(await readDoc(n.page))) throw new Error(`${n.page} no longer says ${n.says}: check the ${n.service} note`);
 // "In the following Regions, for accounts created before November 2025, we independently map…": the bullets that follow.
 const azIdsText = await readDoc(AZ_IDS_PAGE);
 const mapped = azIdsText.slice(azIdsText.indexOf('we independently map'));
@@ -171,7 +213,7 @@ if (independentNames.size < 5) throw new Error(`az-ids.html: expected the indepe
 
 const out = {
   source: `${MCP} (AWS Knowledge MCP Server: ${AZ_PAGE}, ${REGIONS_PAGE}, tool aws___get_regional_availability)`,
-  docs: { azs: AZ_PAGE, overrides: OVERRIDES.map((o) => o.page).join(' '), regions: REGIONS_PAGE, availability: AVAILABILITY, azIds: 'https://docs.aws.amazon.com/global-infrastructure/latest/regions/az-ids.html' },
+  docs: { azs: AZ_PAGE, overrides: [...OVERRIDES, ...NOTES].map((o) => o.page).join(' '), regions: REGIONS_PAGE, availability: AVAILABILITY, azIds: 'https://docs.aws.amazon.com/global-infrastructure/latest/regions/az-ids.html' },
   asOf,
   note:
     'AZ IDs are the same physical place in every account; AZ names (us-east-1a) may map to different AZ IDs per account in the oldest Regions. ' +
@@ -190,6 +232,11 @@ for (const code of codes) {
   const services = {};
   for (const [id, names] of Object.entries(PRODUCTS)) {
     const rows = names.map((n) => availability[code]?.[n]);
+    const only = OVERRIDES.find((x) => x.service === id && x.pageOnly);
+    if (only) {
+      services[id] = { status: only.regions.has(code) ? 'available' : 'not-listed', source: only.page };
+      continue;
+    }
     if (!rows[0]) {
       missing++;
       console.warn(`${code}: no availability row for ${names[0]}`);
@@ -204,7 +251,8 @@ for (const code of codes) {
       continue;
     }
     const o = OVERRIDES.find((x) => x.service === id && x.regions?.has(code));
-    const note = o?.optInNote && table[code]?.optIn ? { note: o.optInNote } : {};
+    const caveat = NOTES.find((n) => n.service === id);
+    const note = o?.optInNote && table[code]?.optIn ? { note: o.optInNote } : caveat && s.status === 'available' ? { note: caveat.note, source: caveat.page } : {};
     services[id] = { ...s, ...note, ...(extra.length ? { extra } : {}), ...(overridden[code]?.includes(id) ? { source: o.page } : {}) };
   }
   out.regions[code] = {

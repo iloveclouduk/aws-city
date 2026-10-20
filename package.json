@@ -9,7 +9,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "start": "node scripts/start.mjs",
+    "start": "node scripts/launcher/boot.mjs",
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox",
     "build": "wxt build",
@@ -24,13 +24,15 @@
     "smoke": "wxt build && node scripts/smoke.mjs",
     "check": "tsc --noEmit && vitest run",
     "lint": "eslint .",
-    "open": "wxt build && node scripts/open.mjs",
+    "open": "node scripts/open.mjs --build",
     "art": "python3 art/pack/import_agentic.py && python3 art/characters/aws_city.py && python3 art/characters/crowd_small.py && python3 art/tiles/generate_tiles.py",
     "smoke:copilot": "wxt build && node scripts/smoke-copilot.mjs",
     "live": "node scripts/live.mjs",
     "icons": "node scripts/fetch-aws-icons.mjs",
+    "aws-catalog": "node scripts/fetch-aws-catalog.mjs",
     "prices": "node scripts/fetch-prices.mjs",
     "region-facts": "node scripts/fetch-region-facts.mjs",
+    "city-maps": "node scripts/fetch-city-maps.mjs",
     "setup": "node scripts/launcher/require-node.mjs && npm --prefix infra ci --no-audit --no-fund --loglevel=error && node infra/setup/setup.mjs",
     "lint:firefox": "wxt build -b firefox && web-ext lint -s .output/firefox-mv3",
     "safari:xcode": "wxt build -b safari && xcrun safari-web-extension-converter .output/safari-mv3 --project-location .cache/safari --app-name \"AWS City\" --bundle-identifier dev.awscity.AWS-City --macos-only --no-prompt --force"

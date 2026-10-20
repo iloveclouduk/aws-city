@@ -46,6 +46,7 @@ export const MAPPING = {
   kms: 'AWS-Key-Management-Service',
   shield: 'AWS-Shield', // "Shield & WAF": WAF is AWS-WAF
   guardduty: 'Amazon-GuardDuty',
+  securityagent: 'AWS-Security-Agent',
   cloudwatch: 'Amazon-CloudWatch', // "CloudWatch & CloudTrail": CloudTrail is AWS-CloudTrail
   bedrock: 'Amazon-Bedrock',
   agentcore: 'Amazon-Bedrock-AgentCore',
@@ -53,6 +54,27 @@ export const MAPPING = {
   q: 'Amazon-Q',
   rekognition: 'Amazon-Rekognition',
   textract: 'Amazon-Textract',
+  apprunner: 'AWS-App-Runner',
+  batch: 'AWS-Batch',
+  lightsail: 'Amazon-Lightsail',
+  backup: 'AWS-Backup',
+  kinesis: 'Amazon-Kinesis-Data-Streams',
+  opensearch: 'Amazon-OpenSearch-Service',
+  documentdb: 'Amazon-DocumentDB',
+  transitgateway: 'AWS-Transit-Gateway',
+  globalaccelerator: 'AWS-Global-Accelerator',
+  secretsmanager: 'AWS-Secrets-Manager',
+  inspector: 'Amazon-Inspector',
+  securityhub: 'AWS-Security-Hub',
+  macie: 'Amazon-Macie',
+  polly: 'Amazon-Polly',
+  comprehend: 'Amazon-Comprehend',
+  stepfunctions: 'AWS-Step-Functions',
+  cloudformation: 'AWS-CloudFormation',
+  systemsmanager: 'AWS-Systems-Manager',
+  config: 'AWS-Config',
+  organizations: 'AWS-Organizations',
+  appsync: 'AWS-AppSync',
 };
 
 /** Diagram group boxes (Architecture-Group-Icons) and actors (Resource-Icons, General): kind → package file name.

@@ -15,7 +15,12 @@ export declare const elapsed: (ms: number) => string;
 export declare const parseDownloadProgress: (chunk: string | Buffer) => { fraction: number; total: string } | undefined;
 export declare const explainDownloadError: (output?: string) => string;
 export declare const browserFromArg: (value: unknown) => string | undefined;
-export interface LaunchArgs { help: boolean; intro: boolean; mode?: 'demo' | 'live'; browser?: string; error?: string }
+export interface LaunchArgs { help: boolean; intro?: boolean; rebuild?: boolean; mode?: 'demo' | 'live'; browser?: string; profile?: string; region?: string; error?: string }
+export declare const REGION_RE: RegExp;
+export type StartPlan = { kind: 'go' | 'again'; mode: 'demo' | 'live'; browser: string } | { kind: 'ask'; browser?: string; mode?: undefined };
+export declare const startPlan: (args: LaunchArgs, prefs?: { mode?: string; browser?: string }, o?: { interactive?: boolean; installed?: string[] }) => StartPlan;
+export declare const introPlays: (args: LaunchArgs) => boolean;
+export declare const choiceLabel: (mode: string, browser: string, region?: string) => string;
 export declare const parseArgs: (argv: string[], env?: Record<string, string | undefined>) => LaunchArgs;
 export declare const helpText: () => string;
 export declare const lockPid: (target: unknown) => number | undefined;
