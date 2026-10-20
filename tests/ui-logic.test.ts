@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { connectionLabel, DEMO_KEY, placeSuggestions, isAccountIdOrRoleArn, isDemo, setDemo, isOnline, newlyUnlocked, nextTabIndex, offlineReason, shuffle, unlockText } from '@/ui/logic';
+import { connectionLabel, DEMO_KEY, placeSuggestions, isAccountIdOrRoleArn, isDemo, setDemo, isOnline, newlyUnlocked, nextTabIndex, offlineReason, shuffle, signLegend, unlockText } from '@/ui/logic';
 import type { Progress } from '@/backend/contract';
 import { badgeCount, dueDeck, NEW_CARDS_PER_DAY, newCardsLeft } from '@/state/srs';
 import { CARDS, QUESTS, type QuestStep } from '@/world/content';
@@ -43,7 +43,7 @@ describe('error codes → friendly text', () => {
   it('maps known codes and falls back to the message', () => {
     expect(errorText({ message: 'x', code: 'quota' } as { message: string })).toBe('You’ve used today’s AI helpers — back tomorrow!');
     expect(errorText({ message: 'x', code: 'auth' } as { message: string })).toBe('Please sign in again');
-    expect(errorText({ message: 'x', code: 'unlinked' } as { message: string })).toBe('Connect your AWS account in the Build tab');
+    expect(errorText({ message: 'x', code: 'unlinked' } as { message: string })).toBe('Connect your AWS account in the Deploy tab');
     expect(errorText({ message: 'raw', code: 'nope' } as { message: string })).toBe('raw');
     expect(errorText({ message: 'raw' })).toBe('raw');
   });
@@ -224,6 +224,69 @@ describe("Today's goals on Home", () => {
     expect(games.map((x) => [x.id, x.have, x.goal])).toEqual([['games', 0, 1]]);
     expect(todayGoals({ ...log, games: 2 }, '2026-10-12', { learn: false, puzzles: false, care: false, games: true })[0].have).toBe(1);
   });
+
+  it('the Drawing board is a bonus goal: a chip, never the finish line', async () => {
+    const { settleToday, todayDone, todayGoals } = await import('@/state/progress');
+    const day = '2026-10-12';
+    const open = { learn: true, puzzles: true, care: false, designs: true };
+    const first = todayGoals(undefined, day, open);
+    expect(first.map((g) => [g.id, !!g.bonus])).toEqual([['cards', false], ['puzzles', false], ['designs', true]]);
+    const set = settleToday(undefined, day, first.flatMap((g) => (g.bonus ? [] : [g.id])));
+    expect(set.ids).toEqual(['cards', 'puzzles']);
+    const goals = todayGoals({ day, cards: 0, puzzles: 0, fixes: 0, designs: 1 }, day, open, set.ids);
+    expect(goals.find((g) => g.id === 'designs')).toMatchObject({ have: 1, goal: 1, bonus: true });
+    expect(todayDone(goals)).toEqual({ done: 0, of: 2 });
+    // Even a saved set that names it (an older day's set) keeps it a bonus.
+    expect(todayGoals(undefined, day, open, ['cards', 'designs']).find((g) => g.id === 'designs')?.bonus).toBe(true);
+  });
+
+  it("fixes the day's finish line at the first look: areas that open later are bonus goals", async () => {
+    const { settleToday, todayDone, todayGoals } = await import('@/state/progress');
+    const day = '2026-10-12';
+    const morning = { learn: true, puzzles: false, care: false, games: true };
+    const set = settleToday(undefined, day, todayGoals(undefined, day, morning).map((g) => g.id));
+    expect(set).toEqual({ day, ids: ['cards', 'games'] });
+    // Later the same day two more areas open: the set stands, and they come as bonus goals after the day's own.
+    const later = { learn: true, puzzles: true, care: true, games: true, labs: true };
+    expect(settleToday(set, day, todayGoals(undefined, day, later).map((g) => g.id))).toBe(set);
+    const log = { day, cards: 5, puzzles: 1, fixes: 0, games: 0 };
+    const goals = todayGoals(log, day, later, set.ids);
+    expect(goals.map((g) => [g.id, !!g.bonus])).toEqual([['cards', false], ['games', false], ['puzzles', true], ['labs', true], ['fixes', true]]);
+    // "1/2 done", not "2/5": a bonus done doesn't move the finish line.
+    expect(todayDone(goals)).toEqual({ done: 1, of: 2 });
+    // A new day sets its goals again; a day that started with nothing open takes the first goals that appear.
+    expect(settleToday(set, '2026-10-13', ['cards']).ids).toEqual(['cards']);
+    const empty = settleToday(undefined, day, []);
+    expect(settleToday(empty, day, ['cards']).ids).toEqual(['cards']);
+  });
+});
+
+describe('the Learn tab counts cards learned, not cards seen', () => {
+  it('a "Didn\u2019t know" card is not learned; Knew it or Easy is, and a card once remembered stays learned', async () => {
+    const { isKnown } = await import('@/state/srs');
+    const { review } = await import('@/learning/srs');
+    const now = Date.parse('2026-10-12T09:00:00Z');
+    expect(isKnown(undefined)).toBe(false);
+    expect(isKnown(review(undefined, 'again', now))).toBe(false);
+    const good = review(undefined, 'good', now);
+    expect(isKnown(good)).toBe(true);
+    expect(isKnown(review(good, 'again', now))).toBe(false);
+    expect(isKnown({ ...review(good, 'again', now), remembered: true })).toBe(true);
+  });
+});
+
+describe('build costs in the practice account', () => {
+  it('says plainly that practice is free, and keeps AWS’s estimate for a real account', async () => {
+    const { costLine, PRACTICE_COST } = await import('@/ui/logic');
+    expect(PRACTICE_COST).toBe('Practice: free, nothing is created.');
+    expect(costLine('Usually $0 for a small site.', 'mock')).toBe(PRACTICE_COST);
+    expect(costLine('Usually $0 for a small site.', 'server')).toBe('Usually $0 for a small site.');
+  });
+
+  it('no quest step promises "for real" (the practice account builds nothing real)', async () => {
+    const { QUESTS } = await import('@/world/content');
+    for (const q of QUESTS) for (const st of q.steps) expect(st.text).not.toMatch(/for real/i);
+  });
 });
 
 describe('the city postcard', () => {
@@ -258,5 +321,27 @@ describe('dueFor', () => {
     expect(dueFor(p, 's3', now)).toBe(1);
     expect(dueFor(p, 'lambda', now)).toBe(0);
     expect(c).toBeTruthy();
+  });
+});
+
+describe('a building sign’s marks, in words', () => {
+  it('says what ×N and ! mean (resources here, things to check), and nothing when the sign shows neither', () => {
+    const findings = {
+      a: { serviceId: 's3', status: 'open', severity: 'medium' },
+      b: { serviceId: 's3', status: 'open', severity: 'high' },
+      c: { serviceId: 's3', status: 'resolved', severity: 'high' },
+      d: { serviceId: 'ec2', status: 'open', severity: 'low' },
+    };
+    const inventory = { homeRegion: 'us-west-2', counts: { s3: 3 } };
+    expect(signLegend({ inventory, findings, region: 'us-west-2', serviceId: 's3' })).toEqual([
+      { mark: '×3', text: 'on its sign: 3 of your AWS resources live here.' },
+      { mark: '!! 2', text: 'on its sign: 2 things to check in City care (one is urgent).' },
+    ]);
+    expect(signLegend({ inventory, findings, region: 'us-west-2', serviceId: 'ec2' })).toEqual([{ mark: '!', text: 'on its sign: one thing to check in City care.' }]);
+    expect(signLegend({ inventory, findings, region: 'us-west-2', serviceId: 'lambda' })).toEqual([]);
+    // Another Region's city counts its own listed items, and findings show in the home Region only.
+    expect(signLegend({ inventory: { ...inventory, items: [{ region: 'eu-west-1', serviceId: 's3' }] }, findings, region: 'eu-west-1', serviceId: 's3' })).toEqual([
+      { mark: '×1', text: 'on its sign: one of your AWS resources lives here.' },
+    ]);
   });
 });

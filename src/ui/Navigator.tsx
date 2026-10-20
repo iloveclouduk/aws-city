@@ -4,6 +4,9 @@ import { placeFor, TIER_NAMES } from '@/world/places';
 import { DISTRICTS, servicesIn } from '@/world/taxonomy';
 import { isPlaced } from '@/game/assets';
 import { SITES } from '@/world/layout';
+import { cityPlanFor } from '@/world/plan';
+import { ALL_RIDES, openRides } from '@/world/park';
+import { practitioners } from '@/world/airport';
 import { AwsIcon } from './AwsIcon';
 import { Icon } from './icons';
 import { Portrait } from './Portrait';
@@ -29,9 +32,11 @@ export function Navigator({ onOpen }: { onOpen?: () => void }) {
   const sites = SITES.filter(isPlaced);
   // "Where AWS runs" opens at 3 landmarks; the Day 1 Quarter is open from the start (src/state/ladder.ts).
   const l = useLadder();
+  // The classic 3×3 city (`?map=legacy`, or a Region whose map doesn't zone) has no lot for some services.
+  const plan = cityPlanFor(cityRegion);
   return (
     <nav className="nav" aria-label="Places in the city">
-      {/* One map of the world (WorldScene): Places only offers the way there. */}
+      {/* One map of the world (WorldScene): the places list only offers the way there. City Clients live in the Jobs tab. */}
       {l.worldList && (
         <button className="nav-row" onClick={openWorld}>
           <span>🌍 Visit another Region</span>
@@ -44,6 +49,27 @@ export function Navigator({ onOpen }: { onOpen?: () => void }) {
         </span>
         <span className="muted">start here</span>
       </button>
+      <button className="nav-row" onClick={() => go('workshop')}>
+        <span>🛠️ Workshop Studio</span>
+        <span className="muted">hands-on, step by step</span>
+      </button>
+      <section className="nav-district edge outside">
+        <div className="nav-head">
+          <h4>Outside the gate</h4>
+        </div>
+        <button className="nav-row" onClick={() => bus.emit('flyTo', { id: 'park' })}>
+          <span>🎡 re:Play Park</span>
+          <span className="muted">
+            {openRides(progress, cityRegion)}/{ALL_RIDES.length} rides open
+          </span>
+        </button>
+        <button className="nav-row" onClick={() => bus.emit('flyTo', { id: 'airport' })}>
+          <span>✈️ City airport</span>
+          <span className="muted">
+            {practitioners(progress, cityRegion)} {practitioners(progress, cityRegion) === 1 ? 'building' : 'buildings'} at Practitioner
+          </span>
+        </button>
+      </section>
       {l.day1 && sites.length > 0 && (
         <section className="nav-district edge day1">
           <div className="nav-head">
@@ -87,8 +113,9 @@ export function Navigator({ onOpen }: { onOpen?: () => void }) {
               .filter((s) => tierOf(progress, s.id, cityRegion) >= 0)
               .map((s) => {
                 const t = tierOf(progress, s.id, cityRegion);
+                const here = !!plan.landmarkLayout(s.id);
                 return (
-                  <button key={s.id} className="nav-row" onClick={() => go(s.id)}>
+                  <button key={s.id} className="nav-row" onClick={() => (here ? go(s.id) : peek(s.id))}>
                     <span className="with-icon">
                       <AwsIcon serviceId={s.id} size={20} />
                       <span className="nav-name">
@@ -96,9 +123,13 @@ export function Navigator({ onOpen }: { onOpen?: () => void }) {
                         <small>{s.name.replace(/^(Amazon|AWS) /, '')}</small>
                       </span>
                     </span>
-                    <span className="lv" title={TIER_NAMES[t]}>
-                      Lv {t}
-                    </span>
+                    {here ? (
+                      <span className="lv" title={TIER_NAMES[t]}>
+                        Lv {t}
+                      </span>
+                    ) : (
+                      <span className="muted">not here in the classic city</span>
+                    )}
                   </button>
                 );
               })}
@@ -118,7 +149,7 @@ export function Navigator({ onOpen }: { onOpen?: () => void }) {
                 </span>
               </button>
             )}
-            {open && (
+            {open && plan.landmarkLayout(`hq:${d.id}`) && (
               <button className="nav-row hq" onClick={() => go(`hq:${d.id}`)}>
                 Visit {d.hq} →
               </button>

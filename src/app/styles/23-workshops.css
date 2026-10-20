@@ -1,0 +1,718 @@
+/* Hands-on workshops (src/ui/Workshop.tsx) and the practice terminal (src/ui/PracticeTerminal.tsx). */
+.workshop-card {
+  max-width: 560px;
+  /* Compact: the terminal and its tools fit at 1400×880 and in the 400 px panel (no empty bands between blocks). */
+  gap: 8px;
+  padding: var(--s-4);
+}
+.workshop-card > p,
+.workshop-step p {
+  margin: 0;
+}
+.workshop-status {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.workshop-status > span {
+  flex: none;
+}
+.workshop-progress {
+  flex: 1;
+  min-width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--sunken);
+  overflow: hidden;
+}
+.workshop-progress i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--meter-lo), var(--meter-hi));
+}
+.workshop-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.workshop-steps li.now .btn {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--ink-hi);
+}
+.workshop-step {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--panel-3);
+  display: grid;
+  gap: 6px;
+}
+.workshop-what summary {
+  cursor: pointer;
+  color: var(--info);
+  font-size: var(--fs-sm);
+}
+.workshop-what p {
+  margin-top: 4px;
+}
+.workshop-step h4 {
+  margin: 0;
+}
+.code-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.workshop-cmd {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--bg-deep);
+  color: var(--code);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* A long command wraps, and past five lines it scrolls in its box. */
+  max-height: 7.5em;
+  overflow-y: auto;
+}
+.workshop-cmd:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+}
+.terminal {
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--bg-deep);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.terminal-screen {
+  max-height: 150px;
+  min-height: 44px;
+  overflow-y: auto;
+  padding: 6px 8px;
+}
+.terminal-hint {
+  color: var(--muted);
+}
+.terminal-line {
+  margin: 0 0 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  color: var(--ink-soft);
+}
+.terminal-line.in {
+  color: var(--ink-hi);
+}
+.terminal-line.err {
+  color: var(--bad-ink);
+}
+.terminal-line.ok {
+  color: var(--good-ink);
+}
+/* The input, its tools and the note: pinned to the dialog's bottom edge while the terminal is in view, so Hint, Fill
+   and Tab never sit below the fold (sticky inside .terminal, the dialog being the scroller). */
+.terminal-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--bg-deep);
+  border-radius: 0 0 6px 6px;
+}
+.terminal-input {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding: 4px 8px;
+  color: var(--accent);
+}
+.terminal-input textarea {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: var(--ink-hi);
+  font: inherit;
+  padding: 4px 0;
+  resize: none;
+  /* Grows with a long command (wrapped, monospace), then scrolls. */
+  field-sizing: content;
+  min-height: 1.6em;
+  max-height: 7.5em;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.terminal-input textarea:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+}
+.terminal-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding: 2px 6px;
+  font-family: var(--font-ui);
+}
+.terminal-note {
+  margin: 0;
+  padding: 4px 8px 6px;
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+}
+/* The building this workshop grows, in the dialog's header: its icon, its level and a meter that pulses as steps pay. */
+.workshop-building {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-3);
+}
+.workshop-building .grow-line {
+  margin-top: 0;
+}
+.workshop-building-level {
+  font-weight: 800;
+  color: var(--accent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .workshop-building.bumped .workshop-building-icon {
+    display: inline-block;
+    animation: workshop-hop 600ms cubic-bezier(0.2, 1.6, 0.4, 1);
+  }
+}
+@keyframes workshop-hop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-6px) scale(1.15);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+.workshop-intro {
+  margin: 0;
+}
+.workshop-paid {
+  margin: 0;
+  color: var(--good-ink);
+  font-size: var(--fs-sm);
+}
+/* The plaque on the "Workshop complete" card: the one that drops in front of the building in the city. */
+.workshop-plaque {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0;
+}
+.workshop-plaque span {
+  padding: 4px 12px;
+  border: 2px solid var(--gold-deep);
+  border-radius: 4px;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  color: var(--black);
+  font-weight: 800;
+  letter-spacing: 1px;
+  font-size: var(--fs-sm);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .workshop-plaque span {
+    animation: plaque-drop 700ms cubic-bezier(0.3, 1.5, 0.5, 1) 200ms both;
+  }
+}
+@keyframes plaque-drop {
+  from {
+    transform: translateY(-40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.workshop-real,
+.workshop-check {
+  display: grid;
+  gap: 6px;
+}
+.workshop-check label {
+  display: grid;
+  gap: 2px;
+}
+.workshop-check input,
+.workshop-error textarea {
+  background: var(--bg-deep);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--ink-hi);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 8px;
+}
+.workshop-error textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  margin: 6px 0;
+}
+.ok-note {
+  color: var(--good-ink);
+}
+.workshop-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.workshop-pick {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  text-align: left;
+}
+.workshop-source {
+  margin: 0;
+}
+/* AWS North Hall (src/ui/NorthHall.tsx). */
+.talk-stage {
+  display: grid;
+  gap: 8px;
+}
+.talk-stage h4 {
+  margin: 0;
+}
+.talk-ideas {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+.talk-services {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.talk-check {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+}
+.talk-check p {
+  margin: 0 0 4px;
+}
+.talk-check .btn.good {
+  border-color: var(--good);
+  color: var(--good-ink);
+}
+.talk-check .btn.bad {
+  border-color: var(--bad-line);
+  color: var(--bad-ink);
+}
+/* "Show the CloudFormation" (src/ui/TemplateView.tsx). */
+.template-view summary {
+  cursor: pointer;
+  color: var(--info);
+  margin-top: 4px;
+}
+.template-yaml {
+  max-height: 260px;
+  overflow: auto;
+  margin: 6px 0;
+  white-space: pre;
+}
+.btn.workshop-pick {
+  justify-content: flex-start;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+}
+.workshop-pick > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* My City (src/ui/Collection.tsx) and the HUD's rank chip. */
+.collection-card {
+  max-width: 560px;
+}
+.rank-ladder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0;
+}
+.rank-step {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rank-step.got {
+  color: var(--ink);
+  border-color: var(--accent-line);
+}
+.rank-step.now {
+  background: var(--accent-soft);
+  color: var(--ink-hi);
+  font-weight: 700;
+}
+.badge-grid {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 6px;
+}
+.badge-grid li {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 12px;
+}
+.badge-grid li.got {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.badge-grid li.locked {
+  color: var(--muted);
+}
+.badge-icon {
+  font-size: 20px;
+}
+.collection-stats {
+  list-style: none;
+  margin: 4px 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.collection-stats li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--line);
+}
+.rank-chip {
+  white-space: nowrap;
+}
+/* Leaderboards (src/ui/Leaderboard.tsx). */
+.board-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.board-list li {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.board-list li.you {
+  background: var(--accent-soft);
+  color: var(--ink-hi);
+  font-weight: 700;
+}
+.board-rank {
+  color: var(--muted);
+  text-align: right;
+}
+.board-profile {
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+  padding-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+.toggle-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.scale-facts {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+/* The Well-Architected review (src/ui/WaReview.tsx). */
+.wa-review summary {
+  cursor: pointer;
+  color: var(--info);
+  margin: 6px 0;
+}
+.wa-pillar {
+  margin: 8px 0;
+}
+.wa-pillar-head {
+  display: flex;
+  justify-content: space-between;
+}
+.wa-checks {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+.wa-checks li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+/* The architecture sandbox (src/ui/diagram/Sandbox.tsx). */
+.sandbox {
+  display: grid;
+  gap: 8px;
+}
+.sandbox-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sandbox-name,
+.sandbox-bar select {
+  background: var(--bg-deep);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--ink-hi);
+  padding: 4px 6px;
+  min-width: 0;
+}
+.sandbox-name {
+  flex: 1;
+}
+.sandbox-board {
+  width: 100%;
+  height: auto;
+  background: var(--bg-deep);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.sb-cell {
+  cursor: pointer;
+  outline: none;
+}
+.sb-cell:hover,
+.sb-cell:focus-visible {
+  fill: rgba(240, 166, 58, 0.12);
+  stroke: var(--accent-line);
+}
+.sandbox-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.sb-piece {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 12px;
+  padding: 3px 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--ink);
+  cursor: pointer;
+}
+.sb-piece.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink-hi);
+}
+.sandbox-selected {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+/* Launch Day (src/ui/launch/LaunchDay.tsx). */
+.launch-card {
+  max-width: 600px;
+}
+.launch-budget {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.launch-slots {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.launch-slots li {
+  display: grid;
+  gap: 2px;
+}
+.launch-timeline svg {
+  width: 100%;
+  height: auto;
+  background: var(--bg-deep);
+  border-radius: 6px;
+}
+.launch-timeline {
+  margin: 8px 0 0;
+}
+.launch-grade {
+  font-size: 15px;
+}
+.grade {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 800;
+  color: var(--accent-ink);
+  background: var(--accent);
+  margin-right: 6px;
+}
+.grade-A {
+  background: var(--good);
+}
+.grade-D {
+  background: var(--bad);
+}
+.launch-cta {
+  margin-top: 6px;
+}
+.sb-piece.on .muted {
+  color: var(--ink-soft);
+}
+
+/* The Drawing board's intro and first-time guide (src/ui/diagram/Sandbox.tsx). */
+.drawing-intro {
+  margin-bottom: var(--s-4);
+  padding: var(--s-4);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+}
+.drawing-intro h3 {
+  margin: 0 0 var(--s-2);
+}
+.drawing-intro p {
+  margin: 0;
+}
+.drawing-guide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+}
+.drawing-guide ol {
+  flex: 1 1 220px;
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+/* The review's verdict sits beside its button; what's missing comes first under it. */
+.sandbox-verdict {
+  align-self: center;
+  font-weight: 700;
+}
+.sandbox-verdict.pass {
+  color: var(--good-ink);
+}
+.sandbox-verdict.fail {
+  color: var(--bad-ink);
+}
+.sandbox-gaps {
+  margin-bottom: var(--s-3);
+}
+.sandbox-gaps ul {
+  margin: var(--s-1, 4px) 0 0;
+  padding-left: 1.2em;
+}
+
+/* My City, the progress hub: the numbers, what's coming, and its actions. */
+.hub-numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--s-3);
+  margin: var(--s-4) 0 var(--s-3);
+  padding: 0;
+  list-style: none;
+}
+.hub-numbers li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm);
+  background: var(--panel-3);
+}
+.hub-numbers b {
+  font-size: 1.25em;
+  color: var(--ink-hi);
+}
+.hub-numbers li span:last-child {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.hub-soon {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub-soon li {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  color: var(--ink-soft);
+}
+.hub-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+/* A step here finished the active quest's workshop step: say so, and that the dialog can close. */
+.workshop-quest-done {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--good);
+  color: var(--good-ink);
+  font-weight: 600;
+}

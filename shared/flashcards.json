@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-10-11",
+  "asOf": "2026-10-18",
   "version": 1,
   "cards": {
     "ec2": [
@@ -66,6 +66,22 @@
         "simple": "Placement groups choose where servers sit: huddled close for speed, apart for safety, or in separate racks.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-groups.html"
+      },
+      {
+        "id": "ec2-09",
+        "q": "Savings Plans, Reserved Instances or Spot: which saves money when?",
+        "a": "Savings Plans: commit to an amount of spend per hour for 1 or 3 years. Reserved Instances: commit to an instance setup, such as type and Region, for 1 or 3 years. Spot: unused capacity at a big discount, for work that can be interrupted.",
+        "simple": "Promise steady use for one or three years and pay less. Or use spare servers cheaply, if the job can stop.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-purchasing-options.html"
+      },
+      {
+        "id": "ec2-10",
+        "q": "What happens to instance store data when you stop an instance?",
+        "a": "It's gone. Instance store disks are physically attached to the host and kept through a reboot, but every block is erased when the instance stops, hibernates or terminates. Use them for caches and scratch data; keep anything valuable on EBS, S3 or EFS.",
+        "simple": "It's wiped. Built-in disks survive a restart but are erased when the server stops. Keep real data elsewhere.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-store-lifetime.html"
       }
     ],
     "lambda": [
@@ -140,6 +156,87 @@
         "simple": "When every cook is busy, new orders are turned away for a moment. Retry, or save some cooks for key dishes.",
         "tier": 3,
         "source": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-concurrency.html"
+      },
+      {
+        "id": "lambda-10",
+        "q": "What is a Lambda durable function?",
+        "a": "A normal Lambda function that saves its progress with checkpoints and replays after a pause or failure. Finished steps are skipped and their stored results reused, so one durable execution can run for up to a year.",
+        "simple": "A function that saves its progress, so it can pause for a long time and pick up where it stopped.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html",
+        "talk": "durable-functions"
+      },
+      {
+        "id": "lambda-11",
+        "q": "In a durable function, what does waitForCallback do?",
+        "a": "It suspends the execution until an outside system sends a callback, such as a customer's reply or a manager's approval. The other system answers with SendDurableExecutionCallbackSuccess or Failure, and the function carries on.",
+        "simple": "It pauses the function until another system answers, like a customer replying to a text.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/help-panel/lambda/latest/console/durable-operations.html",
+        "talk": "durable-functions"
+      },
+      {
+        "id": "lambda-12",
+        "q": "Why must code outside steps in a durable function be deterministic?",
+        "a": "On replay the handler runs again from the top. Completed steps return their saved results, but code outside a step runs again, so random numbers, timestamps and calls to other systems belong inside steps.",
+        "simple": "After a pause the code reruns from the start, so anything random or time-based must sit in a saved step.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html",
+        "talk": "durable-functions"
+      },
+      {
+        "id": "lambda-13",
+        "q": "Do durable function steps run exactly once?",
+        "a": "No. Steps are at-least-once by default: an interrupted attempt runs again on replay. At-most-once per retry waits for the start checkpoint and raises StepInterrupted instead. For at most once overall, also turn retries off.",
+        "simple": "No. By default a step may run twice, so make it safe to repeat, or pick at-most-once with no retries.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/lambda/latest/dg/durable-execution-idempotency.html",
+        "talk": "durable-functions"
+      },
+      {
+        "id": "lambda-14",
+        "q": "What are the fixed size limits of one durable execution?",
+        "a": "30,000 durable operations and 100 MB of persisted data per execution, with at most 1 MB per operation payload. These quotas are fixed and can't be raised.",
+        "simple": "One run can hold 30,000 saved operations and 100 megabytes of data, and those limits can't be raised.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html",
+        "talk": "durable-functions"
+      },
+      {
+        "id": "lambda-15",
+        "q": "What is Lambda Managed Instances?",
+        "a": "A way to run Lambda functions on current-generation EC2 instances in your own account. Lambda still handles the instance lifecycle, patching, routing, load balancing and scaling, and EC2 Savings Plans and Reserved Instances apply.",
+        "simple": "Lambda functions running on EC2 servers in your account, with Lambda still doing all the upkeep.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances.html",
+        "talk": "lambda-managed-instances"
+      },
+      {
+        "id": "lambda-16",
+        "q": "How is Lambda Managed Instances priced?",
+        "a": "You pay the EC2 instance price plus a 15% management fee. EC2 discounts such as Savings Plans apply to the compute only, not to the fee.",
+        "simple": "The server's normal price plus 15% for Lambda's care. Server discounts don't shrink the 15%.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances.html",
+        "talk": "lambda-managed-instances"
+      },
+      {
+        "id": "lambda-17",
+        "q": "How does Lambda Managed Instances scale, and does it have cold starts?",
+        "a": "It has no cold starts, because it doesn't scale when an invocation arrives. It scales in the background on CPU use and concurrency, absorbs traffic doubling within 5 minutes, and scales down to a set minimum, never to zero.",
+        "simple": "It grows ahead of demand by watching how busy the servers are, so no cold starts, but it never stops fully.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances-scaling.html",
+        "talk": "lambda-managed-instances"
+      },
+      {
+        "id": "lambda-18",
+        "q": "What does Lambda tenant isolation mode guarantee?",
+        "a": "With TenancyConfig set to PER_TENANT, which can only be chosen when the function is created, execution environments are never shared between tenants. Every invoke must pass a tenant id, with --tenant-id or the X-Amz-Tenant-Id header.",
+        "simple": "Each customer gets its own copies of the function's environment, never shared with another customer.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/lambda/latest/dg/tenant-isolation.html",
+        "talk": "multi-tenant-saas"
       }
     ],
     "ecs": [
@@ -206,6 +303,22 @@
         "simple": "Blue/green runs the new version beside the old. Visitors move over only once it's healthy, and can move back.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-type-blue-green.html"
+      },
+      {
+        "id": "ecs-09",
+        "q": "How can an ECS service add and remove tasks on its own?",
+        "a": "Service Auto Scaling changes the desired task count for you. It can track a target metric (like a thermostat), step on CloudWatch alarms, follow a schedule, predict from past patterns, or follow an SQS queue's backlog per task.",
+        "simple": "Set a target, like 'keep the processor half busy', and ECS adds or removes copies of your app to stay there.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-auto-scaling.html"
+      },
+      {
+        "id": "ecs-10",
+        "q": "How do you get a shell inside a running ECS container without SSH?",
+        "a": "Turn on ECS Exec. It uses Systems Manager Session Manager, so you open no inbound ports and manage no SSH keys, on EC2 or Fargate. CloudTrail records who connected, and each command and its output can be logged to S3 or CloudWatch Logs.",
+        "simple": "ECS Exec lets you type commands inside a running container with no open doors or keys, and it keeps a record.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-exec.html"
       }
     ],
     "fargate": [
@@ -272,6 +385,22 @@
         "simple": "For big, steady work packed tightly onto servers, ECS on EC2 can cost less than Fargate.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ManagedInstances.html"
+      },
+      {
+        "id": "fargate-09",
+        "q": "How much disk does a Fargate task get?",
+        "a": "At least 20 GiB of temporary (ephemeral) storage on platform version 1.4.0 or later, and you can raise it to 200 GiB in the task definition. Your container image is stored there too, so subtract its size. It's encrypted, and it's gone when the task stops.",
+        "simple": "Each task gets a 20 GiB scratch disk, up to 200 GiB if you ask. It's wiped when the task ends.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-storage.html"
+      },
+      {
+        "id": "fargate-10",
+        "q": "Do Fargate tasks share a server with other tasks?",
+        "a": "No. Fargate runs each task in its own isolated, hardware-virtualised environment. Tasks don't share an operating system, Linux kernel, network interface, temporary storage, processor (CPU) or memory with other tasks.",
+        "simple": "No. Each task runs walled off in its own little machine, so one task can't see another's memory or files.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/security-shared-model.html"
       }
     ],
     "eks": [
@@ -338,6 +467,22 @@
         "simple": "Auto Mode lets AWS also run the worker computers, scaling, networking and storage, so you do less every day.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/eks/latest/userguide/automode.html"
+      },
+      {
+        "id": "eks-09",
+        "q": "What are Amazon EKS add-ons?",
+        "a": "Supporting software every cluster needs, such as the VPC CNI networking plugin, kube-proxy and CoreDNS. As EKS add-ons they come validated by AWS with the latest security patches and bug fixes, and EKS installs and updates them for you.",
+        "simple": "Add-ons are the helper programs every cluster needs, like networking. AWS checks, installs and updates them.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/eks/latest/userguide/eks-add-ons.html"
+      },
+      {
+        "id": "eks-10",
+        "q": "How do you give an IAM role access to a Kubernetes cluster on EKS?",
+        "a": "Create an EKS access entry. It links an IAM identity to Kubernetes permissions, from an AWS-maintained access policy or a Kubernetes group, all through the EKS API. It replaces editing the old aws-auth ConfigMap and can restore access after a mistake.",
+        "simple": "Add an access entry: it says which AWS role may use the cluster and what it can do there.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html"
       }
     ],
     "beanstalk": [
@@ -404,6 +549,22 @@
         "simple": "Special settings files and hook scripts let you tweak what Beanstalk builds and run steps during a deploy.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/platforms-linux-extend.html"
+      },
+      {
+        "id": "beanstalk-09",
+        "q": "All at once, rolling, or rolling with an additional batch: how do they differ?",
+        "a": "All at once is quickest but your app can be briefly unavailable. Rolling updates one batch of instances at a time: no downtime, but less capacity while it runs. Rolling with an additional batch launches extra instances first, so capacity never drops, but takes longer.",
+        "simple": "Update every server at once (fast, brief outage), a few at a time (no outage), or add spares first.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/using-features.deploy-existing-version.html"
+      },
+      {
+        "id": "beanstalk-10",
+        "q": "What do Beanstalk managed platform updates do?",
+        "a": "They upgrade your environment to the newest patch, or patch and minor, version of its platform during a weekly two-hour maintenance window, with no loss of capacity. They never cross platform branches (major versions), because those can break your app.",
+        "simple": "Beanstalk can patch your servers' software for you each week in a quiet window, without taking your app down.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/environment-platform-update-managed.html"
       }
     ],
     "s3": [
@@ -568,6 +729,22 @@
         "simple": "Multi-Attach plugs one fast disk into several servers in the same zone, but they must take turns carefully.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volumes-multi.html"
+      },
+      {
+        "id": "ebs-09",
+        "q": "gp3 or io2 Block Express: when do you need io2?",
+        "a": "gp3 suits boot disks, dev/test and most databases, up to 80,000 IOPS and 2,000 MiB/s. Pick io2 Block Express for latency under a millisecond, more than 80,000 IOPS (up to 256,000) or 99.999% durability. Only io1/io2 support Multi-Attach.",
+        "simple": "Start with gp3, the everyday disk. Pay for io2 only when a big database needs the fastest, most reliable disk.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volume-types.html"
+      },
+      {
+        "id": "ebs-10",
+        "q": "When would you pick an HDD volume (st1 or sc1)?",
+        "a": "For big streaming reads and writes measured in throughput: st1 for big data, data warehouses and log processing, sc1 for rarely read data where the lowest cost matters. Neither can be a boot volume, and both start at 125 GiB.",
+        "simple": "Spinning-disk volumes are cheap and good at reading long files, like logs. A server can't start from one.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volume-types.html"
       }
     ],
     "efs": [
@@ -634,6 +811,22 @@
         "simple": "One Zone is cheaper but keeps data in one place, fine for test data. Regional survives losing a zone.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/efs/latest/ug/features.html#file-system-type"
+      },
+      {
+        "id": "efs-09",
+        "q": "How does EFS replication help with disaster recovery?",
+        "a": "EFS keeps a copy of a file system's data and metadata in a destination file system and Region you choose, with a 15-minute recovery point objective for most file systems. To fail over, delete the replication configuration: the replica becomes writeable.",
+        "simple": "EFS can keep a copy of your shared drive in another place. If disaster strikes, you switch to the copy.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/efs/latest/ug/efs-replication.html"
+      },
+      {
+        "id": "efs-10",
+        "q": "How do you encrypt EFS traffic between your server and the file system?",
+        "a": "Mount with the EFS mount helper and its TLS option. It opens a secure TLS connection when the file system mounts, and all the file-sharing (NFS) traffic goes through it. Without the helper you can set up stunnel yourself.",
+        "simple": "Mount the shared drive with the EFS helper's encryption option, and everything sent to it is scrambled.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/efs/latest/ug/encryption-in-transit.html"
       }
     ],
     "glue": [
@@ -700,6 +893,22 @@
         "simple": "Data Quality rules check your data, so bad data can be flagged or stopped before it lands.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/glue/latest/dg/glue-data-quality.html"
+      },
+      {
+        "id": "glue-09",
+        "q": "When should a Glue job use the Flex execution class?",
+        "a": "For jobs that aren't urgent, like tests, pre-production runs and data loads. Flex runs on spare AWS capacity and cuts their cost by up to 35%, but start and run times can vary, so set a shorter timeout. It needs Glue 3.0 or later and no streaming.",
+        "simple": "Flex is the cheaper, slower lane: fine for jobs that can wait, not for ones that must finish on time.",
+        "tier": 3,
+        "source": "https://aws.amazon.com/glue/faqs/"
+      },
+      {
+        "id": "glue-10",
+        "q": "What does Auto Scaling do for a Glue job?",
+        "a": "With Glue 3.0 or later, Glue adds workers when a stage of the job needs more parallel work and removes idle ones, up to the maximum you set. You stop guessing the worker count and pay less for idle capacity.",
+        "simple": "Glue adds helpers when the job gets busy and sends them home when they're idle, so you don't guess the size.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/glue/latest/dg/auto-scaling.html"
       }
     ],
     "athena": [
@@ -766,6 +975,22 @@
         "simple": "Federated query lets Athena ask other databases too, right where they are, and mix the answers together.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/athena/latest/ug/federated-queries.html"
+      },
+      {
+        "id": "athena-09",
+        "q": "How can Athena answer a repeated query without scanning the data again?",
+        "a": "Turn on query result reuse and set a maximum age. If the same query ran in the same workgroup, its result hasn't expired and you can still read the tables and result location, Athena returns the stored result: faster, and no new bytes scanned.",
+        "simple": "Athena can hand back the answer it worked out last time, if it's fresh enough, so you don't pay to scan again.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/athena/latest/ug/reusing-query-results.html"
+      },
+      {
+        "id": "athena-10",
+        "q": "How can you update or delete single rows in an S3 data lake with Athena?",
+        "a": "Use ACID transactions on a shared table format such as Apache Iceberg. Athena then supports INSERT, UPDATE, DELETE and time travel queries on S3 data, handles locking for concurrent users, and other engines like Spark can read the same tables.",
+        "simple": "Store the table as Iceberg and Athena can change or delete single rows safely, even look back in time.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/athena/latest/ug/acid-transactions.html"
       }
     ],
     "lakeformation": [
@@ -832,6 +1057,22 @@
         "simple": "Share tables with other accounts so they can read them where they are, without copying anything.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/lake-formation/latest/dg/cross-account-permissions.html"
+      },
+      {
+        "id": "lakeformation-09",
+        "q": "What is a Lake Formation blueprint?",
+        "a": "A template for loading data into your lake from a known kind of source, such as a relational database or CloudTrail logs. From it you create a workflow: Glue crawlers, jobs and triggers that load and update the data, tracked as one unit.",
+        "simple": "A blueprint is a ready-made recipe for pulling data from a common source into your lake, on a schedule.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/lake-formation/latest/dg/how-it-works-terminology.html"
+      },
+      {
+        "id": "lakeformation-10",
+        "q": "How can you move to Lake Formation permissions without breaking existing users?",
+        "a": "Use hybrid access mode. You opt in chosen users and tables to Lake Formation permissions, and they then need both those and IAM permissions. Everyone else keeps their access through plain IAM policies until you move them.",
+        "simple": "Hybrid mode moves people to the new permissions one group at a time, while everyone else keeps working.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/lake-formation/latest/dg/hybrid-access-mode.html"
       }
     ],
     "dynamodb": [
@@ -898,6 +1139,22 @@
         "simple": "Global tables keep copies in several Regions, and each copy can be read and written. Changes spread fast.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_HowItWorks.html"
+      },
+      {
+        "id": "dynamodb-09",
+        "q": "How can DynamoDB delete old items for you, for free?",
+        "a": "Turn on time to live (TTL) and store an expiry time on each item as a Number in Unix epoch seconds. DynamoDB deletes expired items, usually within a few days, without using write capacity. Filter expired items out of reads until then.",
+        "simple": "Give each item an expiry time and DynamoDB deletes it for free a few days later. Good for old sessions.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html"
+      },
+      {
+        "id": "dynamodb-10",
+        "q": "When is DynamoDB Accelerator (DAX) worth adding?",
+        "a": "When single-digit milliseconds isn't fast enough. DAX is an in-memory cache with the DynamoDB API that cuts eventually consistent reads to microseconds, and it helps read-heavy or bursty apps that read the same keys again and again.",
+        "simple": "This memory cache sits in front of DynamoDB and makes repeated reads super fast, with almost no code change.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DAX.html"
       }
     ],
     "rds": [
@@ -964,6 +1221,22 @@
         "simple": "It shows what's keeping your database busy, so you can fix slow questions before buying a bigger one.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PerfInsights.html"
+      },
+      {
+        "id": "rds-09",
+        "q": "Multi-AZ DB instance or Multi-AZ DB cluster: what's the difference?",
+        "a": "A Multi-AZ DB cluster has one writer and two readable replicas in three Availability Zones, with semisynchronous replication. Compared with a Multi-AZ DB instance deployment, it adds read capacity and lowers write latency.",
+        "simple": "A cluster keeps two spare copies in other zones that can also answer reads, so it's faster as well as safer.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/multi-az-db-clusters-concepts.html"
+      },
+      {
+        "id": "rds-10",
+        "q": "How do RDS Blue/Green Deployments make database upgrades safer?",
+        "a": "RDS makes a staging copy (green) that stays in sync with production (blue). You upgrade the engine or change parameters on green and test it, then switch over, usually in under a minute with no data loss and no app changes.",
+        "simple": "RDS builds a twin of your database to try changes on, then swaps it in within about a minute.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/blue-green-deployments-overview.html"
       }
     ],
     "aurora": [
@@ -1120,6 +1393,22 @@
         "simple": "Sorted sets keep players in score order, so the top ten comes back fast without sorting yourself.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/elasticache-use-cases.html#elasticache-for-redis-use-cases-gaming"
+      },
+      {
+        "id": "elasticache-09",
+        "q": "Memcached or Valkey/Redis OSS: which ElastiCache engine?",
+        "a": "Memcached for the simplest model: caching objects, large multi-threaded nodes, adding and removing nodes freely. Valkey or Redis OSS for rich data types, replication and failover, and newer features such as vector search.",
+        "simple": "Memcached is a plain, simple cache. Valkey does much more: lists, rankings, backup copies and search.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/SelectEngine.html"
+      },
+      {
+        "id": "elasticache-10",
+        "q": "What does an ElastiCache global datastore give you?",
+        "a": "Valkey or Redis OSS replication across Regions: one primary cluster takes writes, and read-only secondary clusters in other Regions copy it asynchronously. You get fast local reads far away, and can promote a secondary if the primary degrades.",
+        "simple": "A copy of your cache in another Region: nearby users read faster, and it can take over in a disaster.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Redis-Global-Datastore.html"
       }
     ],
     "redshift": [
@@ -1186,6 +1475,22 @@
         "simple": "They keep ready-made answers to hard questions, so dashboards get answers fast and cheaply.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/redshift/latest/dg/materialized-view-overview.html"
+      },
+      {
+        "id": "redshift-09",
+        "q": "How does Redshift cope when thousands of users query at once?",
+        "a": "Turn on concurrency scaling. Redshift adds cluster capacity on its own for spikes in read queries and common writes such as ETL, so eligible queries don't wait in a queue. Users still see current data, and you pay only while the extra capacity runs queries.",
+        "simple": "When lots of people ask at once, Redshift adds extra helpers for a while, and you pay only while they work.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/redshift/latest/dg/concurrency-scaling.html"
+      },
+      {
+        "id": "redshift-10",
+        "q": "How can another team query your Redshift data without a copy?",
+        "a": "Use data sharing. It gives live access to your tables across clusters, Serverless workgroups, AWS accounts and Regions, with no copying or moving. Readers see updates as soon as a write commits, and you control what each one may read or write.",
+        "simple": "Share your tables directly: other teams see the live data, always up to date, without making copies.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/redshift/latest/dg/datashare-overview.html"
       }
     ],
     "neptune": [
@@ -1252,6 +1557,22 @@
         "simple": "Neptune Analytics can link facts together so an AI's answers find the right, related information.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base-build-graphs.html"
+      },
+      {
+        "id": "neptune-09",
+        "q": "Property graph or RDF: how do Neptune's two graph models differ?",
+        "a": "In a property graph, nodes and edges can each carry extra properties, and you query with Gremlin or openCypher. RDF stores facts as triples (subject, predicate, object), each part named by a URI, and you query with SPARQL, a web standard.",
+        "simple": "Two graph styles: dots and lines that carry details, or simple three-part facts like 'Ana knows Bo'.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/neptune/latest/userguide/graph-get-started.html"
+      },
+      {
+        "id": "neptune-10",
+        "q": "Neptune Database or Neptune Analytics: which one?",
+        "a": "Neptune Database serves live apps such as social networks, fraud alerts and Customer 360, up to 100,000 queries a second with Multi-AZ and multi-Region options. Neptune Analytics loads big graphs into memory to run graph algorithms for insights and trends.",
+        "simple": "Neptune Database runs your live app. Neptune Analytics studies a huge graph in memory to spot patterns.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/neptune-analytics/latest/userguide/neptune-analytics-vs-neptune-database.html"
       }
     ],
     "vpc": [
@@ -1318,6 +1639,22 @@
         "simple": "Peering is a private lane between two networks. Transit Gateway is a hub that links many networks together.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-basics.html"
+      },
+      {
+        "id": "vpc-09",
+        "q": "What do VPC Flow Logs record, and do they slow your network?",
+        "a": "They capture information about the IP traffic to and from network interfaces in your VPC, sent to CloudWatch Logs, S3 or Data Firehose. Use them to debug security group rules that are too strict or see what reaches an instance. They're collected outside the traffic path, so no slowdown.",
+        "simple": "Flow logs note who talked to whom in your network, without slowing it. Great for finding blocked traffic.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html"
+      },
+      {
+        "id": "vpc-10",
+        "q": "Gateway endpoint or interface endpoint: how do you reach AWS services privately?",
+        "a": "Gateway endpoints serve only S3 and DynamoDB, at no extra charge. Interface endpoints (AWS PrivateLink) put network interfaces with private IP addresses in your subnets for many more services, without an internet gateway, billed per hour per Availability Zone plus per GB.",
+        "simple": "Private doors to AWS services: free ones for S3 and DynamoDB, paid ones for almost everything else.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/vpc/latest/privatelink/privatelink-access-aws-services.html"
       }
     ],
     "route53": [
@@ -1392,6 +1729,14 @@
         "simple": "Each address card has a type: some hold a computer's address, some point to a name, some say where mail goes.",
         "tier": 2,
         "source": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/ResourceRecordTypes.html"
+      },
+      {
+        "id": "route53-10",
+        "q": "Latency or geolocation routing: when do you use which?",
+        "a": "Latency routing sends each user to the Region that answers them fastest. Geolocation routing picks the resource by where the user is: show content in their language or only where you have rights. Add a default record for locations Route 53 can't place.",
+        "simple": "Latency sends people to the quickest place. Geolocation sends them by country, say for their own language.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy-geo.html"
       }
     ],
     "cloudfront": [
@@ -1548,6 +1893,33 @@
         "simple": "A stage is a named copy, like test or live, each with its own settings, so you can try changes safely.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-stages.html"
+      },
+      {
+        "id": "apigateway-09",
+        "q": "What can a Lambda authorizer return besides an allow or deny policy?",
+        "a": "A context map of strings, numbers or booleans (no objects or arrays). API Gateway exposes it as $context.authorizer values, and a Lambda proxy integration receives it in the event, for example the caller's tenant id.",
+        "simple": "Extra facts about the caller, like which company they belong to, passed on to your code.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-lambda-authorizer-output.html",
+        "talk": "multi-tenant-saas"
+      },
+      {
+        "id": "apigateway-10",
+        "q": "How can a Lambda authorizer pick a caller's usage plan?",
+        "a": "Set the API's key source to AUTHORIZER, and have the authorizer return one of the usage plan's API keys as usageIdentifierKey. Throttles and quotas then apply per key, on a best-effort basis.",
+        "simple": "The authorizer names the caller's key, so each customer gets their own speed limit.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-lambda-authorizer-output.html",
+        "talk": "multi-tenant-saas"
+      },
+      {
+        "id": "apigateway-11",
+        "q": "Should API keys be used to decide who may call an API?",
+        "a": "No. API keys with usage plans meter and throttle clients on a best-effort basis, but AWS advises against using them for authentication, authorization or cost control. Use authorizers for access, and AWS WAF and AWS Budgets for cost.",
+        "simple": "No. Keys count and slow down callers, but a proper sign-in check must decide who gets in.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-api-usage-plans.html",
+        "talk": "multi-tenant-saas"
       }
     ],
     "sqs": [
@@ -1614,6 +1986,30 @@
         "simple": "Ring the bell once and several queues each get their own copy, so each helper works at its own pace.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/sns/latest/dg/welcome.html#SNSFanoutScenario"
+      },
+      {
+        "id": "sqs-09",
+        "q": "How big can an SQS message be, and what if yours is bigger?",
+        "a": "Up to 1 MiB (1,048,576 bytes). For more, the SQS Extended Client Library for Java or Python stores the payload in S3, up to 2 GB, and sends a message holding a pointer to it.",
+        "simple": "A message holds up to 1 MiB. For bigger things, put the file in S3 and send a note saying where it is.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html"
+      },
+      {
+        "id": "sqs-10",
+        "q": "Delay queue or visibility timeout: what's the difference?",
+        "a": "Both hide messages for a while. A delay queue hides each new message when it's first added, for up to 15 minutes. A visibility timeout hides a message only after a consumer receives it. For scheduling further ahead, use EventBridge Scheduler.",
+        "simple": "A delay hides a new message before anyone sees it. A visibility timeout hides it while a worker handles it.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-delay-queues.html"
+      },
+      {
+        "id": "sqs-11",
+        "q": "How fast can an SQS FIFO queue go?",
+        "a": "Without high throughput mode, 300 calls per second per action, or 3,000 messages a second with batches of 10. High throughput mode raises that a lot, up to 70,000 calls a second in the largest Regions. Spread messages across many message group IDs to use it.",
+        "simple": "Ordered queues are slower than standard ones. Batching and high throughput mode speed them up a lot.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html"
       }
     ],
     "eventbridge": [
@@ -1680,6 +2076,22 @@
         "simple": "EventBridge has smarter filters and replay. SNS is faster for huge crowds and can text, email and buzz phones.",
         "tier": 4,
         "source": "https://aws.amazon.com/eventbridge/faqs/"
+      },
+      {
+        "id": "eventbridge-09",
+        "q": "What happens when EventBridge can't deliver an event to a target?",
+        "a": "It retries with exponential back-off and random jitter, by default for 24 hours and up to 185 times; you can change both in the target's retry policy. After that the event is dropped, so attach a dead-letter queue to keep failed events.",
+        "simple": "EventBridge keeps trying for up to a day, then gives up, unless a spare queue catches what it missed.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-retry-policy.html"
+      },
+      {
+        "id": "eventbridge-10",
+        "q": "How do you send events from one AWS account's bus to another's?",
+        "a": "On the receiving account, add a resource policy to its event bus that lets chosen accounts, or your whole organisation, send events. On the sending account, create a rule whose target is that bus. Then the receiver's own rules route the events onward.",
+        "simple": "Let the other account accept your events, then add a rule that forwards events to its bus.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-cross-account.html"
       }
     ],
     "iam": [
@@ -1746,6 +2158,24 @@
         "simple": "No. They are a ceiling for whole accounts. Permissions still have to be given by normal policies.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html"
+      },
+      {
+        "id": "iam-09",
+        "q": "What is a session policy?",
+        "a": "A policy you pass when you assume a role, for example with aws sts assume-role --policy. The session's permissions are the intersection of the role's policies and the session policy, so it can only narrow access, never widen it.",
+        "simple": "An extra rule added when you borrow a role. It can only take permissions away, never add them.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/cli/latest/reference/sts/assume-role.html",
+        "talk": "multi-tenant-saas"
+      },
+      {
+        "id": "iam-10",
+        "q": "How does the dynamodb:LeadingKeys condition help keep tenants apart?",
+        "a": "It checks the partition key values a request touches. A policy with ForAllValues:StringEquals on dynamodb:LeadingKeys set to one tenant id only allows that tenant's items, so a bug can't read another tenant's rows.",
+        "simple": "It lets a request touch only rows whose key belongs to its own customer.",
+        "tier": 4,
+        "source": "https://aws.amazon.com/blogs/apn/isolating-saas-tenants-with-dynamically-generated-iam-policies/",
+        "talk": "multi-tenant-saas"
       }
     ],
     "cognito": [
@@ -1812,6 +2242,24 @@
         "simple": "Identity pools give signed-in and guest users different badges, or pick a badge using details on their pass.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/cognito/latest/developerguide/role-based-access-control.html"
+      },
+      {
+        "id": "cognito-09",
+        "q": "How can one Cognito user pool record which tenant a user belongs to?",
+        "a": "With a custom attribute such as custom:tenantID. Make it immutable or read-only to the app client, so users can't change their own tenant. AWS calls this a fit for surface-level tenancy.",
+        "simple": "Give each user a tenant label they can't edit themselves, carried in their sign-in token.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/cognito/latest/developerguide/custom-attribute-based-multi-tenancy.html",
+        "talk": "multi-tenant-saas"
+      },
+      {
+        "id": "cognito-10",
+        "q": "When is one shared user pool not enough for multi-tenancy?",
+        "a": "When tenants need strong isolation or their own settings, such as per-tenant MFA rules or branding. Then use separate app clients or a user pool for each tenant.",
+        "simple": "When each customer needs its own sign-in rules or look, give them their own pool or app client.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/cognito/latest/developerguide/custom-attribute-based-multi-tenancy.html",
+        "talk": "multi-tenant-saas"
       }
     ],
     "kms": [
@@ -1878,6 +2326,30 @@
         "simple": "Matching keys in different Regions, so data locked in one place can be unlocked in another.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-overview.html"
+      },
+      {
+        "id": "kms-09",
+        "q": "Symmetric or asymmetric KMS key: which should you create?",
+        "a": "Symmetric for data you keep in AWS: services that work with KMS encrypt your data only with symmetric keys. Asymmetric keys are a public and private key pair, for signing or for encryption by people outside AWS who can't call KMS. The private key never leaves KMS unencrypted.",
+        "simple": "Use the one-secret kind for data in AWS. Use the key-pair kind only for signing or for people outside AWS.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/kms/latest/developerguide/symmetric-asymmetric.html"
+      },
+      {
+        "id": "kms-10",
+        "q": "What does automatic rotation of a KMS key change?",
+        "a": "Only the key material used for new encryption, every year by default or on a custom period; you can also rotate on demand. The key's ID and policy stay the same, and KMS still decrypts old data with the old material, so apps need no code changes.",
+        "simple": "Rotation swaps in a fresh secret inside the same key. Old data still opens, and your app doesn't change.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html"
+      },
+      {
+        "id": "kms-11",
+        "q": "What is a KMS grant, and why do AWS services use them?",
+        "a": "A grant lets one principal use one KMS key for set operations, without changing key or IAM policies. It can allow but never deny. Services that encrypt your data create a grant for a task, use it and retire it when done, which makes grants good for temporary access.",
+        "simple": "A grant is a temporary pass to use one key. AWS services take one for a job, then hand it back.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/kms/latest/developerguide/grants.html"
       }
     ],
     "shield": [
@@ -1944,6 +2416,22 @@
         "simple": "Shield Advanced adds better spotting, money back for attack costs, and a team of experts on call.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/waf/latest/developerguide/ddos-advanced-summary-capabilities.html"
+      },
+      {
+        "id": "shield-09",
+        "q": "What can an AWS WAF rule do with a request that matches it?",
+        "a": "Allow it or Block it (by default a 403 Forbidden), which ends the checks. Count it and carry on to the next rules, handy for testing a new rule safely. Or send a CAPTCHA puzzle or a silent Challenge to check it isn't a bot.",
+        "simple": "A rule can let a request in, turn it away, just count it while you test, or ask 'are you human?'",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-action.html"
+      },
+      {
+        "id": "shield-10",
+        "q": "What does the AWS WAF Bot Control rule group catch?",
+        "a": "At the Common level, bots that say what they are, like scrapers, search engines and automated browsers. The Targeted level adds sophisticated bots that hide, using rate limits, CAPTCHA and background browser challenges. It costs extra.",
+        "simple": "Bot Control spots robots visiting your site, from honest search engines to sneaky ones posing as people.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-bot.html"
       }
     ],
     "guardduty": [
@@ -2010,6 +2498,22 @@
         "simple": "One account becomes the head watcher for everyone, switching it on for every account and seeing all alerts.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_organizations.html"
+      },
+      {
+        "id": "guardduty-09",
+        "q": "How do you quiet GuardDuty findings you'll never act on?",
+        "a": "Create a suppression rule: a filter that archives matching new findings automatically. They aren't sent to EventBridge, Security Hub or S3, but GuardDuty still keeps them for 90 days. Archived findings don't count toward attack sequences, so keep rules narrow.",
+        "simple": "A suppression rule files away alerts you've decided don't matter, so the real ones stand out.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/guardduty/latest/ug/findings_suppression-rule.html"
+      },
+      {
+        "id": "guardduty-10",
+        "q": "What is a GuardDuty attack sequence finding?",
+        "a": "Extended Threat Detection links many events across data sources, resources and time into one finding for a multi-stage attack. Weak signals and earlier findings count, as in stolen credentials then data taken from S3. It's on by default at no extra cost.",
+        "simple": "GuardDuty joins small clues into one story of an attack, so you see the whole plot, not just pieces.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/guardduty/latest/ug/guardduty-extended-threat-detection.html"
       }
     ],
     "cloudwatch": [
@@ -2076,6 +2580,104 @@
         "simple": "One diary that records what happens in every account in your organisation, in one place.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/creating-trail-organization.html"
+      },
+      {
+        "id": "cloudwatch-09",
+        "q": "How do composite alarms cut alarm noise?",
+        "a": "A composite alarm watches other alarms and combines their states with AND, OR and NOT. Your team gets one notice when any web server alarm fires, not a flood, or a notice only when the CPU and memory alarms are both in ALARM.",
+        "simple": "A composite alarm bundles several alarms into one, so the team gets one clear alert instead of a pile.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/alarm-combining.html"
+      },
+      {
+        "id": "cloudwatch-10",
+        "q": "What is a CloudWatch Synthetics canary?",
+        "a": "A script on a schedule that follows the same routes and actions as a customer, checking your web pages and APIs for availability and latency, with screenshots. You find problems before customers do, even when no one is using the app.",
+        "simple": "A canary is a robot visitor that tries your website every few minutes, so you hear about problems first.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Synthetics_Canaries.html"
+      }
+    ],
+    "securityagent": [
+      {
+        "id": "securityagent-01",
+        "q": "What is AWS Security Agent?",
+        "a": "A frontier agent, now part of AWS Continuum, that reviews designs and code for security risks, models threats and runs on-demand penetration tests against your own applications.",
+        "simple": "An AI helper that checks your app's plans, code and running site for ways an attacker could get in.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/what-is.html"
+      },
+      {
+        "id": "securityagent-02",
+        "q": "What is a penetration test?",
+        "a": "An authorised, simulated attack on your own application to find weaknesses before a real attacker does. AWS Security Agent runs multi-step attack chains and confirms each finding by exploiting it.",
+        "simple": "A practice attack on your own app, with permission, to find holes before a real attacker does.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/blogs/security/aws-security-agent-on-demand-penetration-testing-now-generally-available/"
+      },
+      {
+        "id": "securityagent-03",
+        "q": "Which AWS Security Agent features are ready, and which are still in preview?",
+        "a": "On-demand penetration testing is generally available and billed. Design review, code review and threat modelling are still in preview and not billed, within monthly limits per account.",
+        "simple": "Practice attacks are ready and paid for. Design and code reviews are still free previews.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/continuum/faqs/"
+      },
+      {
+        "id": "securityagent-04",
+        "q": "Why must you verify a domain before a pen test?",
+        "a": "AWS Security Agent only tests domains you have proven you own. You add the TXT record it gives you to the domain's DNS, or expose an HTTP route that returns a validation string. Only then can a test start.",
+        "simple": "So it only ever attacks sites you really own. You prove it by adding a record to your domain.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/security-guidance.html"
+      },
+      {
+        "id": "securityagent-05",
+        "q": "What's the difference between target URLs and accessible URLs?",
+        "a": "Target URLs are your verified domains, the ones the agent tests. Accessible URLs are domains it may reach, such as a sign-in provider, but doesn't test. Requests to anything else are blocked by the network.",
+        "simple": "Targets get tested. Accessible sites are only visited, like the sign-in page, and never attacked.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/security-guidance.html"
+      },
+      {
+        "id": "securityagent-06",
+        "q": "What are out-of-scope URLs for in a pen test?",
+        "a": "They stop AWS Security Agent from testing those paths. Mark anything destructive or irreversible, such as bulk deletes, payment capture or sending emails, so the test can't cause real harm.",
+        "simple": "They keep the agent away from pages that delete, pay or send messages, so the test can't do real harm.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/security-guidance.html"
+      },
+      {
+        "id": "securityagent-07",
+        "q": "How is AWS Security Agent penetration testing priced?",
+        "a": "$50 per task-hour, metered per second. An average test takes about 24 task-hours, roughly $1,200.",
+        "simple": "By the hour the agent works: an average test costs about $1,200.",
+        "tier": 3,
+        "source": "https://aws.amazon.com/blogs/security/aws-security-agent-on-demand-penetration-testing-now-generally-available/"
+      },
+      {
+        "id": "securityagent-08",
+        "q": "What does each AWS Security Agent pen test finding include?",
+        "a": "Proof: the agent confirms the flaw by exploiting it, then reports a CVSS score, reproduction steps and the impact. It can open a pull request with a fix, and retest once you've fixed it.",
+        "simple": "Proof that it's real, how bad it is, how to repeat it, and often a ready-made fix.",
+        "tier": 3,
+        "source": "https://aws.amazon.com/blogs/security/aws-security-agent-on-demand-penetration-testing-now-generally-available/"
+      },
+      {
+        "id": "securityagent-09",
+        "q": "Where can AWS Security Agent's targets be hosted, and where does it run?",
+        "a": "Targets can be on AWS, Azure, GCP or on premises, and private endpoints connect through a VPC. The service itself runs in a limited set of AWS Regions, so check where it's offered first.",
+        "simple": "It can test apps hosted almost anywhere, but the service runs only in some AWS Regions.",
+        "tier": 4,
+        "source": "https://aws.amazon.com/blogs/security/aws-security-agent-on-demand-penetration-testing-now-generally-available/"
+      },
+      {
+        "id": "securityagent-10",
+        "q": "Why should pen tests run against pre-production rather than the live app?",
+        "a": "The agent uses intentionally minimal-impact payloads and guardrails, such as reading a database version instead of dropping a table. Business logic can still react in surprising ways, so AWS recommends testing pre-production.",
+        "simple": "Even a careful practice attack can trip real business rules, so test a copy, not the live app.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/security-guidance.html"
       }
     ],
     "bedrock": [
@@ -2142,6 +2744,22 @@
         "simple": "If the start of your ask is always the same, it's remembered and reused, so it's cheaper and quicker.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html"
+      },
+      {
+        "id": "bedrock-09",
+        "q": "When should you use Bedrock batch inference instead of calling the model directly?",
+        "a": "When you have lots of prompts and don't need the answers right away. Put the prompts in files in S3 and submit one batch job; Bedrock processes them asynchronously and writes the responses back to S3. An EventBridge rule can tell you when it's done.",
+        "simple": "Got thousands of questions and no rush? Drop them in S3 as one job and collect all the answers later.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/batch-inference.html"
+      },
+      {
+        "id": "bedrock-10",
+        "q": "Geographic or global cross-Region inference in Bedrock?",
+        "a": "Both let Bedrock pick a Region to run your request, for more throughput, with no extra routing cost and data kept on the AWS network. Geographic profiles stay inside an area such as the US or EU, for data residency rules. Global profiles use any commercial Region and cost about 10% less.",
+        "simple": "Bedrock can send your request to another Region. Keep it in one area for data rules, or go worldwide to save.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html"
       }
     ],
     "agentcore": [
@@ -2208,6 +2826,33 @@
         "simple": "Observability records every step an agent takes, and Policy checks each tool call against firm rules.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy.html"
+      },
+      {
+        "id": "agentcore-09",
+        "q": "What does each AgentCore Runtime session get?",
+        "a": "Its own microVM, with separate compute, memory and filesystem. When the session ends the microVM is terminated and its memory sanitized. By default a session stops after 15 minutes idle or 8 hours in total.",
+        "simple": "Its own tiny private computer, wiped clean when the session ends.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html",
+        "talk": "agentic-microservices"
+      },
+      {
+        "id": "agentcore-10",
+        "q": "What can AgentCore Gateway turn into MCP tools?",
+        "a": "Lambda functions, OpenAPI specs, Smithy models and API Gateway REST API stages, and it can connect existing MCP servers. Outbound auth to each target can use an API key, OAuth or IAM.",
+        "simple": "Your functions and web APIs, so an agent can find and call them as tools.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/help-panel/bedrock-agentcore/latest/console/hp-gateway-target-set-up.html",
+        "talk": "agentic-microservices"
+      },
+      {
+        "id": "agentcore-11",
+        "q": "Where does AgentCore support the Agent2Agent (A2A) protocol?",
+        "a": "In AgentCore Runtime: with serverProtocol set to A2A, the container serves JSON-RPC on port 9000 and an Agent Card at /.well-known/agent-card.json. AWS says broader A2A support across other AgentCore services is coming.",
+        "simple": "In Runtime, so the agents you host there can talk to other agents in a shared language.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-a2a.html",
+        "talk": "agentic-microservices"
       }
     ],
     "sagemaker": [
@@ -2274,6 +2919,22 @@
         "simple": "Pipelines run the steps for you, and the registry keeps each model's versions and whether it's approved.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/sagemaker/latest/dg/model-registry.html"
+      },
+      {
+        "id": "sagemaker-09",
+        "q": "What does SageMaker JumpStart give you?",
+        "a": "Pretrained, open-source models for many kinds of problems, which you can fine-tune, evaluate and deploy from SageMaker Studio or the Python SDK, plus solution templates and example notebooks. Check each third-party model's licence before you use it.",
+        "simple": "JumpStart is a shelf of ready-made models you can tune on your data and launch, instead of starting from zero.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/sagemaker/latest/dg/studio-jumpstart.html"
+      },
+      {
+        "id": "sagemaker-10",
+        "q": "When does a SageMaker multi-model endpoint save money?",
+        "a": "When you host many models that use the same ML framework, some rarely called. They share one fleet and serving container, and SageMaker AI loads models into memory as traffic needs. Expect cold-start delays for rarely used models; give busy, latency-critical ones their own endpoint.",
+        "simple": "Many similar models can share one set of servers. Cheaper, but a rarely used model may answer slowly at first.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/sagemaker/latest/dg/multi-model-endpoints.html"
       }
     ],
     "q": [
@@ -2340,6 +3001,22 @@
         "simple": "Take away the one permission Q needs to act for you, so it can still chat but can't change anything.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/id-based-policy-examples-users.html"
+      },
+      {
+        "id": "q-09",
+        "q": "What can you ask Amazon Q Developer about your AWS bill?",
+        "a": "Past and forecast costs from Cost Explorer, savings ideas from Cost Optimization Hub and Compute Optimizer, Savings Plans options and service prices, in your own words. It answers from your account's real data and shows which APIs it called.",
+        "simple": "Ask Q 'why did my bill go up?' in plain words. It checks your real costs and shows where it found the answer.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/chat-costs.html"
+      },
+      {
+        "id": "q-10",
+        "q": "What does Amazon Q Developer in chat applications (formerly AWS Chatbot) do?",
+        "a": "It forwards AWS notifications from SNS topics, such as CloudWatch alarms with charts, to Slack, Microsoft Teams or Amazon Chime channels, so a team can respond together. You can ask Amazon Q questions and run AWS CLI commands from the channel.",
+        "simple": "It posts AWS alerts into your team chat, where you can ask Q questions and fix things together.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/chatbot/latest/adminguide/what-is.html"
       }
     ],
     "rekognition": [
@@ -2406,6 +3083,22 @@
         "simple": "When the usual labels don't know your things, like your own parts. Teach it with your own labelled pictures.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/rekognition/latest/customlabels-dg/what-is.html"
+      },
+      {
+        "id": "rekognition-09",
+        "q": "What does Rekognition Face Liveness check?",
+        "a": "That the person verifying their identity is really in front of the camera, not someone spoofing their face with a photo or video, or an attack that bypasses the camera. The user takes a short video selfie and gets a confidence score from 0 to 100.",
+        "simple": "Face Liveness checks a real, live person is at the camera, not a photo or a video of someone else.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/rekognition/latest/dg/how-it-works-types.html"
+      },
+      {
+        "id": "rekognition-10",
+        "q": "Can Rekognition tell if workers wear protective equipment?",
+        "a": "Yes. DetectProtectiveEquipment finds face covers, hand covers and head covers on people in an image, predicts whether each covers the right body part, and returns bounding boxes for the people and items.",
+        "simple": "Yes. It can spot masks, gloves and helmets in a photo and say if they're worn properly.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/rekognition/latest/dg/how-it-works-types.html"
       }
     ],
     "textract": [
@@ -2472,6 +3165,1920 @@
         "simple": "Every answer comes with a score for how sure it is. Send unsure ones to a person to check.",
         "tier": 4,
         "source": "https://docs.aws.amazon.com/sagemaker/latest/dg/a2i-textract-task-type.html"
+      },
+      {
+        "id": "textract-09",
+        "q": "What does Textract's Layout feature add?",
+        "a": "It labels the parts of a page: title, headers and footers, section titles, page numbers, lists, figures, tables, key-value pairs and paragraph text, each with a bounding box. Elements come back in reading order, column by column, so text from multi-column pages stays in order.",
+        "simple": "Layout says which text is a title, a heading or a paragraph, and returns it in the order people read it.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/textract/latest/dg/layoutresponse.html"
+      },
+      {
+        "id": "textract-10",
+        "q": "What is a Textract adapter, and when would you train one?",
+        "a": "An adapter customises Textract for your own kind of document. You annotate sample documents, train the adapter, review its accuracy, then pass it to AnalyzeDocument with your queries. Retrain it later to improve it further.",
+        "simple": "If Textract misreads your special forms, teach it with your own examples so it gets them right.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/textract/latest/dg/textract-adapters-tutorial.html"
+      }
+    ],
+    "apprunner": [
+      {
+        "id": "apprunner-01",
+        "q": "What is AWS App Runner?",
+        "a": "A service that deploys a web app straight from your source code or a container image, then runs, load-balances and scales it for you, with no servers or load balancer to set up. Since 30 April 2026 it takes no new customers; existing customers keep using it.",
+        "simple": "Hand Remy your code and he runs it as a website. New teams now use ECS Express Mode instead.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/apprunner/latest/dg/what-is-apprunner.html"
+      },
+      {
+        "id": "apprunner-02",
+        "q": "Can a new AWS customer start using App Runner today?",
+        "a": "No. AWS closed App Runner to new customers. Existing customers can keep using it as normal, even creating new services, and AWS keeps investing in its security and availability, but plans no new features. For new apps AWS recommends Amazon ECS Express Mode.",
+        "simple": "No. Teams already on it can stay, but new teams are sent to ECS Express Mode.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+      },
+      {
+        "id": "apprunner-03",
+        "q": "Where can App Runner deploy an app from?",
+        "a": "From a container image in a registry such as Amazon ECR, or from source code in a GitHub or Bitbucket repository. For code, a managed runtime (Python, Node.js, Java and others) builds the container image for you, with no Dockerfile to write.",
+        "simple": "From a ready container image, or straight from code in a repository that App Runner builds for you.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/apprunner/latest/dg/service-source-code.html"
+      },
+      {
+        "id": "apprunner-04",
+        "q": "What do App Runner auto scaling settings control?",
+        "a": "Max concurrency (how many requests one instance handles before App Runner adds another), max size (the most instances) and min size (instances always provisioned). You pay for the memory of every provisioned instance, but for CPU only on the ones actively serving.",
+        "simple": "How busy each copy may get, and the fewest and most copies. Idle copies cost only their memory.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/apprunner/latest/dg/manage-autoscaling.html"
+      },
+      {
+        "id": "apprunner-05",
+        "q": "How is App Runner billed?",
+        "a": "Per second for the vCPU and memory of instances while they handle requests, plus memory for provisioned instances while they wait. Automatic deployments add a set monthly fee per app, and builds from source code are billed by build time.",
+        "simple": "You pay for computer time while it works, a little memory while it waits, and extra for builds.",
+        "tier": 2,
+        "source": "https://aws.amazon.com/apprunner/pricing/"
+      },
+      {
+        "id": "apprunner-06",
+        "q": "What web address does a new App Runner service get?",
+        "a": "A subdomain of awsapprunner.com, served over HTTPS. You can link up to five custom domains; with Route 53 as your DNS provider, the console adds the certificate validation and DNS records for you.",
+        "simple": "A ready web address with a padlock. You can add up to five of your own names too.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/apprunner/latest/dg/manage-custom-domains.html"
+      },
+      {
+        "id": "apprunner-07",
+        "q": "How does an App Runner service reach a database in a private subnet?",
+        "a": "Through a VPC connector: choose private subnets (ideally in three Availability Zones) and security groups, and all outgoing traffic goes through your VPC. Incoming traffic still arrives at the public domain. Reaching the internet or AWS APIs then needs a NAT gateway or VPC endpoints.",
+        "simple": "A private side door lets the app call your database. Visitors still come in the front.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/apprunner/latest/dg/network-vpc.html"
+      },
+      {
+        "id": "apprunner-08",
+        "q": "When does App Runner deploy a new version by itself?",
+        "a": "With the automatic deployment trigger on, App Runner builds and deploys each time you push a commit to the source directory, or push a new image version to the image repository.",
+        "simple": "Every time you push new code or a new image, Remy picks it up and runs the new version.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/apprunner/latest/dg/service-source-code.html"
+      },
+      {
+        "id": "apprunner-09",
+        "q": "How do you move an App Runner service to ECS Express Mode with no downtime?",
+        "a": "Create an Express Mode service from the same container image, add your custom domain and certificate to its load balancer, then shift traffic with Route 53 weighted records (10, 25, 50, 75, then 100 percent). Keep App Runner running 24 to 48 hours so a rollback is just a weight change.",
+        "simple": "Run the new copy beside the old one, move visitors over bit by bit, and keep the old one to switch back.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+      },
+      {
+        "id": "apprunner-10",
+        "q": "What does ECS Express Mode build from one API call?",
+        "a": "From a container image and two IAM roles (a task execution role and an infrastructure role) it creates an ECS service on Fargate, an Application Load Balancer, auto scaling and networking in your own account. Express Mode adds no charge; you pay for the resources it creates.",
+        "simple": "Give it a container and two roles, and it builds the whole website setup in your account.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+      },
+      {
+        "id": "apprunner-11",
+        "q": "An App Runner app deploys from source code. What changes when it moves to Express Mode?",
+        "a": "Express Mode deploys container images only, so add a build step first: a Dockerfile, a push to a registry such as Amazon ECR, then the deploy. A pipeline such as GitHub Actions can rebuild and deploy on each push, as App Runner did.",
+        "simple": "Package the code as a container first. A pipeline can then rebuild and redeploy it on each push.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+      }
+    ],
+    "batch": [
+      {
+        "id": "batch-01",
+        "q": "What is AWS Batch?",
+        "a": "A fully managed service for batch computing at any scale. You submit containerised jobs; Batch provisions the compute, schedules the jobs and scales capacity to the work queued, with no batch software to install or manage.",
+        "simple": "Bram bakes big piles of jobs for you: he lights just enough ovens, then lets them cool.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/batch/latest/userguide/what-is-batch.html"
+      },
+      {
+        "id": "batch-02",
+        "q": "Does AWS Batch cost extra?",
+        "a": "No. There is no additional charge for AWS Batch. You pay for the compute it starts to run your jobs, such as EC2 instances or Fargate.",
+        "simple": "Batch itself is free. You pay for the ovens it lights: the servers or containers your jobs use.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/batch/pricing/"
+      },
+      {
+        "id": "batch-03",
+        "q": "What are the four building blocks of AWS Batch?",
+        "a": "Jobs (the units of work, run as containers), job definitions (the blueprint: image, CPU, memory, role), job queues (where submitted jobs wait) and compute environments (the managed or unmanaged capacity jobs run on).",
+        "simple": "Jobs are orders, job definitions are recipes, queues are the order rail, and compute environments are ovens.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/batch/latest/userguide/batch_components.html"
+      },
+      {
+        "id": "batch-04",
+        "q": "What is an array job in AWS Batch?",
+        "a": "One submission that fans out into 2 to 10,000 child jobs sharing the same job definition. Each child reads its own index from the AWS_BATCH_JOB_ARRAY_INDEX variable: ideal for Monte Carlo simulations, parameter sweeps or rendering.",
+        "simple": "One order slip for thousands of batches: each oven gets its own number and bakes its own part.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/batch/latest/userguide/array_jobs.html"
+      },
+      {
+        "id": "batch-05",
+        "q": "Which compute can a managed Batch compute environment use?",
+        "a": "Fargate, Amazon EC2 (On-Demand or Spot Instances) or Amazon ECS Managed Instances. You set the instance types and the minimum, desired and maximum vCPUs, and Batch launches and stops capacity to fit the jobs queued.",
+        "simple": "Rented ovens of different kinds. Bram starts more when orders pile up and stops them when done.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/batch/latest/userguide/batch_components.html"
+      },
+      {
+        "id": "batch-06",
+        "q": "What does RUNNABLE mean for a Batch job?",
+        "a": "The job has no outstanding dependencies and waits for enough resources in one of its queue's compute environments. It starts as soon as capacity fits, but can stay RUNNABLE indefinitely if none ever does, a common thing to troubleshoot.",
+        "simple": "The order is ready to bake and waits for a free oven big enough.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/batch/latest/userguide/job_states.html"
+      },
+      {
+        "id": "batch-07",
+        "q": "How do you cut Batch costs with Spot Instances?",
+        "a": "Use a Spot compute environment with the SPOT_PRICE_CAPACITY_OPTIMIZED allocation strategy, which picks the Spot pools least likely to be interrupted at the lowest price, and give jobs a retry strategy so an interrupted job runs again.",
+        "simple": "Rent spare ovens cheaply, pick the ones least likely to be taken back, and rebake any cut-off batch.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/batch/latest/userguide/allocation-strategies.html"
+      },
+      {
+        "id": "batch-08",
+        "q": "How do automated retries work in AWS Batch?",
+        "a": "A retry strategy gives a job 1 to 10 attempts; a failed attempt puts it back in RUNNABLE. With evaluateOnExit (up to 6 rules) you can retry only for certain reasons, such as a host failure, and exit for the rest. Cancelled or terminated jobs are not retried.",
+        "simple": "Bram can rebake a failed batch up to ten times, and only for the failures worth retrying.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/batch/latest/userguide/job_retries.html"
+      },
+      {
+        "id": "batch-09",
+        "q": "How do you start a Batch job when a file arrives in S3, or on a schedule?",
+        "a": "Make the job queue the target of an EventBridge rule. A rule can submit a job for each matching event, such as an object upload, with the input transformer passing the bucket and key as job parameters. For schedules, AWS recommends EventBridge Scheduler.",
+        "simple": "A bell rings when a file arrives or the clock strikes, and a new order lands on Bram's rail.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/batch/latest/userguide/batch-cwe-target.html"
+      },
+      {
+        "id": "batch-10",
+        "q": "What is fair-share scheduling in AWS Batch?",
+        "a": "By default a job queue runs jobs first in, first out, so urgent work can get stuck behind earlier jobs. Attaching a scheduling policy turns on fair-share scheduling: share identifiers divide the queue's compute between users or workloads.",
+        "simple": "Instead of strict first come, first served, each team gets its fair share of the ovens.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/batch/latest/userguide/job_scheduling.html"
+      },
+      {
+        "id": "batch-11",
+        "q": "What are multi-node parallel jobs in AWS Batch?",
+        "a": "Single jobs that span several EC2 instances (gang scheduling), for large high-performance computing or distributed GPU training with frameworks such as MPI. The main node starts first, then the child nodes; the job finishes when the main node exits.",
+        "simple": "One giant cake baked across many ovens at once, all started together and led by a head oven.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/batch/latest/userguide/multi-node-parallel-jobs.html"
+      }
+    ],
+    "lightsail": [
+      {
+        "id": "lightsail-01",
+        "q": "What is Amazon Lightsail?",
+        "a": "The easiest way to start on AWS for websites and web apps. It bundles virtual private servers (instances), container services, managed databases, load balancers, a content delivery network, SSD storage, static IP addresses and DNS management for a low, predictable monthly price.",
+        "simple": "Skye rents you a ready-rigged server for one monthly price, with storage and data included.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/lightsail/latest/userguide/what-is-amazon-lightsail.html"
+      },
+      {
+        "id": "lightsail-02",
+        "q": "What does a Lightsail instance plan include?",
+        "a": "Memory, vCPUs, SSD storage and a data transfer allowance in one monthly price; only outbound data beyond the allowance costs extra. For example, the smallest Linux plan with a public IPv4 address is $5 a month: 512 MB of memory, 2 vCPUs, 20 GB of SSD and 1 TB of transfer.",
+        "simple": "One price covers the computer, its disk and lots of data. Only data beyond that costs extra.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/lightsail/pricing/"
+      },
+      {
+        "id": "lightsail-03",
+        "q": "What can a Lightsail instance start from?",
+        "a": "An image (blueprint) with a plain operating system, a development stack such as LAMP or Node.js, or a ready application such as WordPress, Drupal or Magento, so you skip installing the software yourself.",
+        "simple": "A ready-made starting kit: a bare system, a coding setup, or an app like WordPress already installed.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/lightsail/latest/userguide/what-is-amazon-lightsail.html"
+      },
+      {
+        "id": "lightsail-04",
+        "q": "Why attach a static IP to a Lightsail instance?",
+        "a": "An instance's default public IP address changes every time you stop and start it. A static IP stays the same, so your domain's DNS records keep working. It costs nothing while attached to an instance, but is charged when it isn't attached.",
+        "simple": "So the address doesn't change when you restart. It's free while it's in use.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/lightsail/latest/userguide/understanding-static-ip-addresses-in-amazon-lightsail.html"
+      },
+      {
+        "id": "lightsail-05",
+        "q": "How does a Lightsail instance firewall work?",
+        "a": "Each instance has an IPv4 and an IPv6 firewall made of allow rules: a protocol, a port and the source addresses. They filter traffic arriving at the public IP; all outbound traffic is allowed. Limit SSH and RDP to your own IP address.",
+        "simple": "You list which doors are open and who may knock. Keep the admin door open only to you.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/lightsail/latest/userguide/understanding-firewall-and-port-mappings-in-amazon-lightsail.html"
+      },
+      {
+        "id": "lightsail-06",
+        "q": "What do Lightsail automatic snapshots keep?",
+        "a": "Once turned on, Lightsail takes a daily snapshot of the instance or disk and keeps the latest seven. They are deleted with the instance, so copy one to a manual snapshot to keep it. Windows instances and managed databases don't support automatic snapshots.",
+        "simple": "A copy every day, the last seven kept. Save one by hand if you want to keep it for good.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-configuring-automatic-snapshots.html"
+      },
+      {
+        "id": "lightsail-07",
+        "q": "How does a Lightsail load balancer keep a site up?",
+        "a": "It spreads web traffic across Lightsail instances in several Availability Zones, health-checks them and sends requests only to healthy ones. Attach a validated Lightsail certificate for HTTPS. The instances should share a central database and media storage.",
+        "simple": "One gate sends visitors to healthy servers in different zones, so one failing server doesn't stop the site.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/lightsail/latest/userguide/understanding-lightsail-load-balancers.html"
+      },
+      {
+        "id": "lightsail-08",
+        "q": "What managed databases does Lightsail offer?",
+        "a": "MySQL or PostgreSQL plans with memory, processing, storage and a transfer allowance included, in standard or high availability configurations, for a fixed monthly price. They scale separately from your instances.",
+        "simple": "Ready-run databases for a fixed monthly price, kept apart from your servers so each can grow.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/lightsail/latest/userguide/what-is-amazon-lightsail.html"
+      },
+      {
+        "id": "lightsail-09",
+        "q": "How do you move a Lightsail instance to Amazon EC2?",
+        "a": "Export an instance snapshot to EC2. It becomes an AMI and an EBS snapshot (plus one more EBS snapshot per attached disk) in the same Region, from which you launch an EC2 instance. For another Region, copy the snapshot there in Lightsail first.",
+        "simple": "Export a snapshot and it becomes an EC2 starting image, ready to launch a bigger server.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-exporting-snapshots-to-amazon-ec2.html"
+      },
+      {
+        "id": "lightsail-10",
+        "q": "When should you choose Amazon EC2 instead of Lightsail?",
+        "a": "When you need advanced networking, flexible pay-per-use or commitment pricing, hundreds of instance types, or close integration with services such as RDS, DynamoDB or Lambda. Lightsail fits simple sites, small apps and prototypes with fixed, predictable costs.",
+        "simple": "When you outgrow simple: special networks, many server types, or tight links to other AWS services.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/lightsail-elastic-beanstalk-ec2.html"
+      },
+      {
+        "id": "lightsail-11",
+        "q": "How can a Lightsail project use other AWS services?",
+        "a": "Lightsail keeps a focused set of features, but you can connect your project to other AWS services through Amazon VPC peering, so your instances can reach resources such as databases in your account's VPC.",
+        "simple": "A private link lets your Lightsail servers talk to the rest of your AWS account.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/lightsail/latest/userguide/what-is-amazon-lightsail.html"
+      }
+    ],
+    "backup": [
+      {
+        "id": "backup-01",
+        "q": "What is AWS Backup?",
+        "a": "A fully managed service that centralises and automates data protection across AWS services, in the cloud and on premises. You set backup policies once and monitor backups of many resource types in one place, instead of service by service with custom scripts.",
+        "simple": "Bea backs up the whole city's data on a timetable, all from one office.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html"
+      },
+      {
+        "id": "backup-02",
+        "q": "What can AWS Backup protect?",
+        "a": "Many resource types, including EC2 instances, EBS volumes, S3 data, DynamoDB tables, RDS and Aurora databases, EFS and FSx file systems, DocumentDB, Neptune and Redshift clusters, EKS clusters, CloudFormation stacks and Storage Gateway volumes.",
+        "simple": "Disks, files, buckets, tables and databases from many AWS services, all from one place.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html"
+      },
+      {
+        "id": "backup-03",
+        "q": "What are a backup plan, a backup vault and a recovery point?",
+        "a": "A backup plan says when and how to back up and how long to keep each copy. A backup vault is the container that stores and encrypts the backups. Each backup the plan makes is a recovery point you can restore.",
+        "simple": "The plan is the timetable, the vault is the strongroom, and each saved copy is one you can restore.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/plan-options-and-configuration.html"
+      },
+      {
+        "id": "backup-04",
+        "q": "How do you assign resources to a backup plan?",
+        "a": "By resource ID, or by tags: every resource with the tag you choose, for example backup=daily, is backed up under the plan, so one plan covers many services consistently.",
+        "simple": "Stick a label on what matters, and everything with that label gets backed up.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html"
+      },
+      {
+        "id": "backup-05",
+        "q": "How long can AWS Backup keep backups?",
+        "a": "Snapshot backups from 1 day to 100 years, or indefinitely. Continuous backups for point-in-time restore keep 1 to 35 days. Supported backups can move to cheaper cold storage, where they must then stay at least 90 days.",
+        "simple": "Snapshots for a day up to a hundred years; second-by-second backups for up to 35 days.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/plan-options-and-configuration.html"
+      },
+      {
+        "id": "backup-06",
+        "q": "Why are AWS Backup backups incremental?",
+        "a": "For supported resource types, the first backup is a full copy and each later one stores only what changed, so you can back up often while storing less. Resource types without incremental support make a full copy each time.",
+        "simple": "Bea copies everything once, then only what changed, so backing up often stays cheap.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html"
+      },
+      {
+        "id": "backup-07",
+        "q": "How do you protect backups from losing a whole Region or account?",
+        "a": "Add a copy rule to the plan: each backup is copied to a vault in another Region, or to another account in your AWS Organizations organization. You can fan backups in to one central account, then fan them out again for resilience.",
+        "simple": "Send a copy of every backup to a far-away vault, in another Region or another account.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html"
+      },
+      {
+        "id": "backup-08",
+        "q": "Governance mode or compliance mode for Vault Lock?",
+        "a": "Governance mode can be removed by users with enough IAM permissions. Compliance mode becomes immutable after a grace time of at least 72 hours: from then on no one, not the root user and not AWS, can delete backups early or change the lock.",
+        "simple": "Trusted admins can open a governance lock. Once set, nobody can open a compliance lock.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/vault-lock.html"
+      },
+      {
+        "id": "backup-09",
+        "q": "What does AWS Backup restore testing do?",
+        "a": "On a schedule it restores the latest or a random recovery point of chosen resources, times the restore, optionally lets you validate the result, then deletes the restored resources. It proves backups really restore, and the results help show compliance.",
+        "simple": "Every so often Bea restores a backup for real, times it, checks it, then tidies up.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/restore-testing.html"
+      },
+      {
+        "id": "backup-10",
+        "q": "What is a logically air-gapped vault?",
+        "a": "A special backup vault with extra protection: it is always locked in compliance mode, encrypted with an AWS owned key by default (or your own KMS key), and you can share access with other accounts so they can restore quickly after an incident.",
+        "simple": "An extra-sealed vault, always locked, that another account can use to restore fast.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/logicallyairgappedvault.html"
+      },
+      {
+        "id": "backup-11",
+        "q": "How do you manage backups across many AWS accounts?",
+        "a": "Use backup policies through AWS Organizations, so backup plans apply automatically to the accounts in your organization. AWS Backup Audit Manager then checks backups against controls you choose and reports daily on compliance.",
+        "simple": "Write the backup rules once for the whole company, and a daily report shows who follows them.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html"
+      }
+    ],
+    "kinesis": [
+      {
+        "id": "kinesis-01",
+        "q": "What is Amazon Kinesis Data Streams?",
+        "a": "A service that collects and processes streams of data records in real time, such as logs, website clicks or market feeds. A record is typically ready to read less than a second after it is written, and several applications can read the same stream.",
+        "simple": "Kenzie's millrace: live data rushes in, in order, and many wheels can read it at once.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/streams/latest/dev/introduction.html"
+      },
+      {
+        "id": "kinesis-02",
+        "q": "What is a shard in a Kinesis data stream?",
+        "a": "A sequence of records with a fixed capacity: up to 1 MB or 1,000 records per second written, and 2 MB per second read. A stream is one or more shards, and its capacity is the sum of theirs.",
+        "simple": "One lane of the river. More lanes carry more water.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/streams/latest/dev/key-concepts.html"
+      },
+      {
+        "id": "kinesis-03",
+        "q": "How long does a Kinesis data stream keep records?",
+        "a": "24 hours by default. You can raise retention up to 8,760 hours (365 days); retention over 24 hours costs extra. Until a record expires, any application can read it again.",
+        "simple": "A day by default, up to a year for a little more, and readers can go back and read again.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/streams/latest/dev/key-concepts.html"
+      },
+      {
+        "id": "kinesis-04",
+        "q": "What does a record's partition key do?",
+        "a": "Kinesis hashes it to pick the shard, so records with the same key land on the same shard, in order. Choose a key with many values, such as a user id, so records spread evenly across shards.",
+        "simple": "A label on each record: same label, same lane, kept in order.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/streams/latest/dev/key-concepts.html"
+      },
+      {
+        "id": "kinesis-05",
+        "q": "On-demand or provisioned capacity for a Kinesis stream?",
+        "a": "On-demand needs no capacity planning: it scales on its own, ready for up to double the peak write throughput of the last 30 days, and you pay per GB. Provisioned means you choose the number of shards, billed per shard-hour, which suits predictable traffic.",
+        "simple": "Let the river widen by itself and pay per use, or dig a set number of lanes yourself.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/streams/latest/dev/how-do-i-size-a-stream.html"
+      },
+      {
+        "id": "kinesis-06",
+        "q": "How does Lambda read a Kinesis data stream?",
+        "a": "An event source mapping reads each shard and invokes your function with batches of records, one batch per shard at a time, in order. A parallelization factor of up to 10 runs more batches per shard at once while keeping order per partition key.",
+        "simple": "Lambda takes scoops of records from each lane, in order, and can take several scoops at once when busy.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/lambda/latest/dg/with-kinesis.html"
+      },
+      {
+        "id": "kinesis-07",
+        "q": "What is enhanced fan-out?",
+        "a": "A consumer that gets its own 2 MB per second from each shard, pushed to it over HTTP/2 with about 70 ms delay, instead of sharing one 2 MB per second with every other reader. A stream can have up to 20 of them (50 with On-demand Advantage).",
+        "simple": "Each reader gets its own private pipe from every lane instead of sharing one.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/streams/latest/dev/enhanced-consumers.html"
+      },
+      {
+        "id": "kinesis-08",
+        "q": "What happens when a Lambda function keeps failing on a Kinesis batch?",
+        "a": "By default Lambda retries until the records expire, so one bad record can block its shard for up to a week. Set a maximum retry count and record age, bisect failed batches to isolate the bad record, and send failures to an on-failure destination.",
+        "simple": "One broken record can jam a lane. Limit retries, split the batch, and set the bad record aside.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/lambda/latest/dg/kinesis-on-failure-destination.html"
+      },
+      {
+        "id": "kinesis-09",
+        "q": "How do you encrypt the records in a Kinesis stream?",
+        "a": "Turn on server-side encryption: Kinesis encrypts records with an AWS KMS key as producers put them in. Producers and consumers then need permission to use that key, and the KMS calls are billed.",
+        "simple": "Turn on encryption with a key, and every record is scrambled as it enters the river.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/streams/latest/dev/key-concepts.html"
+      },
+      {
+        "id": "kinesis-10",
+        "q": "When is a Kinesis stream a better fit than an SQS queue?",
+        "a": "When several applications must each read the same records, in order per key, and may need to read them again later. A stream keeps every record for its retention period; a queue hands each message to one consumer, which deletes it once processed.",
+        "simple": "When many readers need every record, in order, and may need to rewind. A queue gives each job to one worker.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/application-integration-on-aws-how-to-choose.html"
+      },
+      {
+        "id": "kinesis-11",
+        "q": "How many shards does a provisioned stream need?",
+        "a": "The larger of (write KB per second / 1,024) and (read KB per second / 2,048), rounded up, where read bandwidth is write bandwidth times the number of consumers. Change the count with UpdateShardCount as traffic grows.",
+        "simple": "Count how much flows in and how many readers there are, then dig enough lanes for the bigger need.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/streams/latest/dev/how-do-i-size-a-stream.html"
+      }
+    ],
+    "opensearch": [
+      {
+        "id": "opensearch-01",
+        "q": "What is Amazon OpenSearch Service?",
+        "a": "A managed service that deploys, runs and scales OpenSearch clusters in the AWS Cloud. OpenSearch is an open-source search and analytics engine for log analytics, real-time app monitoring and clickstream analysis.",
+        "simple": "Ola's tower runs a search engine for you: fast searches through text, logs and clicks, with no servers to run.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/what-is.html"
+      },
+      {
+        "id": "opensearch-02",
+        "q": "What is an OpenSearch Service domain?",
+        "a": "A domain is an OpenSearch cluster: the settings, instance types, instance counts and storage you choose. Each instance in it is one node, and OpenSearch Service replaces failed nodes for you.",
+        "simple": "A domain is your own search cluster. Each machine in it is a node, and broken ones are swapped out for you.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/what-is.html"
+      },
+      {
+        "id": "opensearch-03",
+        "q": "What is OpenSearch Serverless?",
+        "a": "An on-demand option with no clusters to size. You create a collection (a group of indexes) for search, time series or vector search, and capacity scales up and back down with use.",
+        "simple": "No machines to pick: you make a collection, and it grows and shrinks with how much you search.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/serverless-overview.html"
+      },
+      {
+        "id": "opensearch-04",
+        "q": "How many primary shards does OpenSearch Service give a new index by default?",
+        "a": "Five primary shards, each with one replica: 10 shards in all. Open-source OpenSearch defaults to one of each. Primary shards are hard to change later, so decide before you index the first document.",
+        "simple": "Five main pieces, plus a copy of each. Choose the count before you start: changing it later is hard.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp-sharding.html"
+      },
+      {
+        "id": "opensearch-05",
+        "q": "How big should each shard be?",
+        "a": "Roughly 10–30 GiB where search speed matters most, and 30–50 GiB for write-heavy work such as log analytics. Very large shards slow recovery, and too many small ones waste CPU and memory.",
+        "simple": "Not too big, not too small: about 10 to 50 GiB each, at the smaller end when quick searches matter most.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp-sharding.html"
+      },
+      {
+        "id": "opensearch-06",
+        "q": "What does Multi-AZ with Standby give an OpenSearch Service domain?",
+        "a": "The domain spans three AZs, each holding a full copy of the data, and one zone's nodes wait as standby. If infrastructure fails, standby takes over in under a minute, for 99.99% availability at no extra cost.",
+        "simple": "Three zones each hold all the data, one on standby. If a zone fails, standby takes over in under a minute.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-multiaz.html"
+      },
+      {
+        "id": "opensearch-07",
+        "q": "Why put an OpenSearch Service domain in a VPC?",
+        "a": "A VPC domain has no public endpoint: only resources that can reach the VPC can call it, and traffic stays within the AWS Cloud. You choose VPC or public access when you create the domain and can't switch later.",
+        "simple": "In your private network, nobody on the internet can reach it. Decide at the start: you can't switch later.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html"
+      },
+      {
+        "id": "opensearch-08",
+        "q": "What is UltraWarm storage for?",
+        "a": "Cheaper storage for read-only data you query less often, such as older logs. UltraWarm nodes keep data in Amazon S3 with caching, at a much lower cost per GiB than hot storage on the data nodes.",
+        "simple": "Older logs you rarely read move to a cheaper back room backed by S3, and you can still search them.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ultrawarm.html"
+      },
+      {
+        "id": "opensearch-09",
+        "q": "How can a DynamoDB table's items become searchable in OpenSearch without custom code?",
+        "a": "Use the zero-ETL integration. An OpenSearch Ingestion pipeline loads a snapshot through DynamoDB export to S3, then follows DynamoDB Streams to copy changes in near real time, using none of the table's throughput.",
+        "simple": "A ready-made pipeline copies the table, then keeps up with every change, without slowing the table down.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/OpenSearchIngestionForDynamoDB.html"
+      },
+      {
+        "id": "opensearch-10",
+        "q": "How does OpenSearch help a GenAI app find meaning, not just matching words?",
+        "a": "With vector search. You store embeddings and find the nearest neighbours by distance or similarity (k-NN). Vector search collections in OpenSearch Serverless can be the vector store for Amazon Bedrock Knowledge Bases.",
+        "simple": "It stores number fingerprints of meaning, so an AI can find passages that say the same thing in other words.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/serverless-vector-search.html"
+      },
+      {
+        "id": "opensearch-11",
+        "q": "What does fine-grained access control add to an OpenSearch Service domain?",
+        "a": "Permissions inside the data: at the index, document and field level, mapped to users and roles, so each person sees only the indexes, documents and fields they're allowed to.",
+        "simple": "Each person sees only their own shelves, pages or even single lines of the index.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/fgac.html"
+      }
+    ],
+    "documentdb": [
+      {
+        "id": "documentdb-01",
+        "q": "What is Amazon DocumentDB?",
+        "a": "Amazon DocumentDB (with MongoDB compatibility) is a fully managed document database. You can run the same application code, drivers and tools that you use with MongoDB.",
+        "simple": "Doc's archive keeps data as whole folders, and apps written for MongoDB can talk to it unchanged.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/documentdb/latest/devguide/what-is.html"
+      },
+      {
+        "id": "documentdb-02",
+        "q": "What is a document database?",
+        "a": "A NoSQL database that stores and queries data as JSON-like documents. A document can nest objects inside objects, and documents can each have different fields.",
+        "simple": "Each record is a folder that can hold folders inside, and no two folders need the same shape.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/nosql/document/"
+      },
+      {
+        "id": "documentdb-03",
+        "q": "When is a document database a good fit?",
+        "a": "When the schema must stay flexible for fast, changing development: user profiles where each user shares different details, content management, and real-time data from many sources.",
+        "simple": "When records differ a lot, like user profiles, and your app keeps changing what it stores.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/documentdb/latest/devguide/document-database-use-cases.html"
+      },
+      {
+        "id": "documentdb-04",
+        "q": "How does DocumentDB keep its storage durable?",
+        "a": "Storage and compute are separate. The cluster volume keeps six copies of your data across three AZs, and it grows by itself in 10 GB steps as you add data.",
+        "simple": "Six copies across three zones, and the storage grows by itself as you add more.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/documentdb/latest/devguide/what-is.html"
+      },
+      {
+        "id": "documentdb-05",
+        "q": "How many replica instances can a DocumentDB cluster have?",
+        "a": "Up to 15. Replicas share the cluster's storage, so they don't repeat writes; they serve reads, and if the primary fails DocumentDB fails over to a replica in another AZ.",
+        "simple": "Up to 15 helpers answer reads, and one takes over if the main machine fails.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/documentdb/latest/devguide/what-is.html"
+      },
+      {
+        "id": "documentdb-06",
+        "q": "Does DocumentDB require encrypted connections?",
+        "a": "By default, yes: encryption in transit is turned on for new clusters, so clients must connect over TLS. It's set by the tls parameter in the cluster parameter group.",
+        "simple": "Yes, by default: apps must use a locked, encrypted line to talk to it.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/documentdb/latest/devguide/security.encryption.ssl.html"
+      },
+      {
+        "id": "documentdb-07",
+        "q": "Can you restore DocumentDB to an exact moment?",
+        "a": "Yes. Automated backups give point-in-time recovery to any second in the retention period, up to the last 5 minutes. Retention can be set up to 35 days.",
+        "simple": "Yes: rewind to any second in the last 35 days, up to about five minutes ago.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/documentdb/latest/devguide/what-is.html"
+      },
+      {
+        "id": "documentdb-08",
+        "q": "How can code react when data in DocumentDB changes?",
+        "a": "Turn on change streams and use the cluster as a Lambda event source. Lambda invokes your function each time data changes, for instance-based clusters (not elastic or global clusters).",
+        "simple": "A running list of every change lets a function wake up each time a folder is updated.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/lambda/latest/dg/with-documentdb.html"
+      },
+      {
+        "id": "documentdb-09",
+        "q": "What do DocumentDB elastic clusters add?",
+        "a": "Elastic clusters handle millions of reads and writes per second and petabytes of storage, without you choosing, managing or upgrading instances.",
+        "simple": "A version that spreads across many machines for huge sizes, with no machines for you to pick.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/documentdb/latest/devguide/docdb-using-elastic-clusters.html"
+      },
+      {
+        "id": "documentdb-10",
+        "q": "What does a DocumentDB global cluster do?",
+        "a": "One primary Region takes writes and copies them to up to 10 read-only secondary Regions, usually in under a second. In a Region-wide outage you can promote a secondary, typically in under a minute.",
+        "simple": "Read-only copies in up to 10 other Regions. If one Region goes down, another can take over in about a minute.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/documentdb/latest/devguide/global-clusters.html"
+      },
+      {
+        "id": "documentdb-11",
+        "q": "Can DocumentDB do vector search for GenAI apps?",
+        "a": "Yes, on DocumentDB 5.0 instance-based clusters. You store embeddings beside your JSON documents and search for the most similar ones, for semantic search, recommendations and chatbots.",
+        "simple": "Yes: it can find documents that mean something similar, right beside the data your app already keeps.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/documentdb/latest/devguide/vector-search.html"
+      }
+    ],
+    "transitgateway": [
+      {
+        "id": "transitgateway-01",
+        "q": "What is AWS Transit Gateway?",
+        "a": "A network transit hub that connects your VPCs and on-premises networks. It acts as a Regional virtual router: each network attaches to it once, instead of being linked to every other network.",
+        "simple": "Tess's interchange: every network drives in once and can reach the others, instead of a road to each.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/vpc/latest/tgw/how-transit-gateways-work.html"
+      },
+      {
+        "id": "transitgateway-02",
+        "q": "Why use a hub instead of peering every VPC with every other?",
+        "a": "VPC peering isn't transitive: if A peers with B and with C, B still can't reach C through A. Linking every pair grows fast, while a hub needs one attachment per VPC.",
+        "simple": "Peering only links pairs, so many networks need lots of links. A hub needs one link for each network.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-basics.html"
+      },
+      {
+        "id": "transitgateway-03",
+        "q": "What can you attach to a transit gateway?",
+        "a": "VPCs, Site-to-Site VPN connections, Direct Connect gateways, Transit Gateway Connect attachments for SD-WAN appliances, and peering connections to other transit gateways.",
+        "simple": "Your private networks, your office's links, and other hubs in other Regions or accounts.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/vpc/latest/tgw/what-is-transit-gateway.html"
+      },
+      {
+        "id": "transitgateway-04",
+        "q": "How does a VPC attachment reach each Availability Zone?",
+        "a": "You pick exactly one subnet in each AZ you enable, and the transit gateway puts a network interface there. Resources can only reach it from AZs where it has an attachment, so enable several.",
+        "simple": "Give it one small room in each zone. Zones without one can't use the hub, so set it up in several.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/vpc/latest/tgw/how-transit-gateways-work.html"
+      },
+      {
+        "id": "transitgateway-05",
+        "q": "What decides where traffic goes inside a transit gateway?",
+        "a": "Transit gateway route tables. Each attachment is associated with exactly one route table, and its routes (static or propagated) pick the next attachment by destination IP address.",
+        "simple": "Its route tables: each network follows one table, which says which exit leads to each address.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/vpc/latest/tgw/what-is-transit-gateway.html"
+      },
+      {
+        "id": "transitgateway-06",
+        "q": "Do you need two transit gateways for high availability?",
+        "a": "No. Transit gateways are highly available by design. For redundancy, AWS recommends a single transit gateway in each Region.",
+        "simple": "No. One hub per Region is already built to keep running; you don't need a spare.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/vpc/latest/tgw/tgw-best-design-practices.html"
+      },
+      {
+        "id": "transitgateway-07",
+        "q": "What do you pay for with Transit Gateway?",
+        "a": "An hourly charge for each attachment, plus the amount of traffic the transit gateway processes. By default, data processing is charged to the account that owns the source attachment.",
+        "simple": "Each network plugged in costs a little every hour, plus a charge for the traffic that passes through.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/vpc/latest/tgw/what-is-transit-gateway.html"
+      },
+      {
+        "id": "transitgateway-08",
+        "q": "How can test VPCs be kept apart from production on one transit gateway?",
+        "a": "Associate test VPCs with one route table and production VPCs with another. An attachment only reaches what its route table has routes for, like separate routers inside one hub.",
+        "simple": "Give test and live networks different route tables, so they share a hub but can't reach each other.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/vpc/latest/tgw/tgw-transit-gateways.html"
+      },
+      {
+        "id": "transitgateway-09",
+        "q": "How do other AWS accounts attach to your transit gateway?",
+        "a": "Share it with AWS Resource Access Manager (RAM), and the other accounts' owners can attach their VPCs. AWS suggests keeping it in a central network services account.",
+        "simple": "Share it with your other accounts, and they can plug their own networks into the same hub.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/whitepapers/latest/building-scalable-secure-multi-vpc-network-infrastructure/transit-gateway.html"
+      },
+      {
+        "id": "transitgateway-10",
+        "q": "How do you see what traffic crosses a transit gateway?",
+        "a": "Turn on Transit Gateway Flow Logs. They record IP traffic to and from the transit gateway and publish it to CloudWatch Logs, Amazon S3 or Firehose, without affecting throughput or latency.",
+        "simple": "Flow logs note every trip through the hub and send the list to CloudWatch or S3 to read later.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/vpc/latest/tgw/tgw-flow-logs.html"
+      },
+      {
+        "id": "transitgateway-11",
+        "q": "How do transit gateways in different Regions connect?",
+        "a": "With a peering attachment: the other side accepts it, then you add static routes that point at it. Traffic between Regions is encrypted and travels on the AWS network.",
+        "simple": "Hubs in different Regions shake hands, then routes send traffic across, encrypted on AWS's own network.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/vpc/latest/tgw/tgw-peering.html"
+      }
+    ],
+    "globalaccelerator": [
+      {
+        "id": "globalaccelerator-01",
+        "q": "What is AWS Global Accelerator?",
+        "a": "A service that improves availability and performance for local and global users. It gives your app static IP addresses and carries users' traffic over the AWS global network to your endpoints.",
+        "simple": "Axel's express line: visitors board at the nearest stop and ride AWS's own network to your app.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/global-accelerator/latest/dg/what-is-global-accelerator.html"
+      },
+      {
+        "id": "globalaccelerator-02",
+        "q": "How many static IP addresses does an accelerator get?",
+        "a": "Two static IPv4 addresses, or four with dual-stack (two IPv4 and two IPv6). They're anycast from the AWS edge network and stay assigned as long as the accelerator exists.",
+        "simple": "Two fixed addresses, answered from many places at once, that stay yours while the accelerator exists.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/global-accelerator/latest/dg/what-is-global-accelerator.html"
+      },
+      {
+        "id": "globalaccelerator-03",
+        "q": "How does Global Accelerator shorten the trip to your app?",
+        "a": "Traffic enters at the edge location closest to the user, then travels the well-monitored, congestion-free AWS global network, so it spends less time on the public internet.",
+        "simple": "Users get on at the closest stop, then skip the busy public roads for AWS's quieter private ones.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/global-accelerator/latest/dg/introduction-how-it-works.html"
+      },
+      {
+        "id": "globalaccelerator-04",
+        "q": "What endpoints can a standard accelerator send traffic to?",
+        "a": "Network Load Balancers, Application Load Balancers, EC2 instances and Elastic IP addresses, in one AWS Region or several.",
+        "simple": "Load balancers, servers or fixed server addresses, in one Region or many.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/global-accelerator/latest/dg/what-is-global-accelerator.html"
+      },
+      {
+        "id": "globalaccelerator-05",
+        "q": "What happens when an endpoint becomes unhealthy?",
+        "a": "A standard accelerator health-checks every endpoint, and sends new connections to another healthy endpoint as soon as one fails.",
+        "simple": "It checks every stop all the time, and sends new riders to a healthy one as soon as one breaks.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/global-accelerator/latest/dg/introduction-how-it-works.html"
+      },
+      {
+        "id": "globalaccelerator-06",
+        "q": "How is Global Accelerator different from CloudFront?",
+        "a": "Both use AWS edge locations. CloudFront speeds up cacheable and dynamic web content. Global Accelerator proxies TCP or UDP traffic to apps in one or more Regions: good for gaming, IoT and voice, or apps that need static IP addresses or fast Region failover.",
+        "simple": "CloudFront keeps copies of web content near people. Axel carries any kind of traffic quickly to your app.",
+        "tier": 2,
+        "source": "https://aws.amazon.com/global-accelerator/faqs/"
+      },
+      {
+        "id": "globalaccelerator-07",
+        "q": "Why is its failover quicker than changing DNS records?",
+        "a": "Some devices and resolvers cache DNS answers for a long time. Global Accelerator's IP addresses never change, so a change takes effect in seconds, with no wait for caches to expire.",
+        "simple": "Old addresses can linger in phones and browsers. Axel's addresses never change, so switching takes seconds.",
+        "tier": 3,
+        "source": "https://aws.amazon.com/global-accelerator/faqs/"
+      },
+      {
+        "id": "globalaccelerator-08",
+        "q": "What are traffic dials and endpoint weights?",
+        "a": "A traffic dial sets what share of traffic an endpoint group in a Region gets, for example during tests or upgrades. Endpoint weights split traffic between endpoints inside a group.",
+        "simple": "Dials choose how much traffic each Region gets; weights split it between servers inside that Region.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/global-accelerator/latest/dg/introduction-how-it-works.html"
+      },
+      {
+        "id": "globalaccelerator-09",
+        "q": "How does Global Accelerator help protect your app?",
+        "a": "Your origins hide behind two static entry points that AWS Shield protects from DDoS attacks by default. It can reach internal load balancers and private EC2 instances, keeping them off the public internet.",
+        "simple": "Visitors only see Axel's two addresses, which are shielded from floods, and your servers can stay private.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/global-accelerator/latest/dg/introduction-benefits-of-migrating.html"
+      },
+      {
+        "id": "globalaccelerator-10",
+        "q": "What is a custom routing accelerator for?",
+        "a": "Sending each user to a specific EC2 instance and port in a VPC subnet, chosen by your own logic, such as putting players in one game session or callers on one media server.",
+        "simple": "Your app picks the exact server for each user, like seating game players at the same table.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/global-accelerator/latest/dg/introduction-how-it-works.html"
+      },
+      {
+        "id": "globalaccelerator-11",
+        "q": "Can you use your own IP addresses with Global Accelerator?",
+        "a": "Yes. Bring your own IPv4 address range (BYOIP) and use it for the accelerator's static entry points, so apps with hard-coded addresses can move to AWS without client changes.",
+        "simple": "Yes: bring your own fixed addresses, so customers' apps and firewalls need no change.",
+        "tier": 4,
+        "source": "https://aws.amazon.com/global-accelerator/faqs/"
+      }
+    ],
+    "secretsmanager": [
+      {
+        "id": "secretsmanager-01",
+        "q": "What is AWS Secrets Manager?",
+        "a": "A service that stores, hands out and rotates secrets such as database passwords, API keys and OAuth tokens. Your code asks for a secret when it runs, so the secret never has to sit in the source code.",
+        "simple": "Sid keeps passwords and API keys in a strongroom and hands them to your code only when it runs.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html"
+      },
+      {
+        "id": "secretsmanager-02",
+        "q": "Why shouldn't a password be written into the code?",
+        "a": "Anyone who can read the code, or the app built from it, can read the password, and changing it means redeploying. With Secrets Manager the code fetches the secret at run time; rotate the old one so the leaked copy stops working.",
+        "simple": "Anyone who sees the code sees the password. Fetch it from Sid at run time and change the old one.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/hardcoded.html"
+      },
+      {
+        "id": "secretsmanager-03",
+        "q": "How is Secrets Manager priced?",
+        "a": "You pay per secret per month and per 10,000 API calls ($0.40 a secret a month and $0.05 per 10,000 calls in AWS's examples). Secrets marked for deletion are free, and Lambda rotation functions bill at Lambda's rate.",
+        "simple": "A small monthly fee for each secret and a tiny fee for calls. Secrets waiting to be deleted are free.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/secrets-manager/pricing/"
+      },
+      {
+        "id": "secretsmanager-04",
+        "q": "What does rotating a secret do?",
+        "a": "It updates the credential in both the secret and the database or service, on a schedule you set, as often as every four hours. Apps that fetch the secret each time get the new value without being redeployed.",
+        "simple": "Rotation changes the password in the database and in the strongroom together. Apps just keep asking Sid.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html"
+      },
+      {
+        "id": "secretsmanager-05",
+        "q": "Managed rotation or rotation by a Lambda function?",
+        "a": "Managed rotation is run by the service that owns the secret, such as RDS, Aurora, DocumentDB or Redshift for their admin passwords, with no Lambda function. Other secrets rotate with a Lambda function that Secrets Manager calls step by step.",
+        "simple": "Some services change their own passwords for you. For everything else, a small function does it.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotate-secrets_managed.html"
+      },
+      {
+        "id": "secretsmanager-06",
+        "q": "How is a secret encrypted?",
+        "a": "With envelope encryption: KMS makes a data key that encrypts the secret value, and a KMS key encrypts that data key. You choose the free AWS managed key aws/secretsmanager or a symmetric customer managed key.",
+        "simple": "Every secret is locked with a key from Kit's vault: AWS's free one or one you manage yourself.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/security-encryption.html"
+      },
+      {
+        "id": "secretsmanager-07",
+        "q": "What are the AWSCURRENT, AWSPENDING and AWSPREVIOUS labels?",
+        "a": "Staging labels on a secret's versions. AWSCURRENT is the version returned by default, AWSPENDING is the new value while rotation runs, and AWSPREVIOUS is the one before, so you can roll back.",
+        "simple": "Name tags on a secret's versions: the one in use now, the one being made, and the one before.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/whats-in-a-secret.html"
+      },
+      {
+        "id": "secretsmanager-08",
+        "q": "Single-user or alternating-users rotation?",
+        "a": "Single user changes one user's password and suits most cases, but calls with the old password may be denied for a moment, so retry. Alternating users keeps two users and changes them in turn, so apps always get valid credentials.",
+        "simple": "One user is simplest. Two users taking turns means the app always has a password that works.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotation-strategy.html"
+      },
+      {
+        "id": "secretsmanager-09",
+        "q": "How do you let a role in another AWS account read a secret?",
+        "a": "Attach a resource-based policy to the secret naming that role. Secrets Manager checks new policies with automated reasoning (Zelkova) to stop you granting broad access, and BlockPublicPolicy refuses public ones.",
+        "simple": "Give the secret its own rulebook naming who may read it. Sid refuses rules that open it to everyone.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-access_resource-policies.html"
+      },
+      {
+        "id": "secretsmanager-10",
+        "q": "How do replica secrets help an app that runs in several Regions?",
+        "a": "Secrets Manager copies the encrypted secret, its tags and resource policy to the Regions you pick, each encrypted with a KMS key there. Rotate the primary and the new value reaches every replica; a replica can be promoted to standalone.",
+        "simple": "Copies of the secret wait in other Regions. Change the main one and every copy updates too.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/replicate-secrets.html"
+      },
+      {
+        "id": "secretsmanager-11",
+        "q": "What happens when you delete a secret?",
+        "a": "It stops working at once but is kept for a recovery window of at least seven days, free, and you can restore it. A CloudWatch alarm on access attempts shows if an app still uses it. Replicas must be deleted first.",
+        "simple": "Sid locks it away for at least a week first, so you can change your mind if something still needs it.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/manage_delete-secret.html"
+      }
+    ],
+    "inspector": [
+      {
+        "id": "inspector-01",
+        "q": "What is Amazon Inspector?",
+        "a": "A vulnerability management service. It finds your EC2 instances, container images in Amazon ECR and Lambda functions by itself, and keeps scanning them for known software flaws and unintended network exposure.",
+        "simple": "Ingrid checks your servers, container images and functions for known flaws, and keeps checking.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/inspector/latest/user/what-is-inspector.html"
+      },
+      {
+        "id": "inspector-02",
+        "q": "What is a CVE?",
+        "a": "A Common Vulnerabilities and Exposures entry: a public ID for a known security flaw in software. Inspector reports packages exposed to CVEs, which attackers can exploit while they stay unpatched.",
+        "simple": "A public reference number for a known flaw in a piece of software. Ingrid tells you which you have.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/inspector/latest/user/findings-types.html"
+      },
+      {
+        "id": "inspector-03",
+        "q": "How is Inspector priced?",
+        "a": "Per resource scanned: EC2 instances by the average number assessed in a month, container images per scan and rescan, and Lambda functions per month. New accounts get a 15-day free trial.",
+        "simple": "You pay for each server, image and function it checks. New accounts try it free for 15 days.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/inspector/pricing/"
+      },
+      {
+        "id": "inspector-04",
+        "q": "When does Inspector scan a resource again?",
+        "a": "Automatically, whenever something changes that could add a flaw: a new package installed on an instance, a patch, or a newly published CVE that affects it. There are no scan schedules to set up.",
+        "simple": "Whenever something changes: new software, a patch, or news of a fresh flaw. No timetable needed.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/inspector/latest/user/what-is-inspector.html"
+      },
+      {
+        "id": "inspector-05",
+        "q": "Agent-based or agentless scanning of EC2 instances?",
+        "a": "Agent-based scanning collects the software list through the SSM Agent on the instance; agentless scanning reads it from EBS snapshots. New accounts start in hybrid mode, which uses both.",
+        "simple": "Ingrid either asks a helper on the server or looks at a copy of its disk. By default she does both.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/inspector/latest/user/scanning-ec2.html"
+      },
+      {
+        "id": "inspector-06",
+        "q": "What is the Inspector score?",
+        "a": "A severity score tailored to your environment. Inspector starts from the CVSS base score in the National Vulnerability Database and adjusts it, for example lowering it when a flaw needs the network but the instance has no open path to the internet.",
+        "simple": "Ingrid's own danger rating for your setup. A flaw nobody can reach from the internet scores lower.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/inspector/latest/user/findings-understanding-score.html"
+      },
+      {
+        "id": "inspector-07",
+        "q": "Which kinds of finding does Inspector raise?",
+        "a": "Package vulnerability (software exposed to a CVE), code vulnerability (lines of code that can be exploited, from Lambda code scanning and Code Security) and network reachability (an open network path to an instance).",
+        "simple": "Three kinds: risky software packages, risky lines of code, and doors left open to the network.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/inspector/latest/user/findings-types.html"
+      },
+      {
+        "id": "inspector-08",
+        "q": "How do you act on Inspector findings automatically?",
+        "a": "Inspector sends each finding to EventBridge as an event, where a rule can run a Lambda function or notify through SNS. Findings also go to Security Hub. Once you fix the problem, Inspector notices and closes the finding.",
+        "simple": "Each finding goes to EventBridge, which can run code or tell the team. Fixed problems close themselves.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/inspector/latest/user/what-is-inspector.html"
+      },
+      {
+        "id": "inspector-09",
+        "q": "What does Lambda code scanning add to standard scanning?",
+        "a": "Standard scanning checks a function's packages and layers for CVEs. Code scanning also checks your own code for flaws such as data leaks, injection and weak cryptography. Functions encrypted with customer managed keys aren't scanned.",
+        "simple": "Standard checks the parts you borrowed. Code scanning also reads the code you wrote yourself.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/inspector/latest/user/scanning-lambda.html"
+      },
+      {
+        "id": "inspector-10",
+        "q": "How do you run Inspector across an organization?",
+        "a": "Through AWS Organizations, make one account the delegated administrator. It can activate Inspector for every account in one click, auto-activate new members and see all their findings in one place.",
+        "simple": "One account switches Ingrid on for every account and sees all their findings together.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/inspector/latest/user/what-is-inspector.html"
+      }
+    ],
+    "macie": [
+      {
+        "id": "macie-01",
+        "q": "What is Amazon Macie?",
+        "a": "A data security service that finds sensitive data in your S3 buckets using machine learning and pattern matching, and keeps checking the buckets' security and access settings.",
+        "simple": "Mae checks your S3 buckets for personal or secret data and spots buckets left open.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/macie/latest/user/what-is-macie.html"
+      },
+      {
+        "id": "macie-02",
+        "q": "What counts as sensitive data for Macie?",
+        "a": "Credentials such as private keys and AWS secret access keys; financial information such as credit card and bank account numbers; and personal information such as passport, driver's licence and health insurance numbers.",
+        "simple": "Passwords and keys, card and bank numbers, and personal details like passport numbers.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/macie/latest/user/managed-data-identifiers.html"
+      },
+      {
+        "id": "macie-03",
+        "q": "Is there a free trial for Macie?",
+        "a": "Yes, 30 days the first time you enable it. The trial covers checking your buckets' security and access, and can include automated sensitive data discovery, but not discovery jobs.",
+        "simple": "Yes, 30 days free to check your buckets. Deep searches you start yourself aren't included.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/macie/latest/user/what-is-macie.html"
+      },
+      {
+        "id": "macie-04",
+        "q": "Policy findings or sensitive data findings?",
+        "a": "A policy finding reports a possible security or privacy problem with a bucket, such as it becoming public. A sensitive data finding reports sensitive data Macie found inside an object.",
+        "simple": "One kind says a bucket is badly set up. The other says a file holds sensitive data.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/macie/latest/user/findings-types.html"
+      },
+      {
+        "id": "macie-05",
+        "q": "Automated discovery or a discovery job?",
+        "a": "Automated sensitive data discovery keeps sampling representative objects across all your buckets, for a broad view. A sensitive data discovery job is a deeper, targeted analysis of buckets you choose, run once or on a schedule.",
+        "simple": "Automatic checks sample every bucket a little. A job searches the buckets you pick, in depth.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/macie/latest/user/what-is-macie.html"
+      },
+      {
+        "id": "macie-06",
+        "q": "What is a custom data identifier?",
+        "a": "Your own rule for sensitive data: a regular expression for the text pattern, plus optional keywords and a proximity rule. Use it for data only your organization has, which the managed identifiers don't know.",
+        "simple": "Your own pattern for secret data only your company has, like its own reference numbers.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/macie/latest/user/custom-data-identifiers.html"
+      },
+      {
+        "id": "macie-07",
+        "q": "What is an allow list in Macie?",
+        "a": "Text or text patterns Macie should ignore in objects, such as your organization's public phone numbers or sample test data, so they don't raise sensitive data findings.",
+        "simple": "A list of things Mae should ignore, like your shop's public phone number.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/macie/latest/user/what-is-macie.html"
+      },
+      {
+        "id": "macie-08",
+        "q": "How do you act on Macie findings automatically?",
+        "a": "Macie publishes findings to EventBridge as events, where rules can run a Lambda function or notify through SNS. It can also publish findings to Security Hub.",
+        "simple": "Findings go to EventBridge, which can run code or alert the team, and on to Security Hub.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/macie/latest/user/what-is-macie.html"
+      },
+      {
+        "id": "macie-09",
+        "q": "Can Macie show you the sensitive data it found?",
+        "a": "Yes, if you set it up: it can retrieve and reveal samples, the first 1 to 10 occurrences of each type, up to 128 characters each, encrypted with a KMS key you specify.",
+        "simple": "Yes, if you allow it: Mae can show a few short samples, locked with your own key.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/macie/latest/user/findings-retrieve-sd.html"
+      },
+      {
+        "id": "macie-10",
+        "q": "How do you run Macie across many accounts?",
+        "a": "Integrate it with AWS Organizations (or use invitations). A Macie administrator account can enable Macie for members, review their buckets and policy findings, and look for sensitive data in their buckets.",
+        "simple": "One account switches Mae on for all the others and checks all their buckets.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/macie/latest/user/what-is-macie.html"
+      }
+    ],
+    "securityhub": [
+      {
+        "id": "securityhub-01",
+        "q": "What is AWS Security Hub?",
+        "a": "A unified cloud security service. It gathers signals from posture checks, Inspector (software flaws), Macie (sensitive data) and GuardDuty (threats), correlates them and ranks the critical issues so you can respond at scale.",
+        "simple": "Hana puts every security warning on one board and ranks the worst first.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub-v2.html"
+      },
+      {
+        "id": "securityhub-02",
+        "q": "What are Security Hub's best-practice checks?",
+        "a": "Security Hub CSPM (cloud security posture management) runs checks, called controls, against standards such as AWS Foundational Security Best Practices, CIS and PCI DSS. Each failed check becomes a control finding.",
+        "simple": "Hana checks your setup against lists of good habits, like keeping buckets private, and flags misses.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub.html"
+      },
+      {
+        "id": "securityhub-03",
+        "q": "Can you try Security Hub's best-practice checks for free?",
+        "a": "Yes. The first time you enable Security Hub CSPM in an account, it gets a 30-day free trial. You still pay for other services it uses, such as AWS Config items, but not for Config rules turned on only by its standards.",
+        "simple": "Yes, 30 days free in each account. Other services it leans on may still cost a little.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub.html"
+      },
+      {
+        "id": "securityhub-04",
+        "q": "What is a security standard in Security Hub CSPM?",
+        "a": "A set of requirements based on regulations, industry best practice or company policy. Enabling a standard turns on all its controls, and Security Hub checks them and produces findings. You can turn single controls off.",
+        "simple": "A checklist of good habits. Switch one on and Hana starts checking every item on it.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/securityhub/latest/userguide/standards-view-manage.html"
+      },
+      {
+        "id": "securityhub-05",
+        "q": "What is the security score?",
+        "a": "A score from 0 to 100 percent for each enabled standard, based on how its controls are doing; the summary score averages them. It needs AWS Config resource recording and updates every 24 hours.",
+        "simple": "A percentage of passed checks for each checklist, updated once a day.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/securityhub/latest/userguide/standards-security-score.html"
+      },
+      {
+        "id": "securityhub-06",
+        "q": "Why does Security Hub CSPM need AWS Config?",
+        "a": "Most controls are checked with service-linked AWS Config rules, so you must enable AWS Config and record your resources for Security Hub CSPM to produce most control findings.",
+        "simple": "Most of Hana's checks read the city's records in AWS Config, so Config has to be switched on.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub.html"
+      },
+      {
+        "id": "securityhub-07",
+        "q": "Which format are Security Hub findings in?",
+        "a": "Security Hub generates and receives findings in the Open Cybersecurity Schema Framework (OCSF), including those from GuardDuty, Macie and Inspector. Security Hub CSPM uses the AWS Security Finding Format (ASFF).",
+        "simple": "Every warning is written the same way, whichever watcher raised it, so they're easy to compare.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub-v2.html"
+      },
+      {
+        "id": "securityhub-08",
+        "q": "What are automation rules?",
+        "a": "Rules, made in the administrator account, that update findings as they arrive: for example raise a finding to CRITICAL when it's about a business-critical resource, or suppress INFORMATIONAL ones. They apply to new and updated findings.",
+        "simple": "Rules that sort warnings as they arrive, like marking anything about the payments server urgent.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/securityhub/latest/userguide/automation-rules.html"
+      },
+      {
+        "id": "securityhub-09",
+        "q": "What is cross-Region aggregation?",
+        "a": "You choose a home Region (once called the aggregation Region) and link others. Findings, insights, control statuses and security scores from the linked Regions all appear in the home Region, so you manage them in one place.",
+        "simple": "Pick one Region as home, and warnings from your other Regions show up there too.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/securityhub/latest/userguide/finding-aggregation.html"
+      },
+      {
+        "id": "securityhub-10",
+        "q": "What are exposure findings?",
+        "a": "Security Hub correlates findings from Security Hub CSPM checks, Inspector and other services to detect exposures of one resource. An attack path graph shows how an attacker could reach and take control of it.",
+        "simple": "Hana joins small clues about one resource into one warning, with a map of how an attacker could get in.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub-v2.html"
+      },
+      {
+        "id": "securityhub-11",
+        "q": "What does Security Hub's unused access analysis find?",
+        "a": "IAM roles, users, access keys and permissions not used in the last 90 days. It creates a service-linked IAM Access Analyzer, and for unused permissions it can suggest a smaller replacement policy.",
+        "simple": "Badges and keys nobody has used for 90 days, with a smaller set of permissions to swap in.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub-v2.html"
+      }
+    ],
+    "polly": [
+      {
+        "id": "polly-01",
+        "q": "What is Amazon Polly?",
+        "a": "A service that turns text into lifelike speech, in many languages and voices. You pay only for the text you convert, and you can cache and replay the audio at no extra cost.",
+        "simple": "Pip reads your text aloud in a natural voice. Save the audio and play it again for free.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/polly/latest/dg/what-is.html"
+      },
+      {
+        "id": "polly-02",
+        "q": "What are Polly's voice engines?",
+        "a": "Four: generative (the most human-like and conversational), long-form (for long content such as articles and training), neural (high quality) and standard. You pick an engine and a voice for each request.",
+        "simple": "Four kinds of voice, from plain to very human, including one for long stories.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/polly/latest/dg/voice-engines-polly.html"
+      },
+      {
+        "id": "polly-03",
+        "q": "How is Polly priced?",
+        "a": "Per character of text converted, billed monthly. The rate depends on the engine: standard is cheapest, then neural, generative and long-form. Each engine has a monthly free allowance to start with.",
+        "simple": "You pay for each letter Pip reads, and plainer voices cost less. There's a free allowance each month.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/polly/pricing/"
+      },
+      {
+        "id": "polly-04",
+        "q": "What is SSML?",
+        "a": "Speech Synthesis Markup Language: tags around your text, inside <speak>, that control how Polly says it, such as pauses, speed, pitch, volume, emphasis and pronunciation.",
+        "simple": "Little tags in the text that tell Pip to pause, slow down, speak louder or say a word a certain way.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/polly/latest/dg/ssml.html"
+      },
+      {
+        "id": "polly-05",
+        "q": "What is a pronunciation lexicon?",
+        "a": "A list, in the W3C Pronunciation Lexicon Specification format, that tells Polly how to say particular words, for example reading 'W3C' as 'World Wide Web Consortium'. Lexicons are stored per Region.",
+        "simple": "A word list telling Pip how to say tricky words, like names or short forms.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/polly/latest/dg/managing-lexicons.html"
+      },
+      {
+        "id": "polly-06",
+        "q": "Which audio formats can Polly return?",
+        "a": "MP3 or Ogg Vorbis for web and mobile apps, or PCM for devices and telephony. It can also return speech marks instead of audio.",
+        "simple": "Common sound files for apps and websites, or raw sound for phone systems.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/polly/latest/dg/how-text-to-speech-works.html"
+      },
+      {
+        "id": "polly-07",
+        "q": "Does Polly translate text?",
+        "a": "No. Polly speaks text in the language it's written in, and numbers written as digits are read in the voice's language. Translate the text first if you need another language.",
+        "simple": "No. Pip reads text in the language it's written in. Translate it first if you need another.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/polly/latest/dg/how-text-to-speech-works.html"
+      },
+      {
+        "id": "polly-08",
+        "q": "What are speech marks?",
+        "a": "Metadata about the speech, such as where each sentence and word starts and ends in the audio. Use them to highlight words as they're read or to sync a character's lips in an animation.",
+        "simple": "Timings for each word, so an app can highlight words as Pip says them or move a character's lips.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/polly/latest/dg/speechmarks.html"
+      },
+      {
+        "id": "polly-09",
+        "q": "How do you turn a long article into audio?",
+        "a": "SynthesizeSpeech handles up to 3,000 billed characters in near real time. For longer text, StartSpeechSynthesisTask works in the background on up to 100,000 billed characters, saves the file to S3 and can notify an SNS topic.",
+        "simple": "Short text comes back straight away. Long text is done in the background and saved to S3.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/polly/latest/dg/asynchronous.html"
+      },
+      {
+        "id": "polly-10",
+        "q": "Why might a generative voice sound slightly different months later?",
+        "a": "Generative and long-form voices are generative AI models, so updates to the model or its training data can change how a voice sounds a little. That matters for content made over a long time, like a podcast season.",
+        "simple": "Pip's most human voices can change slightly when they're improved, so a long series may not match.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/polly/latest/dg/generative-voices.html"
+      }
+    ],
+    "comprehend": [
+      {
+        "id": "comprehend-01",
+        "q": "What is Amazon Comprehend?",
+        "a": "A natural language processing (NLP) service that finds insights in text: the entities named, key phrases, language, sentiment and personal data. Its models are pre-trained, so you don't need training data.",
+        "simple": "Nora reads text and tells you who and what it mentions, its language and its mood.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/comprehend/latest/dg/what-is.html"
+      },
+      {
+        "id": "comprehend-02",
+        "q": "What does sentiment analysis tell you?",
+        "a": "The main feeling of a text: positive, negative, neutral or mixed, with a score for how likely each is. Use it to see how customers feel about a product from their comments.",
+        "simple": "Whether a comment sounds happy, unhappy, neutral or mixed, and how sure Nora is.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/comprehend/latest/dg/how-sentiment.html"
+      },
+      {
+        "id": "comprehend-03",
+        "q": "How is Comprehend priced?",
+        "a": "Most features bill per unit of 100 characters, with a minimum of 3 units a request. The free tier covers 50,000 units (5 million characters) a month per feature for 12 months. Custom models also pay for training and endpoints.",
+        "simple": "You pay per 100 letters read. For a year, the first 5 million letters a month are free for each check.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/comprehend/pricing/"
+      },
+      {
+        "id": "comprehend-04",
+        "q": "What is an entity in Comprehend?",
+        "a": "A reference in the text to a real-world thing, such as a person, location, organization, date, quantity or title, each with a confidence score you can filter on.",
+        "simple": "A name or thing in the text, like a person, a place, a date or an amount.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/comprehend/latest/dg/how-entities.html"
+      },
+      {
+        "id": "comprehend-05",
+        "q": "Sentiment or targeted sentiment?",
+        "a": "Sentiment gives one overall feeling per document. Targeted sentiment gives the feeling about each entity mentioned: in 'The tacos were delicious and the staff was friendly', both tacos and staff are positive.",
+        "simple": "One gives the whole review's mood. The other gives the mood about each thing it mentions.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/comprehend/latest/dg/how-targeted-sentiment.html"
+      },
+      {
+        "id": "comprehend-06",
+        "q": "How does Comprehend handle personally identifiable information (PII)?",
+        "a": "It finds PII such as addresses, bank account numbers and phone numbers in English or Spanish text, in real time or in a batch job. Redacting it needs an asynchronous batch job.",
+        "simple": "Nora spots personal details like addresses and phone numbers, and can black them out.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/comprehend/latest/dg/pii.html"
+      },
+      {
+        "id": "comprehend-07",
+        "q": "Real-time or asynchronous analysis?",
+        "a": "Synchronous calls analyse one document, or up to 25 at once, and answer straight away, for interactive apps. For large sets, put the documents in S3 and start an asynchronous job; the results land in S3.",
+        "simple": "One or a few texts get answers straight away. Big piles go in S3 and are read as a background job.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/comprehend/latest/dg/concepts-processing-modes.html"
+      },
+      {
+        "id": "comprehend-08",
+        "q": "What is custom classification?",
+        "a": "You train a classifier on your own labelled examples to sort documents into your own categories, such as routing support requests to the right team. Classify one document in real time, or a set in a job.",
+        "simple": "Teach Nora your own labels with examples, like which team should answer each support message.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/comprehend/latest/dg/how-document-classification.html"
+      },
+      {
+        "id": "comprehend-09",
+        "q": "What is Amazon Comprehend Medical?",
+        "a": "A separate service that finds medical information, such as conditions, medications and protected health information, in clinical text like doctors' notes. It reads US English only and is priced separately.",
+        "simple": "A sister service that reads doctors' notes and finds illnesses and medicines.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/comprehend-medical/latest/dev/comprehendmedical-welcome.html"
+      },
+      {
+        "id": "comprehend-10",
+        "q": "What does a real-time custom model cost while it's idle?",
+        "a": "A custom model used in real time runs on an endpoint, which you pay for from the moment it starts until you delete it, whether or not requests arrive. Use auto scaling, and delete endpoints you no longer need.",
+        "simple": "A live custom model costs money every hour it's switched on, so turn it off when you're done.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/comprehend/latest/dg/manage-endpoints.html"
+      },
+      {
+        "id": "comprehend-11",
+        "q": "How do you keep the text Comprehend reads private?",
+        "a": "Encrypt the input in S3, and use your own KMS key to encrypt job output and the storage volume of the instance that runs the job. IAM controls who may call Comprehend.",
+        "simple": "Lock the input, the results and the working disk with your own key, and let only chosen roles in.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/comprehend/latest/dg/what-is.html"
+      }
+    ],
+    "stepfunctions": [
+      {
+        "id": "stepfunctions-01",
+        "q": "What is AWS Step Functions?",
+        "a": "Stef's service for workflows, also called state machines. Each step is a state, and Step Functions runs them in order, calling Lambda or other AWS services for the work, so you write less glue code.",
+        "simple": "Stef runs the steps of a job in order, calling other services for each one, so you write less glue code.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html"
+      },
+      {
+        "id": "stepfunctions-02",
+        "q": "What are a state and an execution?",
+        "a": "A state is one step in a workflow, such as a Task state that asks another AWS service to do some work. An execution is one run of the workflow, from its first state to its last.",
+        "simple": "A state is one step. An execution is one run of the whole workflow, start to finish.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html"
+      },
+      {
+        "id": "stepfunctions-03",
+        "q": "How is Step Functions priced?",
+        "a": "Standard workflows are billed per state transition, retries included, and 4,000 transitions a month are free with no end date. Express workflows are billed per request, by duration and by memory used.",
+        "simple": "Standard workflows pay per step, with 4,000 free each month. Express ones pay per run and its length.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/step-functions/pricing/"
+      },
+      {
+        "id": "stepfunctions-04",
+        "q": "What does a Choice state do?",
+        "a": "It adds if-then logic: it checks the state's input against its rules and picks the next state. Give it a Default, because if no rule matches and there's no Default, the execution fails.",
+        "simple": "A Choice state is a fork in the road: it looks at the data and picks which step comes next.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/step-functions/latest/dg/state-choice.html"
+      },
+      {
+        "id": "stepfunctions-05",
+        "q": "What is the difference between a Parallel state and a Map state?",
+        "a": "Parallel runs different branches at the same time and waits for all of them to finish; if one fails, the whole state fails. Map runs the same steps once for each item in a list, with the iterations in parallel.",
+        "simple": "Parallel plays different parts at once. Map plays the same part once for every item in a list.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/step-functions/latest/dg/workflow-states.html"
+      },
+      {
+        "id": "stepfunctions-06",
+        "q": "How do Retry and Catch handle a failed step?",
+        "a": "By default an error fails the whole execution. Retry tries the step again, 3 times by default, waiting twice as long each time. Catch sends an error that keeps happening to a fallback state instead.",
+        "simple": "Retry tries a failed step again, waiting a bit longer each time. Catch sends the error to a backup step.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/step-functions/latest/dg/concepts-error-handling.html"
+      },
+      {
+        "id": "stepfunctions-07",
+        "q": "What is the Amazon States Language?",
+        "a": "The JSON-based language a workflow is written in. It names the states, says which one starts, and links each state to the next. The console shows the same workflow as a diagram.",
+        "simple": "The way a workflow is written down: a list of steps and which one comes next. The console draws it.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/step-functions/latest/dg/concepts-amazon-states-language.html"
+      },
+      {
+        "id": "stepfunctions-08",
+        "q": "Standard or Express: which workflow type fits which job?",
+        "a": "Standard runs for up to a year, each step exactly once, with full history: good for payments and long jobs. Express runs for up to five minutes at very high rates: good for streaming data. You can't change the type later.",
+        "simple": "Standard is for long, careful jobs that must run once. Express is for lots of quick jobs, up to five minutes.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/step-functions/latest/dg/choosing-workflow-type.html"
+      },
+      {
+        "id": "stepfunctions-09",
+        "q": "How can a workflow wait for a person to approve something?",
+        "a": "Use the wait-for-callback pattern (.waitForTaskToken). The task sends out a task token, for example in a queue message, and the workflow pauses until something returns it with SendTaskSuccess or SendTaskFailure. Standard workflows can wait up to a year.",
+        "simple": "Stef hands out a ticket and waits. When the person approves and hands it back, the music carries on.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html"
+      },
+      {
+        "id": "stepfunctions-10",
+        "q": "How can Step Functions call AWS services without a Lambda function?",
+        "a": "Through service integrations. AWS SDK integrations call the API actions of over two hundred services directly, and optimized integrations add extras for services such as Lambda, DynamoDB, SQS and ECS, like waiting for a job to finish (.sync).",
+        "simple": "Stef can call many AWS services herself, so you don't need a function just to pass a message on.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html"
+      },
+      {
+        "id": "stepfunctions-11",
+        "q": "What is a Distributed Map state?",
+        "a": "A Map state in Distributed mode runs each item as a child workflow execution with its own history, up to 10,000 at once. It can read a large dataset straight from S3, such as a CSV file or a list of objects.",
+        "simple": "For huge jobs, Stef splits the list and runs up to 10,000 small workflows at the same time.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/step-functions/latest/dg/state-map-distributed.html"
+      },
+      {
+        "id": "stepfunctions-12",
+        "q": "Why do Express workflows suit only work that is safe to repeat?",
+        "a": "Asynchronous Express workflows run at least once, so a step might run twice. That suits idempotent work, like writing the same item to DynamoDB again. Payments belong in Standard, which runs each step exactly once unless you add Retry.",
+        "simple": "Quick Express jobs might run a step twice. Use them for safe-to-repeat work and Standard for payments.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/step-functions/latest/dg/choosing-workflow-type.html"
+      }
+    ],
+    "cloudformation": [
+      {
+        "id": "cloudformation-01",
+        "q": "What is AWS CloudFormation?",
+        "a": "Forma's service for infrastructure as code. You describe the AWS resources you want in a template, and CloudFormation creates and configures them for you, working out what depends on what.",
+        "simple": "Describe what you want in one file, and CloudFormation builds it all for you, in the right order.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html"
+      },
+      {
+        "id": "cloudformation-02",
+        "q": "What is the difference between a template and a stack?",
+        "a": "A template is a YAML or JSON text file that describes resources. A stack is what CloudFormation builds from it: you create, update and delete all of its resources together, as one unit.",
+        "simple": "The template is the blueprint. The stack is the building made from it, looked after as one piece.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cloudformation-overview.html"
+      },
+      {
+        "id": "cloudformation-03",
+        "q": "What does CloudFormation cost?",
+        "a": "Nothing extra for resources in the AWS:: namespaces: you pay only for what it creates, like EC2 servers, just as if you'd made them by hand. Third-party resource types and custom hooks are charged per handler operation.",
+        "simple": "Building AWS resources with CloudFormation is free. You pay only for the resources themselves.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/cloudformation/pricing/"
+      },
+      {
+        "id": "cloudformation-04",
+        "q": "Which section must every template have?",
+        "a": "Resources. Each resource has a logical ID, a type such as AWS::S3::Bucket, and its properties. Parameters, Outputs, Mappings, Conditions and the other sections are optional.",
+        "simple": "Every blueprint needs a list of Resources. Everything else in it is optional.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html"
+      },
+      {
+        "id": "cloudformation-05",
+        "q": "What are Parameters and Outputs for?",
+        "a": "Parameters let you pass in values, like an instance type, when you create or update a stack, so one template fits many uses. Outputs hand back values after the build, like a website address, for people or other stacks.",
+        "simple": "Parameters are the blanks you fill in before building. Outputs are the notes handed back after.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html"
+      },
+      {
+        "id": "cloudformation-06",
+        "q": "What do intrinsic functions such as Ref and Fn::GetAtt do?",
+        "a": "They fill in values that only exist when the stack runs, such as the name of a bucket created moments earlier. Ref returns a resource's or parameter's value, Fn::GetAtt reads one of a resource's attributes, and Fn::Sub builds text.",
+        "simple": "They let one part of the blueprint point at another, like 'the bucket I just made'.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/intrinsic-function-reference.html"
+      },
+      {
+        "id": "cloudformation-07",
+        "q": "What happens if a stack fails partway through?",
+        "a": "CloudFormation rolls back: it undoes the changes so the stack returns to its last stable state. You can choose instead to preserve the resources that succeeded, fix the problem and carry on from there.",
+        "simple": "If a build fails, Forma takes the half-built parts down again, unless you ask her to keep them.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stack-failure-options.html"
+      },
+      {
+        "id": "cloudformation-08",
+        "q": "Why preview an update with a change set?",
+        "a": "A change set lists what an update will do before it happens. Some edits replace a resource: renaming an RDS database instance creates a new database and deletes the old one, losing its data unless you backed it up.",
+        "simple": "A change set shows what will change before you build. Some small edits quietly replace a whole database.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cloudformation-overview.html"
+      },
+      {
+        "id": "cloudformation-09",
+        "q": "What is drift, and how do you find it?",
+        "a": "Drift is when someone changes a stack's resource outside CloudFormation, for example in the EC2 console, so it no longer matches the template. Drift detection compares each resource's real settings with the template and lists the differences.",
+        "simple": "Drift is when someone changes things by hand. Drift detection shows what no longer matches the blueprint.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-stack-drift.html"
+      },
+      {
+        "id": "cloudformation-10",
+        "q": "How do you keep a bucket when its stack is deleted?",
+        "a": "Give it DeletionPolicy: Retain. With no policy, CloudFormation deletes the resource along with the stack. For resources that support snapshots, such as EBS volumes, Snapshot saves one before deleting.",
+        "simple": "Mark it Retain and it stays when the stack goes. Snapshot saves a copy before it goes.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-attribute-deletionpolicy.html"
+      },
+      {
+        "id": "cloudformation-11",
+        "q": "What do StackSets do?",
+        "a": "They create, update or delete stacks across many accounts and Regions in one operation, from one template. With AWS Organizations, they can deploy automatically to each new account added to a target OU.",
+        "simple": "One blueprint, built in every account and Region at once, and in each new account as it joins.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/what-is-cfnstacksets.html"
+      },
+      {
+        "id": "cloudformation-12",
+        "q": "How does the AWS CDK relate to CloudFormation?",
+        "a": "The AWS CDK lets you define infrastructure in a programming language such as TypeScript or Python, from reusable pieces called constructs. It turns your code into CloudFormation templates and deploys them as stacks, with rollback on error.",
+        "simple": "A coding kit lets you write the blueprint in TypeScript or Python. CloudFormation then builds it.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/cdk/v2/guide/home.html"
+      }
+    ],
+    "systemsmanager": [
+      {
+        "id": "systemsmanager-01",
+        "q": "What is AWS Systems Manager?",
+        "a": "Manny's depot for looking after servers, called nodes, at scale: in AWS, on premises and in other clouds. From one place you can see them, patch them, run commands and connect, without logging in to each one.",
+        "simple": "Manny looks after all your servers from one place: he checks them, patches them and fixes them.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/systems-manager/latest/userguide/what-is-systems-manager.html"
+      },
+      {
+        "id": "systemsmanager-02",
+        "q": "What makes a server a managed node?",
+        "a": "The SSM Agent is installed on it and can talk to the Systems Manager service. The agent takes requests from Systems Manager, runs them on the machine and reports back how they went.",
+        "simple": "A small helper program, the SSM Agent, runs on the server and does Manny's jobs there.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/systems-manager/latest/userguide/ssm-agent.html"
+      },
+      {
+        "id": "systemsmanager-03",
+        "q": "What does Systems Manager cost?",
+        "a": "Many tools cost nothing extra: Run Command on EC2 and standard Parameter Store parameters, for example. Some features are paid, such as advanced parameters, OpsCenter items and just-in-time node access.",
+        "simple": "Many of Manny's tools are free for EC2 servers. A few extras cost a little.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/systems-manager/pricing/"
+      },
+      {
+        "id": "systemsmanager-04",
+        "q": "How does Session Manager let you in without SSH?",
+        "a": "It opens a shell on a managed node from the browser or the AWS CLI, with no inbound ports, no bastion hosts and no SSH keys. IAM policies decide who may connect, and sessions can be logged.",
+        "simple": "Manny opens the door from inside, so no door to the street stays open and no keys get lost.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html"
+      },
+      {
+        "id": "systemsmanager-05",
+        "q": "What is Run Command for?",
+        "a": "Running the same admin task on many managed nodes at once, such as installing software or collecting log files, without logging in to any of them. It costs nothing extra on EC2 nodes.",
+        "simple": "One command, run on every server at once, with no logging in.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/systems-manager/latest/userguide/run-command.html"
+      },
+      {
+        "id": "systemsmanager-06",
+        "q": "What does Parameter Store keep?",
+        "a": "Named configuration values, like an endpoint address or an AMI ID, as String, StringList or SecureString (encrypted with KMS). Apps read them at run time instead of hard-coding them. For secrets that need rotating, AWS recommends Secrets Manager.",
+        "simple": "A labelled cupboard of settings your apps read when they start, instead of baking them into code.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html"
+      },
+      {
+        "id": "systemsmanager-07",
+        "q": "Standard or advanced parameters: what is the difference?",
+        "a": "Standard is the default and costs nothing extra: up to 10,000 parameters per account and Region, 4 KB each. Advanced allows 100,000 parameters, 8 KB values, parameter policies and sharing with other accounts, for a charge, and can't be downgraded.",
+        "simple": "Standard settings are free and small. Advanced ones hold more and can be shared, for a fee.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/systems-manager/latest/userguide/parameter-store-advanced-parameters.html"
+      },
+      {
+        "id": "systemsmanager-08",
+        "q": "How does Patch Manager keep servers up to date?",
+        "a": "It scans managed nodes for missing patches, or scans and installs them. Patch baselines say which patches are approved, and patch policies or maintenance windows set when patching runs.",
+        "simple": "Manny checks every server for missing fixes and installs the approved ones on a timetable.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager.html"
+      },
+      {
+        "id": "systemsmanager-09",
+        "q": "What is an Automation runbook?",
+        "a": "A document of steps that Systems Manager Automation carries out, such as restarting an instance or updating an AMI. AWS provides ready-made runbooks, you can write your own, and a run can need approval or span accounts and Regions.",
+        "simple": "A runbook is a written-down job that Manny carries out for you, the same way every time.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-automation.html"
+      },
+      {
+        "id": "systemsmanager-10",
+        "q": "What does State Manager do?",
+        "a": "It keeps managed nodes and other resources in a state you define, running Systems Manager documents on a schedule: install software at start-up, keep agents up to date or set network settings.",
+        "simple": "Manny keeps checking each server is set up the way you asked, on a regular round.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-state.html"
+      },
+      {
+        "id": "systemsmanager-11",
+        "q": "What does Default Host Management Configuration do?",
+        "a": "It lets Systems Manager manage every EC2 instance in an account and Region automatically, through a default IAM role, so you don't attach an instance profile to each one. Instances then get Session Manager, Patch Manager and agent updates.",
+        "simple": "Flip one switch and Manny looks after every server in the account, with no setup for each one.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/systems-manager/latest/userguide/fleet-manager-default-host-management-configuration.html"
+      }
+    ],
+    "config": [
+      {
+        "id": "config-01",
+        "q": "What is AWS Config?",
+        "a": "Cora's service records how your AWS resources are set up, how they relate to each other and how that changed over time. Rules then check those settings and flag resources that break them.",
+        "simple": "Cora writes down how everything is set up and every change, then flags whatever breaks the rules.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/config/latest/developerguide/WhatIsConfig.html"
+      },
+      {
+        "id": "config-02",
+        "q": "What is a configuration item?",
+        "a": "A point-in-time record of one resource: its settings, metadata, relationships and related events. AWS Config creates one whenever a resource it records is created, changed or deleted.",
+        "simple": "A snapshot of one thing's settings at one moment, taken each time it changes.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/config/latest/developerguide/config-concepts.html"
+      },
+      {
+        "id": "config-03",
+        "q": "How is AWS Config priced?",
+        "a": "By configuration items recorded, rule evaluations and conformance pack evaluations. Continuous recording makes an item for every change; periodic recording makes at most one a day per resource. S3 and SNS charges apply too.",
+        "simple": "You pay per change Cora records and per rule check. Recording once a day costs less for busy things.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/config/pricing/"
+      },
+      {
+        "id": "config-04",
+        "q": "What does the configuration recorder do?",
+        "a": "It stores changes to the resource types in scope as configuration items. By default, a customer managed recorder records every supported resource type in the Region where AWS Config runs.",
+        "simple": "The recorder is Cora's notebook. By default she writes down every kind of thing she can in the Region.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/config/latest/developerguide/config-concepts.html"
+      },
+      {
+        "id": "config-05",
+        "q": "What do AWS Config rules do?",
+        "a": "They describe the settings you want. AWS Config evaluates resources against each rule and marks them COMPLIANT or NON_COMPLIANT. Managed rules are ready-made by AWS; custom rules run your own checks.",
+        "simple": "A rule says how things should be. Cora marks each resource as following it or not.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config.html"
+      },
+      {
+        "id": "config-06",
+        "q": "When does an AWS Config rule run?",
+        "a": "When a resource in its scope changes, on a schedule such as every 24 hours, or both. Proactive rules can also check settings before a resource is deployed, though they don't block it.",
+        "simple": "Cora checks when something changes, on a timetable, or both. She can even check a plan before it is built.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config_components.html"
+      },
+      {
+        "id": "config-07",
+        "q": "How does AWS Config differ from CloudTrail?",
+        "a": "CloudTrail records API calls: who did what, and when. AWS Config records what resources look like: their settings and how they changed. Together they show who changed a resource and what it looked like before and after.",
+        "simple": "CloudTrail notes who did something. Config notes how things looked before and after.",
+        "tier": 2,
+        "source": "https://aws.amazon.com/blogs/mt/how-to-use-aws-config-and-cloudtrail-to-find-who-made-changes-to-a-resource/"
+      },
+      {
+        "id": "config-08",
+        "q": "What is a conformance pack?",
+        "a": "A collection of AWS Config rules and remediation actions, written as a YAML template and deployed as one unit in an account and Region, or across an organization. AWS provides sample packs to start from.",
+        "simple": "A ready-made set of rules Cora checks together, put in place in one go.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/config/latest/developerguide/conformance-packs.html"
+      },
+      {
+        "id": "config-09",
+        "q": "How can AWS Config fix a broken setting?",
+        "a": "With remediation: you attach a Systems Manager Automation document to a rule, and it runs on noncompliant resources when you choose, or automatically. AWS provides managed remediation documents, and you can write your own.",
+        "simple": "Cora calls on one of Manny's runbooks to put a broken setting right, by hand or automatically.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/config/latest/developerguide/remediation.html"
+      },
+      {
+        "id": "config-10",
+        "q": "What does an aggregator do?",
+        "a": "It collects AWS Config data from many accounts and Regions, or from a whole organization, into one account and Region. The view is read-only: you can't deploy rules through it.",
+        "simple": "One office sees every account's records, though it can only look, not change anything.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/config/latest/developerguide/aggregate-data.html"
+      },
+      {
+        "id": "config-11",
+        "q": "What are advanced queries in AWS Config?",
+        "a": "A subset of SQL SELECT that searches the current settings of your resources, without calling each service's own describe APIs. Through an aggregator, the same query runs across accounts and Regions.",
+        "simple": "Ask Cora questions in SQL, like which servers are a certain type, across every account at once.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/config/latest/developerguide/querying-AWS-resources.html"
+      }
+    ],
+    "organizations": [
+      {
+        "id": "organizations-01",
+        "q": "What is AWS Organizations?",
+        "a": "Orla's service for running many AWS accounts together. You create or invite accounts, group them, apply policies to them and pay for all of them with one bill.",
+        "simple": "Orla groups all your AWS accounts, sets their rules and pays one bill for all of them.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_introduction.html"
+      },
+      {
+        "id": "organizations-02",
+        "q": "What are the management account and member accounts?",
+        "a": "The management account creates the organization, adds accounts, attaches policies and pays every account's charges. Every other account is a member account, and an account can belong to only one organization at a time.",
+        "simple": "One account runs the council and pays the bills. The rest are members, each in one council only.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_getting-started_concepts.html"
+      },
+      {
+        "id": "organizations-03",
+        "q": "What does AWS Organizations cost?",
+        "a": "Nothing: AWS Organizations is offered at no additional charge. With consolidated billing, the management account gets a single bill covering the usage of every account.",
+        "simple": "Organizations itself is free, and all your accounts share one bill.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/organizations/faqs/"
+      },
+      {
+        "id": "organizations-04",
+        "q": "What is an organizational unit (OU)?",
+        "a": "A group of accounts inside the organization, such as all the production accounts or all the security accounts. OUs can hold other OUs, forming a tree under the root, and a policy attached to an OU applies to the accounts inside it.",
+        "simple": "An OU is a ward of accounts. A rule set on the ward applies to every account in it.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_getting-started_concepts.html"
+      },
+      {
+        "id": "organizations-05",
+        "q": "What does a service control policy (SCP) do?",
+        "a": "It sets the most that IAM users and roles in member accounts can do, such as using only certain Regions or services. An SCP never grants permissions: people still need IAM policies that allow the action.",
+        "simple": "An SCP is a by-law that caps what anyone in an account may do. It never hands out extra rights.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html"
+      },
+      {
+        "id": "organizations-06",
+        "q": "Why keep workloads out of the management account?",
+        "a": "SCPs don't restrict users or roles in the management account, so it can't be fenced in like the others. AWS recommends using it only for tasks that must run there and keeping resources in member accounts.",
+        "simple": "The council's own account isn't bound by the by-laws, so keep the real work in member accounts.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_getting-started_concepts.html"
+      },
+      {
+        "id": "organizations-07",
+        "q": "What is a resource control policy (RCP)?",
+        "a": "An organization policy that caps the permissions available on resources in member accounts, for example so only identities from your organization can reach them. SCPs limit your own people and roles; RCPs guard your resources.",
+        "simple": "A resource rule guards the buildings themselves: no one from outside the town gets in.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_rcps.html"
+      },
+      {
+        "id": "organizations-08",
+        "q": "What is a delegated administrator?",
+        "a": "A member account that the management account lets run an integrated AWS service, such as GuardDuty, for the whole organization, or manage organization policies. It keeps day-to-day work out of the management account.",
+        "simple": "Orla hands one member account the keys to run a job for the whole town.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_getting-started_concepts.html"
+      },
+      {
+        "id": "organizations-09",
+        "q": "What is trusted access for an AWS service?",
+        "a": "Turning it on lets a supported service, such as AWS Config or CloudFormation StackSets, work across the accounts in your organization. The service creates a service-linked role in an account when it needs one.",
+        "simple": "Trusted access lets a service like Config do its job in every account in the town.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_integrate_services.html"
+      },
+      {
+        "id": "organizations-10",
+        "q": "What are declarative policies, like tag and backup policies?",
+        "a": "Organization policies that set up services across accounts: tag policies standardise tags, backup policies apply backup plans, and others set Amazon EC2 or Amazon S3 settings, so every account follows the same setup.",
+        "simple": "Town-wide settings, like how to label things and when to back up, set once for every account.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_getting-started_concepts.html"
+      },
+      {
+        "id": "organizations-11",
+        "q": "Is AWS Organizations run per Region?",
+        "a": "No. Its service endpoints are in US East (N. Virginia) for commercial organizations, and organization entities are global, like IAM, so you don't pick a Region. Accounts used in China need a separate organization.",
+        "simple": "There is one council for every Region, run from North Virginia, a bit like IAM.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/organizations/latest/userguide/region-support.html"
+      }
+    ],
+    "appsync": [
+      {
+        "id": "appsync-01",
+        "q": "What is AWS AppSync?",
+        "a": "Gracie's service for serverless GraphQL and real-time APIs. One API endpoint can reach many data sources and push live updates to apps, and you pay for the requests and real-time messages.",
+        "simple": "Gracie connects your app to all its data through one line, and calls back when something changes.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/appsync/latest/devguide/what-is-appsync.html"
+      },
+      {
+        "id": "appsync-02",
+        "q": "How is GraphQL different from a classic web API?",
+        "a": "In a classic (REST) API each resource has its own address, so an app may make many calls and get back extra data. With GraphQL, the app asks one endpoint for exactly the fields it needs, from many sources, in one request.",
+        "simple": "Instead of visiting many counters, you hand Gracie one list and get back exactly what's on it.",
+        "tier": 1,
+        "source": "https://docs.aws.amazon.com/appsync/latest/devguide/graphql-overview.html"
+      },
+      {
+        "id": "appsync-03",
+        "q": "How is AppSync priced?",
+        "a": "Per million query and data modification operations, per million real-time updates and per minute of connection. A server-side cache is billed by the hour. Requests that fail authorization aren't charged.",
+        "simple": "You pay per request and per live update. Requests that fail the sign-in check are free.",
+        "tier": 1,
+        "source": "https://aws.amazon.com/appsync/pricing/"
+      },
+      {
+        "id": "appsync-04",
+        "q": "What do queries, mutations and subscriptions do?",
+        "a": "A query reads data, a mutation changes it, and a subscription keeps a connection open so the app hears about changes. In AppSync, subscriptions are triggered by mutations.",
+        "simple": "A query asks, a mutation changes, and a subscription listens out for news.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/appsync/latest/devguide/aws-appsync-real-time-data.html"
+      },
+      {
+        "id": "appsync-05",
+        "q": "What is a GraphQL schema?",
+        "a": "The blueprint of the API, written in the Schema Definition Language: types with fields that describe the data and how it can be read or changed. It's the contract between the app and the server.",
+        "simple": "The schema is the menu: every kind of data you can ask for, and its exact shape.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/appsync/latest/devguide/schema-components.html"
+      },
+      {
+        "id": "appsync-06",
+        "q": "What is a resolver?",
+        "a": "Code attached to a field in the schema that says how to read or change that field's data in a data source, such as DynamoDB, Lambda, OpenSearch, an HTTP endpoint or a relational database. Resolvers are written in JavaScript or VTL.",
+        "simple": "A resolver is Gracie's note for each item on the menu: which place to ring to get it.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/appsync/latest/devguide/resolver-components.html"
+      },
+      {
+        "id": "appsync-07",
+        "q": "How does an AppSync API decide who may call it?",
+        "a": "With five authorization types: API keys, AWS Lambda, IAM, OpenID Connect and Amazon Cognito user pools. You pick a default and can add more modes, for example Cognito for people and IAM for back-end services.",
+        "simple": "Gracie checks each caller by an API key, a sign-in pass, IAM or your own Lambda check.",
+        "tier": 2,
+        "source": "https://docs.aws.amazon.com/appsync/latest/devguide/security-authz.html"
+      },
+      {
+        "id": "appsync-08",
+        "q": "How do subscriptions deliver live updates?",
+        "a": "When an app subscribes, AppSync opens and keeps up a secure WebSocket connection. Matching changes are pushed to subscribers in real time, and AppSync handles the connections and the scaling.",
+        "simple": "Gracie keeps a line open to each phone and rings it the moment something changes.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/appsync/latest/devguide/aws-appsync-real-time-data.html"
+      },
+      {
+        "id": "appsync-09",
+        "q": "What is a pipeline resolver?",
+        "a": "A resolver that runs a list of functions in order, between a Before and an After step, each against its own data source: for example, check a user's permission, then save the item.",
+        "simple": "Gracie rings several places in turn for one request, like checking a pass, then saving the order.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/appsync/latest/devguide/pipeline-resolvers.html"
+      },
+      {
+        "id": "appsync-10",
+        "q": "How does AppSync caching help?",
+        "a": "Server-side caching keeps resolver results in a dedicated in-memory cache (ElastiCache) that AppSync runs for you, so repeat requests skip the data source and answer faster. The cache is billed per hour by size.",
+        "simple": "Gracie keeps popular answers on a notepad, so she doesn't ring the same place twice.",
+        "tier": 3,
+        "source": "https://docs.aws.amazon.com/appsync/latest/devguide/enabling-caching.html"
+      },
+      {
+        "id": "appsync-11",
+        "q": "What are AppSync Merged APIs?",
+        "a": "They let teams build and deploy their own AppSync source APIs on their own, then combine them into one merged GraphQL API. Apps get a single endpoint while each team ships at its own pace.",
+        "simple": "Each team runs its own switchboard, and Gracie joins them into one number for callers.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/appsync/latest/devguide/merged-api.html"
+      },
+      {
+        "id": "appsync-12",
+        "q": "What is AWS AppSync Events?",
+        "a": "Serverless WebSocket APIs for publishing and subscribing: broadcast real-time events to millions of subscribers, with no API code needed to start and no connections to manage.",
+        "simple": "A loudspeaker for live news: send one message and millions of listening apps hear it.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/appsync/latest/eventapi/event-api-welcome.html"
+      },
+      {
+        "id": "appsync-13",
+        "q": "What is an AppSync Private API?",
+        "a": "An API that can only be reached from your VPC, through interface VPC endpoints (AWS PrivateLink). Apps inside need no public IP addresses, and traffic doesn't leave the AWS network.",
+        "simple": "A private line that only callers inside your own network can use.",
+        "tier": 4,
+        "source": "https://docs.aws.amazon.com/appsync/latest/devguide/using-private-apis.html"
       }
     ]
   }

@@ -4,7 +4,8 @@ import flavourJson from '../../shared/region-flavour.json' with { type: 'json' }
 import { REGIONS, type Region } from './culture';
 
 /** What AWS says about a service in a Region (AWS Knowledge MCP regional availability). */
-export type ServiceStatus = 'available' | 'planned' | 'considering' | 'not-planned' | 'outside-partition';
+/** `not-listed`: the service's own Regions page doesn't list the Region, and AWS hasn't said whether it's coming. */
+export type ServiceStatus = 'available' | 'planned' | 'considering' | 'not-planned' | 'not-listed' | 'outside-partition';
 export interface ServiceAvailability {
   status: ServiceStatus;
   /** e.g. "2026 Q4", for planned launches. */
@@ -59,8 +60,10 @@ export interface Signature {
   /** Plain words for it, e.g. "Red suspension bridge": an impression of the place, never a famous building's name. */
   label: string;
 }
-const FLAVOUR = (flavourJson as unknown as { regions: Record<string, { signature?: Signature }> }).regions;
+const FLAVOUR = (flavourJson as unknown as { regions: Record<string, { signature?: Signature; infillStyle?: 'warm' | 'cool' }> }).regions;
 export const signatureFor = (code: string): Signature | undefined => FLAVOUR[code]?.signature;
+/** The look of a city's ordinary buildings (src/game/infill.ts): brick and stone ('warm') or concrete and glass ('cool'). */
+export const infillStyleFor = (code: string): 'warm' | 'cool' => FLAVOUR[code]?.infillStyle ?? 'cool';
 export const signatureSprite = (s: Signature) => `sig:${s.motif}:${s.variant}`;
 export const isGlobalService = (serviceId: string) => FACTS.global.includes(serviceId);
 
@@ -154,6 +157,7 @@ const STATUS_TEXT: Record<ServiceStatus, string> = {
   planned: 'Planned',
   considering: 'Being planned',
   'not-planned': 'Not planned',
+  'not-listed': 'Not offered here yet',
   'outside-partition': 'Not in this partition: use it from a standard AWS account',
 };
 /** "Planned · 2026 Q4", "Not planned": for a service a Region doesn't offer yet. */

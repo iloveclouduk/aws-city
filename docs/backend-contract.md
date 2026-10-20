@@ -1,4 +1,4 @@
-# Backend contract v2.9
+# Backend contract v2.16
 
 **Source of truth:** `src/backend/contract.ts`. If this doc and that file disagree, the file wins,
 so fix this doc. Both backends import or mirror that file:
@@ -31,6 +31,10 @@ The workshop account denies CloudFormation and `iam:CreateRole`, so `aws` is the
 | `account.verify` | `requestId, roleArn` | `roleArn` may be just the 12-digit account id. The server assumes the role and checks the caller identity before linking. |
 | `bill.enable` | `on` | v2.5: the month-to-date bill on or off (off by default; each Cost Explorer read costs $0.01, so at most one a day). |
 | `flow.enable` | `on` | v2.8: live traffic on or off (off by default; CloudWatch reads at most every 5 minutes while the city is open). |
+| `workshop.verify` | `workshopId, stepId, values?` | v2.10: check a workshop step in the account, read-only (see below). |
+| `presence.beat` | `region, rank?` | v2.11: the player is in this city now (on connect, on arriving, every 30 s while a tab is visible). |
+| `score.submit` | `board, score` | v2.11: a best for a weekly leaderboard (a game id or `mayors:<region>`). |
+| `leaderboard.get` | `board` | v2.11: this week's top of a board. |
 | `progress.get/put`, `screenshot.presign`, `quest.start` | | On `aws`/`hosted`, handled over REST (`/progress`, `/screenshots`) or locally by `ServerBackend`. `DELETE /me` removes everything stored for the player. |
 
 Client-internal, not on the wire: `storage.local` keeps `progress.parked` (a signed-out player's unsynced progress, tagged with the player's id, their Cognito `sub`, and only ever restored to that same player), and the optional `AgentBackend.playerId()` (hosted only; absent on local/mock) exists just to tag it. It is not a security check: the server authorizes every request by the JWT.
@@ -48,6 +52,9 @@ Client-internal, not on the wire: `storage.local` keeps `progress.parked` (a sig
 | `deploy.status {deployId, status, message?, outputs?}` | `status` is one of `creating`, `complete`, `failed`, `rejected`, `deleting` or `deleted`. |
 | `agent.level {agentId, level, skill?}` | The agent gets faster and announces its new skill. |
 | `account.status`, `account.linkUrl` | These drive the Deploy tab's account section. |
+| `presence.state {region, online, mayors[{name, rank}], practice?}` | v2.11: the HUD's 👥 count; public mayors walk the streets as visitors. |
+| `leaderboard.state {board, week, entries[{name, score, you?}], practice?}` | v2.11: the leaderboard card. |
+| `workshop.verified {workshopId, stepId, ok, detail}` | v2.10: the step is ticked as done for real (and pays its building), or the sentence says what to try. |
 | `page.classified`, `chat.answer` (streamed), `screenshot.url`, `progress.state`, `error` | The same as in v1. |
 
 **v2.2 additions (all optional):**
@@ -179,4 +186,144 @@ Agents act in the player's live, logged-in AWS console, one visible step at a ti
 - `Progress.finds?: {[tokenId]: 'YYYY-MM-DD'}`: the golden tokens the player found walking round their cities
   (`src/world/tokens.ts`, six per city, ids `<regionCode>:<n>`), with the local date each was found. Merged as a union;
   the earlier date wins. The server stores it like the rest of `Progress` (at most 1,000 entries).
+
+**v2.10 additions, hands-on workshops and AWS North Hall (optional):**
+
+- `workshop.verify {workshopId, stepId, values?}`: check one workshop step (`shared/workshops.json`) in the player's
+  account. The server takes a fresh poll of the account (the same read-only calls the player role already grants) and
+  runs the step's one check from a fixed registry (`server/src/workshops/checks.ts`: a table, bucket, function or
+  instance is there, in a state, or gone). `values` are the step's placeholder values (`<table>` → `orders`), at most 8,
+  each checked against the check's own name pattern. No writes, no commands. Counts as a request on the socket.
+- `workshop.verified {workshopId, stepId, ok, detail}`: the answer, with one plain sentence (`detail`). With no linked
+  account, `ok: false` and a sentence asking to connect one.
+- `Progress.workshops?: {[workshopId]: {steps: {[stepId]: 'practice' | 'real'}, done?: 'YYYY-MM-DD'}}`: each step done
+  in the practice terminal or checked for real, and the local date the workshop was finished. Merged step by step
+  (`real` beats `practice`); the earlier finish date wins. At most 200 workshops of 50 steps.
+- `Progress.talks?: {[talkId]: 'YYYY-MM-DD'}`: AWS North Hall talks whose check was passed (`shared/conference.json`).
+  Merged like `finds`.
+- `CONTRACT_VERSION` is a string from v2.10 (`'2.10'`): the number 2.10 is 2.1.
+
+**v2.11 additions, the Mayor's city, the live city and leaderboards (optional):**
+
+- `Progress.profile?: {public, name}`: off by default. `name` is two words from the game's lists (`src/state/names.ts`,
+  `^[A-Z][a-z]+ [A-Z][a-z]+$`), never typed by a player. The newer copy's choice wins on merge. Turning it off (a
+  `PUT /progress` with `public: false` after `true`) removes the player's presence and every leaderboard row.
+- `Progress.badges?: {[badgeId]: 'YYYY-MM-DD'}`: badges earned at a moment the rest of `Progress` doesn't record (most
+  badges are read from `Progress` itself, `src/state/badges.ts`). Union; the earlier date wins.
+- `Progress.designs?: {[designId]: {name, updatedAt, nodes[], edges[]}}`: architecture sandbox designs (at most 20, 60
+  nodes, 120 edges). The newer copy of a design wins.
+- `Progress.streak.frozen?`: the day the weekly streak freeze last covered a missed day.
+- `presence.beat {region, rank?}` → `presence.state`: the server keeps one row per player per Region for 90 s (a salted
+  hash of the player, never their id), counts who's there, and names only public profiles (at most 12). Beats closer than
+  20 s apart are ignored; answers are cached 15 s per Region.
+- `score.submit {board, score}` → `leaderboard.state`: kept only for a public profile, on a known board, clamped to what a
+  real round can score, best of the ISO week (UTC). `leaderboard.get {board}` reads one. `DELETE /me` removes the rows.
+- In demo mode the mock answers with `practice: true` and made-up "Practice …" mayors; the UI says so.
+
+**v2.12 additions, fair rewards (optional):**
+
+A v2.12 client needs a v2.12 server: the server's Progress schema is strict (unknown fields fail), so an older server
+refuses a save that carries `remembered`, `scored`, `bestTimed` or `bestWeek`. Deploy the server first, then the client.
+
+- `Progress.cards[id].remembered?: true`: the card's interval reached a week once and its one-time bonus was paid. Never
+  unset (an Again doesn't clear it); merged as a union.
+- `Progress.games[id].scored?`: rounds that scored above 0 (the crown's game step counts these; on an older save `plays`
+  stands in, on merge too: a side without it counts its `plays`). Higher wins.
+- `Progress.games[id].bestTimed?` / `bestWeek?` (`YYYY-Www`, the ISO week of the UTC date, the same week the boards use): the best round played against the
+  clock that week (relaxed rounds never count). The client sends only this week's `bestTimed` to `score.submit`. On merge
+  the later week wins; the same week, the higher score.
+- `presence.beat`'s `rank` may be `Global City`, the sixth rank (above Megacity).
+
+
+**v2.13 additions, City Clients and build mode (optional):**
+
+A v2.13 client needs a v2.13 server: the server's Progress schema is strict (unknown fields fail), so an older server
+refuses a save that carries `clients` or `decor`. Deploy the server first, then the client.
+
+- `Progress.clients?: {[businessId]: {level, done[], at?}}`: City Clients side jobs (`shared/clients.json`,
+  `src/world/clients.ts`). `level` is the levels finished (0 to 3, at most 10); `done` the task ids done (at most 100,
+  lowercase words and dashes), each paying its stars once ever; `at` maps a level (`"1"`) to the local date it was
+  finished. At most 50 businesses. On merge: the higher `level`, the union of `done`, the earlier date per level.
+- `Progress.decor?: {[regionCode]: {updatedAt, props[{id, kind, x, y, at}], spent?}}`: build mode's decorations in each Region's
+  city. `kind` is the prop's atlas sprite (`^[a-z0-9][a-z0-9:-]{0,39}$`), `x`/`y` whole tiles (−64 to 256), `at` the local
+  date it was placed. `spent` is the stars spent on this city's decorations, net of refunds (a whole number, 0 to
+  1,000,000; absent = 0): the player's stars to spend are the stars earned minus every city's `spent`. At most 120 props a city, 20 cities and 240 props in all, so a save stays well inside the 64 KB
+  body. Props are moved and removed as well as added, so a city's list is one choice: on merge the copy with the later
+  `updatedAt` wins, city by city.
+
+
+**v2.14 additions, City Coins (optional):**
+
+A v2.14 client needs a v2.14 server: the server's Progress schema is strict (unknown fields fail), so an older server
+refuses a save that carries `wallet`. Deploy the server first, then the client.
+
+Stars (⭐) are knowledge: they grow buildings and are never spent. City Coins (🪙) are what the player spends
+(decorations now; later combos and cosmetics), earned from side jobs, mini-game rounds, workshop steps, drawing-board
+passes and finishing the day's shift (`src/state/wallet.ts` `COIN_PAY`).
+
+- `Progress.wallet?: {earned, spent, log?, refunded?, shift?}`: coins to spend are `earned − spent`. Both are whole numbers
+  (0 to 100,000,000) that only ever go up: spending adds to `spent`, and a refund (half a removed decoration's price, an
+  undone purchase) adds to `earned`. The server refuses `spent > earned`. `log` is the coins earned on each of the last
+  days, `[{day: "YYYY-MM-DD", coins}]` (at most 31; the client keeps 14), for "today" lines. On merge: the higher
+  `earned`, the higher `spent` and the higher coins per day. Neither copy can go negative, so the merge can't; the cost
+  is that coins earned (or spent) on two surfaces in the same moment, before they sync, count once (the larger).
+- `refunded?`: the stars spent on decorations before v2.14 (`decor[region].spent`), given back once as coins. A v2.14
+  client moves each city's old `spent` into the wallet (`earned += spent − refunded`, `refunded = spent`), drops the
+  field and moves that city's `updatedAt` on a millisecond so the cleaned copy wins the next merge. A copy that still
+  carries `spent` (the server, another surface, an older client) therefore never refunds the same stars twice.
+  `decor[region].spent` stays in the schema so an older client can still save.
+- `shift?`: the last local day (`YYYY-MM-DD`) whose finished shift paid its coins (`COIN_PAY.shift`), so the panel and
+  the tab never pay the same day twice. On merge: the later day.
+
+**v2.15 additions, loops that bring you back (optional):**
+
+A v2.15 client needs a v2.15 server: the server's Progress schema is strict (unknown fields fail), so an older server
+refuses a save that carries `lights`, `seasons`, `drops` or `codex`. Deploy the server first, then the client.
+
+Everything here is earned and cosmetic: no coins or stars inside, nothing bought, nothing taken away.
+
+- `Progress.lights?: {days[], total?, freezes, usedFreezes?}`: City Lights, the forgiving streak (`src/state/lights.ts`).
+  `days` are the local dates (`YYYY-MM-DD`) the player learned something, the last 60, sorted; `total` the learning
+  days ever (each lights a window for good); `freezes` the earned freezes held now (one per 7 learning days, 0 to 3);
+  `usedFreezes` the missed days a freeze covered (at most 60). A missed day no freeze covers dims one window until a
+  later learning day relights it. On merge: the union of `days` and of `usedFreezes` (the last 60 of each), the higher
+  `total` (at least the number of days), and `freezes` from the copy that knows more (the later last day, then more
+  freezes used), ties taking the fewer.
+- `Progress.seasons?: {[seasonId]: {points, claimed[], last?}}`: the free monthly season roads (`src/state/season.ts`, a
+  theme per calendar month; past seasons stay earnable). `points` (whole, 0 to 100,000) come from finished shifts, once
+  a day (`last`); `claimed` the road's step indexes taken (0 to 19, at most 20). At most 24 seasons. On merge, season by
+  season: the higher `points`, the union of `claimed`, the later `last`.
+- `Progress.drops?: {last?, owned[]}`: the Daily Supply Drop (`src/state/drops.ts`): one cosmetic crate a day after the
+  shift is done. `last` the local day a crate was opened; `owned` the cosmetic ids it gave (lowercase words, dashes and
+  colons, at most 200). On merge: the later `last`, the union of `owned`.
+- `Progress.codex?: {combos: {[comboId]: day}}`: the Service Codex's combos found (`shared/combos.json`), each with the
+  local date first found (at most 200). Service cards and sets are read from the rest of Progress. On merge: the union,
+  the earlier date per combo.
+
+**v2.16 additions, merges that never lose a freeze, a refund or a removal (optional):**
+
+A v2.16 client needs a v2.16 server: the server's Progress schema is strict (unknown fields fail), so an older server
+refuses a save that carries any field below. Deploy the server first, then the client. Every field is optional, and a
+v2.15 copy merges with a v2.16 one as described.
+
+- `Progress.lights.freezesEarned?` / `freezesUsed?`: City Lights freezes as two counters that only go up (whole, 0 to
+  100,000). Held = earned − used, at most 3; `freezes` is kept equal to it so an older client reads it. On merge: the
+  higher of each counter, so a freeze earned on one surface (a season road step) and one spent on the other (a missed
+  day) both count. A copy without them counts `freezes + usedFreezes.length` earned and `usedFreezes.length` used.
+- `Progress.seasons[id].extra?`: crate cosmetic ids a freeze step gave instead while the freezes were full (at most 20).
+  On merge: the union. Every season's road is open to everyone; a road's `points` stop at its end (100) and a finished
+  shift's points past it flow into the next unfinished road (this month's, then the months before it), all marked `last`.
+- `Progress.drops.overtime?`: the local day the overtime goal's bonus crate was opened (once a day). `bought?`: crate
+  cosmetics bought with City Coins in Decorate (at most 200). `spares?: {[cosmeticId]: n}`: extra copies of an owned
+  decoration a city may place (0 to 3 each), what a crate holds once every crate item is owned. A crate never holds a
+  cosmetic the player owns from any source. On merge: the later `overtime`, the union of `bought`, the higher count per spare.
+- `Progress.wallet.refundedBy?: {[regionCode]: stars}`: the old decorations' stars given back, city by city (at most 20
+  cities, 0 to 1,000,000), so an older client still buying with stars in one city is refunded only what's new there.
+  `refunded` stays their total. A v2.15 wallet (a total only) refunds against that total once, then city by city. On
+  merge: the higher per city.
+- `Progress.decor[region].gone?`: prop ids removed from that city (at most 200, the most recent). On merge, city by city
+  and prop by prop: every prop in either copy unless either lists it in `gone`; a prop in both stands where the copy
+  with the later `updatedAt` has it; at most 120 a city and 240 in all. A copy without `gone` (before v2.16) can't say
+  what it removed, so then the later copy wins whole, as before. Undo is prop by prop too: a prop brought back after
+  removal gets a new id.
 

@@ -6,6 +6,18 @@ import type { AwsIncident, CityFinding, ServerEvent } from '@/backend/contract';
 import type { Cargo } from '@/world/carriers';
 import type { PageFocus } from './types';
 import type { CitizenRequest } from './requests';
+import type { CityPlan } from '@/world/plan';
+import type { Terrain } from '@/world/terrain';
+import type { Tile } from '@/world/layout';
+
+/** What the city tells the minimap. */
+export interface MinimapState {
+  plan: CityPlan;
+  terrain?: Pick<Terrain, 'kind'>;
+  view: { x: number; y: number; w: number; h: number };
+  /** City Clients: the stations of the focused business's open jobs (yellow dots). */
+  stations?: Tile[];
+}
 
 export interface BusEvents {
   /** Every event from the backend, after the store has applied it. */
@@ -15,6 +27,12 @@ export interface BusEvents {
   /** A new landmark. `quiet`: built because a finding or XP needed it (no camera move, toast or greeting). */
   discovered: { serviceId: string; quiet?: boolean };
   tierUp: { serviceId: string; tier: number };
+  /** v2.10: every step of a workshop is done: its building is established (an "established" plaque in front). */
+  workshopDone: { workshopId: string; serviceId: string };
+  /** A workshop step was done (or done again, paying nothing): the open workshop shows its stars and moves on. */
+  workshopStep: { workshopId: string; stepId: string; mode: 'practice' | 'real'; stars: number; finished: boolean };
+  /** v2.11: a game's end card asks for its leaderboard (app/runtime.ts opens it). */
+  openBoard: { board: string };
   /** Camera fly-to a landmark id ('s3', 'hq:storage', 'plaza') or district id. */
   flyTo: { id: string };
   /**
@@ -22,14 +40,25 @@ export interface BusEvents {
    * counts when Kai arrives. Not accepted (the city asleep behind a game or HQ) → the caller counts it at once.
    */
   walkTo: { id: string; accept: () => void };
+  /**
+   * City Clients: Kai walks to a business's station (src/state/walk.ts walkToStation). The city calls `accept()` when it
+   * will and `arrived()` when he's there (the job opens); not accepted (the city asleep) → the job opens at once.
+   */
+  walkToStation: { clientId: string; station: string; accept: () => void; arrived: () => void };
+  /** A business finished a level of side jobs: its site grows (the scene swaps the sprite, with a bump and confetti). */
+  clientLevelUp: { clientId: string; level: number };
   /** Kai reached a citizen with a question (src/state/requests.ts): the UI shows it. */
   citizenRequest: { request: CitizenRequest; name: string };
+  /** The question card closed: answered (it counted toward the day's five; the "?" goes) or not (the "?" stays). */
+  citizenRequestDone: { answered: boolean };
   /** Lookout is snapping a photo (animation). */
   snap: { phase: 'start' | 'done' | 'failed' };
   /** Game → UI */
   select: { id: string };
   enterHq: { districtId: string };
   questDone: { questId: string };
+  /** A quest step was done (not the last: that's questDone): its building bumps with a ✓ (the store toasts it). */
+  questStep: { questId: string; step: number; serviceId?: string };
   xpGained: { serviceId: string; amount: number };
   /** Dev/demo: force the day/night clock (hour 0–24) or undefined for real time. */
   hour: { hour?: number };
@@ -55,6 +84,19 @@ export interface BusEvents {
   postcard: void;
   /** A short line for screen readers (App's live region): what the keyboard just did in the city. */
   announce: { text: string };
+  /** Build mode's keys pressed in its drawer (src/ui/BuildDrawer.tsx): the city moves the ghost, builds, turns, undoes or leaves. */
+  buildKey: { key: 'up' | 'down' | 'left' | 'right' | 'place' | 'turn' | 'exit' | 'undo' };
+  /** The minimap asks the city for its plan, landscape and camera view (world px); no answer while no city runs. */
+  minimapState: { reply: (s: MinimapState) => void };
+  /** The minimap moves the camera to a world point (px). */
+  panTo: { x: number; y: number };
+  // ── Juice (round 3 step 2, src/game/juice.ts) ──
+  /** A card or question answered for a building: a right one sends a beam of light into it (the city draws it). */
+  answer: { serviceId: string; ok: boolean };
+  /** City Coins earned: a coin flies to the HUD's counter (src/ui/CoinFly.tsx). `from`: where on the page (CSS px). */
+  coins: { n: number; from?: { x: number; y: number } };
+  /** Tonight's City Lights window just lit (the first learning of the day): the city twinkles it in. */
+  windowLit: void;
   /** The tour asks where Kai stands on the page (CSS pixels); the city answers through `reply` (undefined: not shown). */
   locateKai: { reply: (r: { top: number; left: number; width: number; height: number } | undefined) => void };
 }

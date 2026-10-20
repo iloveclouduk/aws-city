@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-10-11",
+  "asOf": "2026-10-18",
   "quests": [
     {
       "id": "storage-static-site",
@@ -11,9 +11,11 @@
       "steps": [
         { "kind": "visit", "serviceId": "s3", "text": "Walk to S3 Lake and talk to Sally" },
         { "kind": "cards", "serviceId": "s3", "count": 5, "text": "Learn 5 S3 cards, like buckets, durability and storage classes" },
+        { "kind": "workshop", "workshopId": "s3-first-bucket", "text": "Hands on: make your first bucket in the S3 workshop (practice is free)" },
         { "kind": "cards", "serviceId": "cloudfront", "count": 3, "text": "Learn 3 CloudFront cards about keeping copies near people (edge caching)" },
+        { "kind": "cards", "serviceId": "route53", "count": 2, "text": "Learn 2 Route 53 cards about how a web address finds your site" },
         { "kind": "puzzle", "puzzleId": "static-site", "text": "Design the City Brochure Site with S3, CloudFront and Route 53" },
-        { "kind": "deploy", "templateId": "static-site", "text": "Build it for real: a private S3 bucket served by CloudFront" }
+        { "kind": "deploy", "templateId": "static-site", "text": "Build it (practice is free): a private S3 bucket served by CloudFront" }
       ]
     },
     {
@@ -26,7 +28,9 @@
       "steps": [
         { "kind": "visit", "serviceId": "lambda", "text": "Walk to the Lambda Food Stall and say hello" },
         { "kind": "cards", "serviceId": "lambda", "count": 5, "text": "Learn 5 Lambda cards, like pricing, timeouts and memory" },
+        { "kind": "workshop", "workshopId": "durable-first-function", "text": "Hands on: do a step of the durable function workshop in the practice terminal" },
         { "kind": "puzzle", "puzzleId": "thumbnails", "text": "Build the Thumbnail Factory: resize every uploaded photo automatically" },
+        { "kind": "cards", "serviceId": "apigateway", "count": 2, "text": "Learn 2 API Gateway cards about the front door to your code" },
         { "kind": "ask", "prompt": "What is a cold start in AWS Lambda and how can I reduce it?", "text": "Ask the agents about cold starts" },
         { "kind": "deploy", "templateId": "hello-api", "text": "Build your first web API with Cody, with no servers to run (serverless)" }
       ]
@@ -41,6 +45,7 @@
       "steps": [
         { "kind": "visit", "serviceId": "dynamodb", "text": "Walk to the DynamoDB Library and meet the librarian" },
         { "kind": "cards", "serviceId": "dynamodb", "count": 5, "text": "Learn 5 DynamoDB cards, like keys, capacity modes and indexes" },
+        { "kind": "workshop", "workshopId": "dynamodb-first-table", "text": "Hands on: make your first table in the DynamoDB workshop (practice is free)" },
         { "kind": "cards", "serviceId": "aurora", "count": 3, "text": "Learn 3 Aurora cards at the Observatory" },
         { "kind": "puzzle", "puzzleId": "global-db", "text": "Keep the booking system running across two Regions" },
         { "kind": "deploy", "templateId": "dynamo-table", "text": "Build a pay-per-request DynamoDB table with backups (point-in-time recovery)" }
@@ -59,7 +64,8 @@
         { "kind": "cards", "serviceId": "apigateway", "count": 3, "text": "Learn 3 API Gateway cards at the station" },
         { "kind": "puzzle", "puzzleId": "order-queue", "text": "Design an order pipeline that never drops an order" },
         { "kind": "ask", "prompt": "When should I use SQS, SNS or EventBridge?", "text": "Ask the agents to compare the three messengers" },
-        { "kind": "deploy", "templateId": "queue-worker", "text": "Build a queue with a Lambda worker and a dead-letter queue for failures" }
+        { "kind": "deploy", "templateId": "queue-worker", "text": "Build a queue with a Lambda worker and a dead-letter queue for failures" },
+        { "kind": "puzzle", "puzzleId": "region-down", "text": "Keep the order app safe if its whole Region goes dark" }
       ]
     },
     {
@@ -73,8 +79,12 @@
         { "kind": "visit", "serviceId": "iam", "text": "Walk to the IAM Gatehouse and talk to Ivy" },
         { "kind": "cards", "serviceId": "iam", "count": 5, "text": "Learn 5 IAM cards, like roles, least privilege and explicit deny" },
         { "kind": "cards", "serviceId": "guardduty", "count": 3, "text": "Learn 3 GuardDuty cards at the Watchtower" },
+        { "kind": "cards", "serviceId": "cloudwatch", "count": 2, "text": "Learn 2 CloudWatch cards about metrics, logs and alarms" },
+        { "kind": "cards", "serviceId": "eventbridge", "count": 2, "text": "Learn 2 EventBridge cards about rules that react to events" },
         { "kind": "puzzle", "puzzleId": "event-audit", "text": "Detect threats and respond automatically, even at 3 a.m." },
+        { "kind": "cards", "serviceId": "shield", "count": 2, "text": "Learn 2 Shield cards about soaking up floods of traffic" },
         { "kind": "puzzle", "puzzleId": "ddos-ready", "text": "Keep the ticket shop open in a flood of junk traffic (DDoS)" },
+        { "kind": "workshop", "workshopId": "cloudfront-s3-oac", "text": "Hands on: start the workshop that hides a bucket behind CloudFront" },
         { "kind": "ask", "prompt": "What is the difference between CloudWatch and CloudTrail?", "text": "Ask the agents: watching versus record-keeping (monitoring vs auditing)" }
       ]
     },
@@ -89,7 +99,17 @@
         { "kind": "visit", "serviceId": "bedrock", "text": "Walk to the Bedrock Mesa" },
         { "kind": "cards", "serviceId": "bedrock", "count": 5, "text": "Learn 5 Bedrock cards, like tokens and looking things up first (RAG)" },
         { "kind": "ask", "prompt": "Explain retrieval-augmented generation in two sentences, with an AWS example.", "text": "Ask the agents what RAG means" },
-        { "kind": "puzzle", "puzzleId": "hr-assistant", "text": "Help a staff helper answer from the city's handbook, then meet AgentCore" }
+        {
+          "kind": "choose",
+          "id": "bedrock-handbook",
+          "text": "Choose how the helper answers from the city's handbook",
+          "question": "Staff want a helper that answers from the city's own handbook and shows which pages it used. Which Bedrock feature fits?",
+          "options": [
+            { "text": "Knowledge Bases, which look up the right handbook passages first (RAG)", "why": "They split and index your documents, then fetch the passages that matter, so the model answers from them with citations.", "correct": true },
+            { "text": "Guardrails", "why": "Guardrails filter what goes in and out, like denied topics. They don't give the model your handbook." },
+            { "text": "Batch inference", "why": "Batch runs lots of prompts later, from files in S3. It doesn't look anything up in your documents." }
+          ]
+        }
       ]
     },
     {
@@ -101,7 +121,7 @@
       "rewardXp": 80,
       "steps": [
         { "kind": "visit", "serviceId": "agentcore", "text": "Walk to the AgentCore Academy and meet Ace" },
-        { "kind": "cards", "serviceId": "agentcore", "count": 8, "text": "Learn all 8 AgentCore cards, like Runtime, Memory, Gateway and Identity" },
+        { "kind": "cards", "serviceId": "agentcore", "count": 8, "text": "Learn 8 AgentCore cards, like Runtime, Memory, Gateway and Identity" },
         { "kind": "cards", "serviceId": "cognito", "count": 3, "text": "Learn 3 Cognito cards so your agent knows who it serves" },
         { "kind": "puzzle", "puzzleId": "hr-assistant", "text": "Build the Staff Helper agent" },
         { "kind": "ask", "prompt": "How does AgentCore Gateway turn a Lambda function into a tool my agent can call?", "text": "Ask the agents how agents get tools" }
@@ -134,6 +154,8 @@
         { "kind": "visit", "serviceId": "ecs", "text": "Walk to the ECS Shipping Docks and meet Captain Cass" },
         { "kind": "cards", "serviceId": "ecs", "count": 4, "text": "Learn 4 ECS cards, like tasks, services and roles" },
         { "kind": "cards", "serviceId": "fargate", "count": 3, "text": "Learn 3 Fargate cards about running containers with no servers to manage" },
+        { "kind": "cards", "serviceId": "elasticache", "count": 2, "text": "Learn 2 ElastiCache cards about keeping hot data in memory" },
+        { "kind": "cards", "serviceId": "vpc", "count": 2, "text": "Learn 2 VPC cards about the private network your containers run in" },
         { "kind": "puzzle", "puzzleId": "container-app", "text": "Design the Harbour Container Shop" },
         { "kind": "ask", "prompt": "When should I run containers on AWS Fargate instead of on EC2 instances I manage?", "text": "Ask the agents: Fargate or EC2 for containers?" }
       ]
@@ -151,6 +173,7 @@
         { "kind": "visit", "serviceId": "kms", "text": "Visit Kit at the KMS Vault" },
         { "kind": "cards", "serviceId": "kms", "count": 3, "text": "Learn 3 KMS cards about keys and encryption" },
         { "kind": "puzzle", "puzzleId": "secure-api", "text": "Design the Members-Only API (no VPC needed)" },
+        { "kind": "puzzle", "puzzleId": "multi-tenant-api", "text": "Design Invoices for Hundreds: one app, every business kept apart" },
         { "kind": "ask", "prompt": "What is the difference between a security group and a network ACL in a VPC?", "text": "Ask the agents how a VPC keeps traffic out" }
       ]
     },
@@ -164,6 +187,7 @@
       "steps": [
         { "kind": "visit", "serviceId": "ec2", "text": "Walk to the EC2 Factory and meet Eddie" },
         { "kind": "cards", "serviceId": "ec2", "count": 5, "text": "Learn 5 EC2 cards, like instance types, AMIs and pricing options" },
+        { "kind": "workshop", "workshopId": "ec2-first-instance", "text": "Hands on: make a key pair, the first step of the EC2 workshop" },
         {
           "kind": "choose",
           "id": "ec2-friday-rush",
@@ -219,7 +243,10 @@
             { "text": "Amazon ECS", "why": "A simpler AWS container service, but it isn't Kubernetes: the team would learn a new way of working." },
             { "text": "AWS Lambda", "why": "Functions that run on demand. Good for events, but not a place to run a Kubernetes setup." }
           ]
-        }
+        },
+        { "kind": "cards", "serviceId": "ebs", "count": 2, "text": "Learn 2 EBS cards about disks that attach to one server" },
+        { "kind": "cards", "serviceId": "efs", "count": 2, "text": "Learn 2 EFS cards about one folder many servers share" },
+        { "kind": "puzzle", "puzzleId": "container-platform", "text": "Give Kube's pods their own disks and one shared folder" }
       ]
     },
     {
@@ -253,7 +280,9 @@
             { "text": "A monthly fee per app, on top of the servers", "why": "There's no extra fee for Beanstalk itself." },
             { "text": "A charge for every deploy", "why": "Deploys are free; you pay for what runs." }
           ]
-        }
+        },
+        { "kind": "cards", "serviceId": "rds", "count": 2, "text": "Learn 2 RDS cards about managed databases with backups" },
+        { "kind": "puzzle", "puzzleId": "beanstalk-app", "text": "Design the Garden Club Sign-ups app with its own database" }
       ]
     },
     {
@@ -334,6 +363,7 @@
       "steps": [
         { "kind": "visit", "serviceId": "rds", "text": "Walk to the RDS Records Hall and meet Ray" },
         { "kind": "cards", "serviceId": "rds", "count": 5, "text": "Learn 5 RDS cards about engines, backups and Multi-AZ" },
+        { "kind": "workshop", "workshopId": "rds-first-database", "text": "Hands on: create a practice database in the RDS workshop" },
         {
           "kind": "choose",
           "id": "rds-multiaz",
@@ -389,7 +419,8 @@
             { "text": "So each row can be updated faster", "why": "Single-row updates are what row-based databases do best." },
             { "text": "Because columns never need backups", "why": "Redshift still takes snapshots of your data." }
           ]
-        }
+        },
+        { "kind": "puzzle", "puzzleId": "analytics-warehouse", "text": "Design the Treasury's Ledger: join old files with new sales" }
       ]
     },
     {
@@ -423,7 +454,8 @@
             { "text": "Only SQL", "why": "Neptune is a graph database; it speaks graph query languages, not SQL." },
             { "text": "Spreadsheet formulas", "why": "Spreadsheets are for tables, not graphs." }
           ]
-        }
+        },
+        { "kind": "puzzle", "puzzleId": "knowledge-graph", "text": "Design Who Knows Whom: follow the links between accounts" }
       ]
     },
     {
@@ -457,7 +489,8 @@
             { "text": "A training job", "why": "A training job builds the model, then stops. It doesn't answer requests." },
             { "text": "A notebook", "why": "Notebooks are for exploring data and experimenting, not for serving an app." }
           ]
-        }
+        },
+        { "kind": "puzzle", "puzzleId": "ml-platform", "text": "Design the Clinic Model Lab with a key the clinic controls" }
       ]
     },
     {
@@ -491,7 +524,8 @@
             { "text": "Yes, it can't make mistakes", "why": "Every AI assistant can make mistakes." },
             { "text": "Only on weekends", "why": "Mistakes don't keep a calendar. Always check." }
           ]
-        }
+        },
+        { "kind": "puzzle", "puzzleId": "chat-alerts", "text": "Send alarms to the team chat, where Quill answers questions" }
       ]
     },
     {
@@ -559,7 +593,832 @@
             { "text": "Accept every answer as it comes", "why": "Unchecked mistakes end up in the clinic's records." },
             { "text": "Throw the whole form away", "why": "One unclear box doesn't make the rest of the form wrong." }
           ]
+        },
+        { "kind": "puzzle", "puzzleId": "document-ai", "text": "Design the Claims Desk: check photos and read forms" }
+      ]
+    },
+    {
+      "id": "security-red-team",
+      "title": "The Red Team Range",
+      "districtId": "security",
+      "serviceIds": ["securityagent", "route53"],
+      "intro": "I attack your apps before anyone else can, but only the ones you own. Let's set up a fair, safe test and learn to read what I find.",
+      "rewardXp": 50,
+      "steps": [
+        { "kind": "visit", "serviceId": "securityagent", "text": "Walk to the Red Team Range and meet Rhea" },
+        { "kind": "cards", "serviceId": "securityagent", "count": 5, "text": "Learn 5 Security Agent cards, like scope, proof and pricing" },
+        {
+          "kind": "choose",
+          "id": "redteam-verify",
+          "text": "Agree which sites Rhea may test",
+          "question": "A team wants Rhea to pen test shop.example.com. What has to happen before the test can start?",
+          "options": [
+            { "text": "They prove they own the domain, for example with a record in its DNS", "why": "AWS Security Agent only tests domains you've proven you own, with a record in its DNS or a check page on the site.", "correct": true },
+            { "text": "Nothing: any website can be tested", "why": "Testing sites you don't own isn't allowed, and the agent refuses domains that aren't verified." },
+            { "text": "They email AWS a screenshot of the site", "why": "Ownership is proven technically, with a DNS record or a check page, not with a picture." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "redteam-scope",
+          "text": "Keep the test from doing real harm",
+          "question": "Which page should be marked out of scope before a pen test?",
+          "options": [
+            { "text": "The page that bulk-deletes customer orders", "why": "Destructive or irreversible actions, like bulk deletes, payments and sending messages, belong out of scope.", "correct": true },
+            { "text": "The product search page", "why": "Search is a normal page worth testing. Injection flaws often hide behind search boxes." },
+            { "text": "The public home page", "why": "The home page is safe to test, and attackers see it first." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "redteam-where",
+          "text": "Choose where to point the test",
+          "question": "Where should the team run its pen test?",
+          "options": [
+            { "text": "A pre-production copy that closely mirrors the live app", "why": "Even careful test attacks can trip real business rules, so AWS recommends testing pre-production.", "correct": true },
+            { "text": "The live site, during the busiest sale of the year", "why": "Real customers and their data could be affected, at the worst possible moment." },
+            { "text": "A blank page with none of the app's code", "why": "A test only finds flaws in the app it can reach. An empty page has nothing to find." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "pen-test-prep", "text": "Plan a fair practice attack on a copy of the shop" },
+        { "kind": "ask", "prompt": "What does AWS Security Agent include with each penetration test finding?", "text": "Ask the agents what a good finding looks like" }
+      ]
+    },
+    {
+      "id": "agentic-microservice",
+      "title": "Agents at Work",
+      "districtId": "aiml",
+      "serviceIds": ["agentcore", "bedrock", "apigateway", "lambda"],
+      "intro": "An agent is a microservice with a mind of its own. Let's give yours good tools, helpful friends and firm limits, so it grows without surprises.",
+      "rewardXp": 60,
+      "steps": [
+        { "kind": "visit", "serviceId": "agentcore", "text": "Walk to the AgentCore Academy and talk to Ace" },
+        { "kind": "cards", "serviceId": "agentcore", "count": 10, "text": "Learn 10 AgentCore cards, like sessions, Gateway tools and A2A" },
+        {
+          "kind": "choose",
+          "id": "agent-tools",
+          "text": "Give an agent the right tool",
+          "question": "An agent needs to call the shop's order service. What's a good way to give it that tool?",
+          "options": [
+            { "text": "Put the order service behind AgentCore Gateway as an MCP tool", "why": "Gateway turns Lambda functions and APIs into MCP tools that agents can find and call.", "correct": true },
+            { "text": "Paste the database password into the agent's prompt", "why": "Secrets in prompts can leak. The agent should go through a tool with its own permissions." },
+            { "text": "Let the agent guess the service's web address", "why": "Guessing makes calls unpredictable. A tool should be named and described." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "agent-retries",
+          "text": "Plan for a tool called twice",
+          "question": "A model may call the same tool twice, or stop halfway. How should the order tool behave?",
+          "options": [
+            { "text": "Make it idempotent: a repeat call with the same order number changes nothing", "why": "Models call tools unpredictably. An idempotent tool stays correct when a call repeats.", "correct": true },
+            { "text": "Assume each tool is called exactly once", "why": "Retries happen, so a second call could place the same order twice." },
+            { "text": "Block the agent after its first call", "why": "That stops legitimate retries too. Making repeats safe is better." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "agent-split",
+          "text": "Split a crowded agent",
+          "question": "One agent has 40 tools and keeps picking the wrong one. What helps most?",
+          "options": [
+            { "text": "Split it into specialised agents that hand work to each other, for example over A2A", "why": "Fewer tools per agent means clearer choices, and AgentCore Runtime can host A2A agents.", "correct": true },
+            { "text": "Give it 20 more tools", "why": "A longer list dilutes the model's choices even more." },
+            { "text": "Remove the model and keep the tools", "why": "Then nothing decides which tool to use." }
+          ]
+        },
+        { "kind": "ask", "prompt": "How do AgentCore Runtime sessions keep one user's agent work apart from another's?", "text": "Ask the agents how sessions stay apart" }
+      ]
+    },
+    {
+      "id": "apprunner-relay",
+      "title": "Remy's Last Relay",
+      "districtId": "compute",
+      "serviceIds": ["apprunner", "ecs", "fargate", "route53"],
+      "intro": "I've run thousands of web apps straight from code or containers. App Runner takes no new customers now, so my last race is passing the baton safely to ECS Express Mode.",
+      "rewardXp": 40,
+      "steps": [
+        { "kind": "visit", "serviceId": "apprunner", "text": "Walk to the App Runner Relay Track and meet Remy" },
+        { "kind": "cards", "serviceId": "apprunner", "count": 4, "text": "Learn 4 App Runner cards about sources, scaling and the handover" },
+        {
+          "kind": "choose",
+          "id": "apprunner-new",
+          "text": "Help a new team pick its starting line",
+          "question": "A team new to AWS wants to run a web app from one container image, with HTTPS and scaling handled for them. What does AWS recommend now?",
+          "options": [
+            { "text": "Amazon ECS Express Mode", "why": "From one image and two roles it builds an ECS service on Fargate, a load balancer, scaling and networking.", "correct": true },
+            { "text": "AWS App Runner", "why": "App Runner is closed to new customers. Only teams already using it can create services." },
+            { "text": "One EC2 server they patch themselves", "why": "It can work, but they'd set up scaling, the load balancer and patching on their own." }
+          ]
+        },
+        { "kind": "cards", "serviceId": "ecs", "count": 2, "text": "Learn 2 ECS cards about services and tasks" },
+        { "kind": "cards", "serviceId": "route53", "count": 2, "text": "Learn 2 Route 53 cards about records and routing" },
+        {
+          "kind": "choose",
+          "id": "apprunner-move",
+          "text": "Plan a move with a quick way back",
+          "question": "The bakery site on App Runner uses its own domain. How do you move it to ECS Express Mode and keep a quick way back?",
+          "options": [
+            { "text": "Route 53 weighted records: shift 10, then 25, 50, 75 and 100 percent", "why": "Both run side by side, so switching back is just a weight change while App Runner is still up.", "correct": true },
+            { "text": "Delete App Runner first, then create the new service", "why": "Visitors get errors in between, and there's nothing to switch back to." },
+            { "text": "Point the domain at the new service all at once", "why": "It can work, but any problem hits every visitor at once." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "runner-handover", "text": "Design Remy's baton handover" }
+      ]
+    },
+    {
+      "id": "batch-bakery",
+      "title": "Bram's Night Shift",
+      "districtId": "compute",
+      "serviceIds": ["batch", "s3", "eventbridge"],
+      "intro": "Some work doesn't need an answer this second, just by morning. Give me a pile of orders and I'll light exactly enough ovens to bake them all.",
+      "rewardXp": 35,
+      "steps": [
+        { "kind": "visit", "serviceId": "batch", "text": "Walk to the Batch Bakery and meet Bram" },
+        { "kind": "cards", "serviceId": "batch", "count": 4, "text": "Learn 4 Batch cards about jobs, queues and compute environments" },
+        {
+          "kind": "choose",
+          "id": "batch-fit",
+          "text": "Pick the right kitchen for a long bake",
+          "question": "Each video frame takes about an hour to render, and there are 5,000 of them. Which service fits best?",
+          "options": [
+            { "text": "AWS Batch", "why": "An array job fans out into thousands of child jobs on capacity that scales to the queue.", "correct": true },
+            { "text": "AWS Lambda", "why": "One run stops after 15 minutes, and each frame takes an hour." },
+            { "text": "Amazon Lightsail", "why": "Fixed-price servers you'd share the frames out to by hand, paid for busy or idle." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "batch-spot",
+          "text": "Make the night shift cheaper",
+          "question": "The renders can start again if they are interrupted. How do you pay less for the compute?",
+          "options": [
+            { "text": "A Spot compute environment, with a retry strategy for interrupted jobs", "why": "Spare capacity at a steep discount, and retries rerun any job whose capacity is taken back.", "correct": true },
+            { "text": "Keep a large On-Demand fleet running all day", "why": "You'd pay for idle servers between batches." },
+            { "text": "Give each job more memory", "why": "More memory makes each job cost more, not less." }
+          ]
+        },
+        { "kind": "cards", "serviceId": "eventbridge", "count": 2, "text": "Learn 2 EventBridge cards about rules and targets" },
+        { "kind": "puzzle", "puzzleId": "overnight-renders", "text": "Design Bram's overnight render bake" }
+      ]
+    },
+    {
+      "id": "lightsail-marina",
+      "title": "Skye's Easy Moorings",
+      "districtId": "compute",
+      "serviceIds": ["lightsail", "route53"],
+      "intro": "Not everyone needs a whole shipyard. I rent ready-rigged boats for one monthly price, and you can sail from day one.",
+      "rewardXp": 35,
+      "steps": [
+        { "kind": "visit", "serviceId": "lightsail", "text": "Walk to the Lightsail Marina and meet Skye" },
+        { "kind": "cards", "serviceId": "lightsail", "count": 4, "text": "Learn 4 Lightsail cards about plans, images and static addresses" },
+        {
+          "kind": "choose",
+          "id": "lightsail-fit",
+          "text": "Help the sailing club choose a host",
+          "question": "A small club wants a WordPress site for a fixed, predictable monthly price, with as little setup as possible. Which fits?",
+          "options": [
+            { "text": "Amazon Lightsail", "why": "A WordPress image and one monthly plan with storage and data transfer included.", "correct": true },
+            { "text": "Amazon EC2 with a load balancer and RDS", "why": "Powerful and flexible, but more to set up, and the bill changes with use." },
+            { "text": "AWS Batch", "why": "Batch runs jobs that finish. A website must answer visitors all day." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "lightsail-ip",
+          "text": "Keep the address after a restart",
+          "question": "The club's site moved to a new address after the instance was stopped and started. What prevents this?",
+          "options": [
+            { "text": "Attach a static IP address to the instance", "why": "It stays the same across restarts and costs nothing while attached.", "correct": true },
+            { "text": "Take a snapshot every day", "why": "Snapshots back up the disk. They don't keep the public address." },
+            { "text": "Open port 443 in the firewall", "why": "That lets HTTPS in, but the address would still change." }
+          ]
+        },
+        { "kind": "cards", "serviceId": "route53", "count": 2, "text": "Learn 2 Route 53 cards about pointing a domain at a site" },
+        { "kind": "puzzle", "puzzleId": "harbour-blog", "text": "Design the sailing club's blog" }
+      ]
+    },
+    {
+      "id": "backup-storehouse",
+      "title": "Bea's Strongroom",
+      "districtId": "storage",
+      "serviceIds": ["backup", "dynamodb", "efs", "ebs"],
+      "intro": "Things get deleted, broken or locked away by mistake. I keep a copy of everything on a timetable, and nobody opens my strongroom early.",
+      "rewardXp": 40,
+      "steps": [
+        { "kind": "visit", "serviceId": "backup", "text": "Walk to the Backup Storehouse and meet Bea" },
+        { "kind": "cards", "serviceId": "backup", "count": 4, "text": "Learn 4 Backup cards about plans, vaults and recovery points" },
+        {
+          "kind": "choose",
+          "id": "backup-central",
+          "text": "Replace a pile of backup scripts",
+          "question": "A team backs up DynamoDB, EFS and EBS with three different scripts. What gives them one schedule and one place to check?",
+          "options": [
+            { "text": "One AWS Backup plan, assigned by tag", "why": "One plan backs up all three on a schedule and shows every job in one console.", "correct": true },
+            { "text": "Turn on S3 versioning", "why": "Versioning keeps old versions of objects in a bucket. It doesn't back up tables, file systems or disks." },
+            { "text": "A bigger EBS volume", "why": "More space on the same disk is not a separate copy you can restore." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "backup-lock",
+          "text": "Stop early deletion, even by admins",
+          "question": "Auditors need proof that nobody, not even the root user, can delete backups before a year is up. What do you use?",
+          "options": [
+            { "text": "Vault Lock in compliance mode", "why": "After its grace time of at least 72 hours, no one can delete backups early or change the lock.", "correct": true },
+            { "text": "Vault Lock in governance mode", "why": "Users with enough IAM permissions can still remove a governance lock." },
+            { "text": "An IAM policy that denies deletion", "why": "An admin who can edit IAM policies could simply remove it again." }
+          ]
+        },
+        { "kind": "cards", "serviceId": "ebs", "count": 2, "text": "Learn 2 EBS cards about disks and snapshots" },
+        { "kind": "puzzle", "puzzleId": "locked-backups", "text": "Design Bea's locked backup plan" }
+      ]
+    },
+    {
+      "id": "kinesis-mill",
+      "title": "Kenzie's Millrace",
+      "districtId": "storage",
+      "serviceIds": ["kinesis", "lambda", "dynamodb", "s3"],
+      "intro": "Data that's an hour old is too late for some jobs. My millrace carries every record as it happens, in order, to every wheel that needs it.",
+      "rewardXp": 40,
+      "steps": [
+        { "kind": "visit", "serviceId": "kinesis", "text": "Walk to the Kinesis Water Mill and meet Kenzie" },
+        { "kind": "cards", "serviceId": "kinesis", "count": 4, "text": "Learn 4 Kinesis cards about shards, keys and retention" },
+        {
+          "kind": "choose",
+          "id": "kinesis-or-queue",
+          "text": "Choose between a stream and a queue",
+          "question": "Two separate apps must each read every click, in order for each player, and read the last day again if they fail. Which fits?",
+          "options": [
+            { "text": "Amazon Kinesis Data Streams", "why": "Many apps read the same stream on their own, in order per partition key, and can read again within retention.", "correct": true },
+            { "text": "An Amazon SQS standard queue", "why": "Each message goes to one consumer and is deleted once processed, and order is not guaranteed." },
+            { "text": "An Amazon S3 bucket", "why": "Good for keeping raw clicks, but apps can't read them in order as they arrive." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "kinesis-key",
+          "text": "Keep each player's clicks in order",
+          "question": "Which partition key keeps each player's clicks in order and spreads the load across shards?",
+          "options": [
+            { "text": "The player's id", "why": "Same player, same shard, so their clicks stay in order, and many players spread the load.", "correct": true },
+            { "text": "Today's date", "why": "Every record that day shares one key and lands on one shard: a hot spot." },
+            { "text": "A random number for each record", "why": "The load spreads, but one player's clicks scatter across shards and lose their order." }
+          ]
+        },
+        { "kind": "cards", "serviceId": "lambda", "count": 2, "text": "Learn 2 Lambda cards about functions and triggers" },
+        { "kind": "puzzle", "puzzleId": "live-scoreboard", "text": "Design Kenzie's live scoreboard" }
+      ]
+    },
+    {
+      "id": "opensearch-index",
+      "title": "Ola's Index",
+      "districtId": "database",
+      "serviceIds": ["opensearch", "dynamodb", "apigateway", "lambda"],
+      "intro": "Every word that comes into my tower gets a note saying where it lives. Ask me for one, and I'll point you to every page that has it.",
+      "rewardXp": 35,
+      "steps": [
+        { "kind": "visit", "serviceId": "opensearch", "text": "Walk to the OpenSearch Index Tower and meet Ola" },
+        { "kind": "cards", "serviceId": "opensearch", "count": 4, "text": "Learn 4 OpenSearch cards about domains, shards and search" },
+        {
+          "kind": "choose",
+          "id": "opensearch-fit",
+          "text": "Pick the right job for the tower",
+          "question": "Which job suits Amazon OpenSearch Service best?",
+          "options": [
+            { "text": "Letting shoppers search products by any word in their names and descriptions", "why": "Searching text across many fields is what a search engine is built for.", "correct": true },
+            { "text": "Fetching one order by its exact order number", "why": "A lookup by key is DynamoDB's job: fast and cheap at any scale." },
+            { "text": "Storing the original product photos", "why": "Files and photos belong in Amazon S3." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "opensearch-shards",
+          "text": "Size the pieces of a log index",
+          "question": "A new index will hold about 60 GiB of logs, which is write-heavy work. Roughly how big should each shard be?",
+          "options": [
+            { "text": "About 30 to 50 GiB", "why": "For write-heavy work such as log analytics, AWS suggests shards of about 30 to 50 GiB.", "correct": true },
+            { "text": "As small as possible, like 1 GiB", "why": "Too many small shards use up processing power and memory, and can slow the whole cluster." },
+            { "text": "One single 60 GiB shard, with more added later", "why": "Very large shards are slow to recover, and adding primary shards to an index later is hard." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "product-search", "text": "Design Product Search: find any item by any word" }
+      ]
+    },
+    {
+      "id": "documentdb-archive",
+      "title": "Doc's Archive",
+      "districtId": "database",
+      "serviceIds": ["documentdb", "ecs", "fargate", "vpc"],
+      "intro": "Every folder in my archive is shaped its own way: one has three pages, the next has thirty. Bring me any folder and I'll file it, then find it again by anything inside.",
+      "rewardXp": 35,
+      "steps": [
+        { "kind": "visit", "serviceId": "documentdb", "text": "Walk to the DocumentDB Archive and meet Doc" },
+        { "kind": "cards", "serviceId": "documentdb", "count": 4, "text": "Learn 4 DocumentDB cards about documents, copies and backups" },
+        {
+          "kind": "choose",
+          "id": "documentdb-fit",
+          "text": "Pick data for the archive",
+          "question": "Which data suits a document database like Amazon DocumentDB best?",
+          "options": [
+            { "text": "User profiles where every user shares different details", "why": "Documents can each hold different fields, so each profile stores only what that user gave.", "correct": true },
+            { "text": "Ten years of sales to add up by month", "why": "Big sums over many rows are a job for a data warehouse like Redshift." },
+            { "text": "Which friends of friends bought this book", "why": "Following links hop after hop is what a graph database like Neptune is for." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "documentdb-move",
+          "text": "Move an app without rewriting it",
+          "question": "A team's app already uses MongoDB drivers. They want a managed database on AWS with as few code changes as possible. What fits?",
+          "options": [
+            { "text": "Amazon DocumentDB", "why": "It's built to run the same application code, drivers and tools used with MongoDB.", "correct": true },
+            { "text": "Amazon DynamoDB", "why": "A great database, but it has its own API, so the app's data code would need rewriting." },
+            { "text": "Amazon Redshift", "why": "A data warehouse for analytics, not an app's everyday database." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "recipe-box", "text": "Design the Recipe Box: store recipes of every shape" }
+      ]
+    },
+    {
+      "id": "transit-interchange",
+      "title": "Tess's Interchange",
+      "districtId": "networking",
+      "serviceIds": ["transitgateway", "vpc", "ec2", "rds"],
+      "intro": "Every network's road comes to my interchange. Drive in once, and you can reach any network I'm told to let you reach. No tangle of bridges.",
+      "rewardXp": 35,
+      "steps": [
+        { "kind": "visit", "serviceId": "transitgateway", "text": "Walk to the Transit Gateway Interchange and meet Tess" },
+        { "kind": "cards", "serviceId": "transitgateway", "count": 4, "text": "Learn 4 Transit Gateway cards about hubs and route tables" },
+        {
+          "kind": "choose",
+          "id": "tgw-transitive",
+          "text": "Find out why pairs aren't enough",
+          "question": "VPC A is peered with VPC B, and A is also peered with VPC C. Can B reach C through A?",
+          "options": [
+            { "text": "No: peering isn't transitive, so B and C need their own link, or a hub", "why": "Peering only links pairs. With a transit gateway, every attached network can reach the others it's routed to.", "correct": true },
+            { "text": "Yes, traffic hops through A", "why": "Peering never passes traffic on through a third network." },
+            { "text": "Only if all three are in different Regions", "why": "Regions don't change it: a peering connection never passes traffic through." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "tgw-segment",
+          "text": "Keep the test network apart",
+          "question": "Test and live networks share one transit gateway. How do you stop test from reaching live?",
+          "options": [
+            { "text": "Give them separate route tables with no routes between them", "why": "Each attachment follows one route table, so test can only reach what its table routes to.", "correct": true },
+            { "text": "Add a second transit gateway as a spare", "why": "Transit gateways are highly available by design, and a spare doesn't separate traffic." },
+            { "text": "Put both in the same subnet", "why": "That would bring them closer together, not keep them apart." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "network-hub", "text": "Design the Network Interchange: one hub for every network" }
+      ]
+    },
+    {
+      "id": "accelerator-express",
+      "title": "Axel's Express",
+      "districtId": "networking",
+      "serviceIds": ["globalaccelerator", "ec2"],
+      "intro": "Two addresses, and they never change. Riders board my express at the stop nearest them, and I drive them to the healthiest Region.",
+      "rewardXp": 35,
+      "steps": [
+        { "kind": "visit", "serviceId": "globalaccelerator", "text": "Walk to Global Accelerator Express and meet Axel" },
+        { "kind": "cards", "serviceId": "globalaccelerator", "count": 4, "text": "Learn 4 Global Accelerator cards about fixed addresses and failover" },
+        {
+          "kind": "choose",
+          "id": "accelerator-fit",
+          "text": "Pick a job for the express",
+          "question": "Which app needs Global Accelerator rather than CloudFront?",
+          "options": [
+            { "text": "A game whose players connect straight to game servers, not to web pages", "why": "Global Accelerator carries any kind of traffic to servers in one or more Regions, which suits games and voice calls.", "correct": true },
+            { "text": "A blog full of photos for readers worldwide", "why": "Photos and web pages are what CloudFront caches and serves from the edge." },
+            { "text": "A video course people stream at home", "why": "CloudFront caches and delivers videos close to viewers." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "accelerator-failover",
+          "text": "Switch Regions in seconds",
+          "question": "Partners' firewalls only allow a few fixed IP addresses, and the app must move to another Region fast if one fails. What helps most?",
+          "options": [
+            { "text": "Global Accelerator's two static IP addresses in front of both Regions", "why": "The addresses never change, so partners allow them once, and new connections move to a healthy Region in seconds.", "correct": true },
+            { "text": "Change the DNS record when a Region fails", "why": "Some devices cache old DNS answers for a long time, so users may keep going to the failed Region." },
+            { "text": "Give each server its own public IP address", "why": "Partners would have to update their firewalls whenever a server changes." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "ticket-express", "text": "Design the Ticket Express: fixed addresses, fast failover" }
+      ]
+    },
+    {
+      "id": "secrets-strongroom",
+      "title": "Sid's Strongroom",
+      "districtId": "security",
+      "serviceIds": ["secretsmanager", "lambda", "rds", "kms"],
+      "intro": "A password written in the code is a password anyone can read. Bring me your secrets: I'll lock them in the strongroom and change them while you sleep.",
+      "rewardXp": 40,
+      "steps": [
+        { "kind": "visit", "serviceId": "secretsmanager", "text": "Walk to the Secrets Manager Strongroom and meet Sid" },
+        { "kind": "cards", "serviceId": "secretsmanager", "count": 4, "text": "Learn 4 Secrets Manager cards about storing and rotating secrets" },
+        {
+          "kind": "choose",
+          "id": "secrets-hardcoded",
+          "text": "Get a password out of the code",
+          "question": "A developer pasted the database password into the app's code. What's the safer fix?",
+          "options": [
+            { "text": "Store it in Secrets Manager, have the app fetch it when it runs, and rotate the old one", "why": "The code no longer holds the password, and rotating it makes the copy that leaked useless.", "correct": true },
+            { "text": "Move it into a comment at the bottom of the file", "why": "Anyone who can read the code can still read the comment." },
+            { "text": "Email it to the team instead", "why": "Email spreads the password further, and it still never changes." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "secrets-rotation",
+          "text": "Change the password without a hiccup",
+          "question": "The payments app must keep working while its database password changes. Which rotation strategy fits?",
+          "options": [
+            { "text": "Alternating users: two users take turns, so one login always works", "why": "While one user's password changes, the other still works, so the app always gets valid credentials.", "correct": true },
+            { "text": "A single user, changed by hand once a year", "why": "Changes by hand are easy to forget, and a single user has a moment where logins can fail." },
+            { "text": "Never rotate, in case it breaks something", "why": "A password that never changes stays useful to anyone who ever saw it." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "secret-password", "text": "Wire the library app to its database with no password in the code" }
+      ]
+    },
+    {
+      "id": "inspector-rounds",
+      "title": "Ingrid's Rounds",
+      "districtId": "security",
+      "serviceIds": ["inspector", "ec2", "lambda"],
+      "intro": "Every server, container image and function in the city gets a visit from me. When a known flaw turns up, you'll hear about it before an attacker does.",
+      "rewardXp": 30,
+      "steps": [
+        { "kind": "visit", "serviceId": "inspector", "text": "Walk to the Inspector's Bureau and meet Ingrid" },
+        { "kind": "cards", "serviceId": "inspector", "count": 4, "text": "Learn 4 Inspector cards about scans, flaws and scores" },
+        {
+          "kind": "choose",
+          "id": "inspector-priority",
+          "text": "Decide which flaw to fix first",
+          "question": "Inspector found the same flaw on two servers. One can be reached from the internet, the other can't. Which comes first?",
+          "options": [
+            { "text": "The one reachable from the internet: its Inspector score is higher", "why": "Inspector adjusts each score to your setup. A flaw attackers can reach from the internet is more urgent.", "correct": true },
+            { "text": "Both are equally urgent, so pick one at random", "why": "The same flaw can matter more or less depending on whether attackers can reach it." },
+            { "text": "Neither: wait for next year's audit", "why": "Inspector scans all the time so you can fix flaws now, not a year later." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "inspector-rescan",
+          "text": "Know when Ingrid checks again",
+          "question": "When does Inspector scan a Lambda function again?",
+          "options": [
+            { "text": "When the function is updated, or a new flaw that affects it is published", "why": "Inspector rescans on changes and on newly published flaws, with no schedule to set up.", "correct": true },
+            { "text": "Only when you press a button each month", "why": "There are no scan schedules to manage: Inspector rescans by itself." },
+            { "text": "Never: one scan when it's created is enough", "why": "New flaws are published every day, so an old scan soon goes stale." }
+          ]
         }
+      ]
+    },
+    {
+      "id": "macie-clues",
+      "title": "Mae Follows the Clues",
+      "districtId": "security",
+      "serviceIds": ["macie", "s3"],
+      "intro": "Somewhere in the lake there's a file full of card numbers that shouldn't be there. Let's find it before anyone else does.",
+      "rewardXp": 30,
+      "steps": [
+        { "kind": "visit", "serviceId": "macie", "text": "Walk to the Macie Detective Agency and meet Mae" },
+        { "kind": "cards", "serviceId": "macie", "count": 4, "text": "Learn 4 Macie cards about sensitive data and bucket checks" },
+        {
+          "kind": "choose",
+          "id": "macie-public",
+          "text": "Spot a bucket left open",
+          "question": "A bucket of customer records was made public by mistake. Which kind of Macie finding tells you?",
+          "options": [
+            { "text": "A policy finding about the bucket's public access", "why": "Policy findings report security or privacy problems with a bucket, such as it becoming public.", "correct": true },
+            { "text": "A sensitive data finding for each file", "why": "Sensitive data findings report what's inside files, not how the bucket is shared." },
+            { "text": "None: Macie only reads the files", "why": "Macie also watches each bucket's access settings and raises policy findings." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "macie-scope",
+          "text": "Search the whole lake on a budget",
+          "question": "You have hundreds of buckets and want a broad picture of where sensitive data lives. What do you turn on?",
+          "options": [
+            { "text": "Automated sensitive data discovery, which samples objects in every bucket", "why": "It keeps sampling representative objects everywhere, for a broad view without reading every file.", "correct": true },
+            { "text": "A one-off job that reads every object in every bucket", "why": "That works but costs the most. Jobs suit deep checks of the buckets you choose." },
+            { "text": "S3 versioning on every bucket", "why": "Versioning keeps old copies of files. It doesn't look for sensitive data." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "security-control-room",
+      "title": "The Control Room",
+      "districtId": "security",
+      "serviceIds": ["securityhub", "guardduty", "inspector", "macie", "eventbridge", "sqs"],
+      "intro": "Gwen watches for attackers, Ingrid for flaws, Mae for loose data. My job is to put all their warnings on one board, worst first, and wake the right people.",
+      "rewardXp": 50,
+      "steps": [
+        { "kind": "visit", "serviceId": "securityhub", "text": "Walk to the Security Hub Control Room and meet Hana" },
+        { "kind": "cards", "serviceId": "securityhub", "count": 4, "text": "Learn 4 Security Hub cards about findings, checks and scores" },
+        {
+          "kind": "choose",
+          "id": "securityhub-board",
+          "text": "Tame a flood of warnings",
+          "question": "Three watchers each post warnings in their own place, and the team misses the urgent ones. What does Security Hub do?",
+          "options": [
+            { "text": "Gathers GuardDuty, Inspector and Macie findings in one format and ranks the critical ones", "why": "Security Hub correlates the signals from all three, so the most urgent issues rise to the top.", "correct": true },
+            { "text": "Replaces GuardDuty, Inspector and Macie", "why": "Security Hub collects their findings. It still needs them to find threats, flaws and sensitive data." },
+            { "text": "Deletes old warnings every night", "why": "Automation rules can suppress or re-rank findings, but its job is to bring them together." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "security-findings-hub", "text": "Put every warning on one board and wake the team for urgent ones" },
+        { "kind": "ask", "prompt": "What is the difference between GuardDuty, Inspector and Macie?", "text": "Ask the agents: threats, flaws or sensitive data?" }
+      ]
+    },
+    {
+      "id": "polly-voice",
+      "title": "Pip Finds a Voice",
+      "districtId": "aiml",
+      "serviceIds": ["polly", "s3"],
+      "intro": "Hear ye, hear ye! Give me any text and I'll read it aloud in a voice that sounds like a person. Long stories too: I'll leave the recording at the lake.",
+      "rewardXp": 30,
+      "steps": [
+        { "kind": "visit", "serviceId": "polly", "text": "Walk to Polly Speakers' Corner and meet Pip" },
+        { "kind": "cards", "serviceId": "polly", "count": 4, "text": "Learn 4 Polly cards about voices, speech tags and audio" },
+        {
+          "kind": "choose",
+          "id": "polly-long",
+          "text": "Read a whole chapter aloud",
+          "question": "A learning app needs a 20-page chapter read aloud as one audio file. How should it ask Polly?",
+          "options": [
+            { "text": "Start a speech synthesis task that saves the audio file to S3", "why": "Background tasks take up to 100,000 billed characters and save the result in an S3 bucket.", "correct": true },
+            { "text": "Send the whole chapter in one SynthesizeSpeech call", "why": "That call is for speech in near real time and stops at 3,000 billed characters." },
+            { "text": "Record a person reading it", "why": "That works, but Polly makes the audio in minutes and can redo it whenever the text changes." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "polly-ssml",
+          "text": "Make Pip pause and stress a word",
+          "question": "The quiz app needs a pause before each answer and one word said louder. What does it use?",
+          "options": [
+            { "text": "Speech tags (SSML) in the text for pauses, volume and emphasis", "why": "Speech Synthesis Markup Language tags tell Polly how to say the text, not just what to say.", "correct": true },
+            { "text": "A different voice for every sentence", "why": "Changing voices doesn't add a pause or stress a word." },
+            { "text": "Capital letters on the loud word", "why": "Capitals don't set the volume. Speech tags such as emphasis and prosody do." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "comprehend-reading-room",
+      "title": "Nora Reads the Room",
+      "districtId": "aiml",
+      "serviceIds": ["comprehend", "polly", "s3", "lambda", "dynamodb"],
+      "intro": "Ten thousand comments came in overnight. I'll read every one and tell you who's happy, who isn't and what they're talking about.",
+      "rewardXp": 40,
+      "steps": [
+        { "kind": "visit", "serviceId": "comprehend", "text": "Walk to the Comprehend Reading Room and meet Nora" },
+        { "kind": "cards", "serviceId": "comprehend", "count": 4, "text": "Learn 4 Comprehend cards about entities, sentiment and personal data" },
+        {
+          "kind": "choose",
+          "id": "comprehend-targeted",
+          "text": "Find out which dish people love",
+          "question": "Reviews say things like 'The tacos were great but the wait was long'. You want the feeling about each dish. Which feature?",
+          "options": [
+            { "text": "Targeted sentiment, which scores the feeling about each thing mentioned", "why": "It gives a sentiment for each entity, so the tacos and the wait get separate scores.", "correct": true },
+            { "text": "Plain sentiment, one score per review", "why": "One score per review hides that the tacos were loved and the wait wasn't." },
+            { "text": "Language detection", "why": "That tells you which language a review is in, not how people feel." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "comprehend-redact",
+          "text": "Hide personal details",
+          "question": "Support chats contain phone numbers and home addresses that analysts mustn't see. What can Comprehend do?",
+          "options": [
+            { "text": "Find the personal details and black them out with an asynchronous job", "why": "Comprehend detects details like addresses and phone numbers, and redaction runs as a batch job.", "correct": true },
+            { "text": "Translate the chats into another language", "why": "Translation doesn't remove anyone's phone number." },
+            { "text": "Count how many chats mention a product", "why": "That's entity detection. The personal details would still be there." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "voice-of-the-people", "text": "Read every comment's mood and put the kind ones on the radio" }
+      ]
+    },
+    {
+      "id": "stepfunctions-bandstand",
+      "title": "Stef's Bandstand",
+      "districtId": "management",
+      "serviceIds": ["stepfunctions", "apigateway", "lambda", "dynamodb"],
+      "intro": "Every job is a piece of music. I read the score, cue each player in turn and, if one misses a note, try the bar again. Let's conduct an order from start to finish.",
+      "rewardXp": 45,
+      "steps": [
+        { "kind": "visit", "serviceId": "stepfunctions", "text": "Walk to the Step Functions Bandstand and meet Stef" },
+        { "kind": "cards", "serviceId": "stepfunctions", "count": 5, "text": "Learn 5 Step Functions cards about states, retries and workflow types" },
+        {
+          "kind": "choose",
+          "id": "stepfunctions-glitch",
+          "text": "Keep an order going through a short glitch",
+          "question": "A payment step sometimes fails because the card service is busy for a moment. What should the workflow do?",
+          "options": [
+            { "text": "Add a Retry with backoff to the payment step, and a Catch for real failures", "why": "Retry tries again after a short, growing wait. Catch sends a failure that keeps happening to the undo steps.", "correct": true },
+            { "text": "Nothing: Step Functions retries every step forever by default", "why": "By default an error fails the whole execution. You add Retry yourself." },
+            { "text": "Start the whole workflow again from the beginning", "why": "That repeats steps that already worked, like saving the order twice." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "stepfunctions-type",
+          "text": "Pick the right workflow type for payments",
+          "question": "Which workflow type suits taking payments, where a step must never run twice by accident?",
+          "options": [
+            { "text": "Standard", "why": "Standard runs each step exactly once unless you add Retry, keeps full history and can run for up to a year.", "correct": true },
+            { "text": "Express", "why": "Asynchronous Express runs at least once, so a step could run twice. Better for work that is safe to repeat." },
+            { "text": "Either: they behave the same", "why": "They differ in how often steps run, how long a run can last and how they are billed." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "order-saga", "text": "Design the Bakery Order Line, with undo steps if payment fails" },
+        { "kind": "ask", "prompt": "When should I use AWS Step Functions instead of Amazon EventBridge?", "text": "Ask the agents: a conductor or a signal box (workflows or events)" }
+      ]
+    },
+    {
+      "id": "cloudformation-blueprints",
+      "title": "Draw It Once, Build It Anywhere",
+      "districtId": "management",
+      "serviceIds": ["cloudformation", "dynamodb"],
+      "intro": "Every building in this city started on my drawing board. Write down what you need once, and it gets built the same way every time, in the right order. Even Cody's builds start as my blueprints.",
+      "rewardXp": 40,
+      "steps": [
+        { "kind": "visit", "serviceId": "cloudformation", "text": "Walk to the CloudFormation Blueprint Office and meet Forma" },
+        { "kind": "cards", "serviceId": "cloudformation", "count": 5, "text": "Learn 5 CloudFormation cards about templates, stacks and change sets" },
+        {
+          "kind": "choose",
+          "id": "cloudformation-preview",
+          "text": "Check an update before it builds",
+          "question": "You're about to rename a database in a stack's template. How do you see what the update will do first?",
+          "options": [
+            { "text": "Create a change set and read it before running the update", "why": "A change set lists every change. Renaming a database replaces it, so you'd see the risk to its data first.", "correct": true },
+            { "text": "Delete the stack and create it again", "why": "That deletes every resource in the stack, data included." },
+            { "text": "Rename the database by hand in the console", "why": "Changes made outside CloudFormation cause drift, and the template no longer matches." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "cloudformation-drift",
+          "text": "Find the setting someone changed by hand",
+          "question": "A teammate changed a server's settings in the EC2 console, not in the template. How can you find what no longer matches?",
+          "options": [
+            { "text": "Run drift detection on the stack", "why": "It compares each resource's real settings with the template and lists the differences.", "correct": true },
+            { "text": "Read the template again", "why": "The template only shows what should be there, not what was changed by hand." },
+            { "text": "Create a second stack from the same template", "why": "That builds a new copy. It doesn't check the first one." }
+          ]
+        },
+        { "kind": "design", "text": "Draw a design of your own on the Drawing board and get it reviewed" },
+        { "kind": "deploy", "templateId": "dynamo-table", "text": "Build a stack from a template (practice is free): one DynamoDB table" }
+      ]
+    },
+    {
+      "id": "systems-manager-depot",
+      "title": "The Caretaker's Rounds",
+      "districtId": "management",
+      "serviceIds": ["systemsmanager", "ec2", "vpc", "cloudwatch"],
+      "intro": "I look after every machine in town without knocking on a single door. Come on my rounds: we'll patch, run jobs and let the admins in safely.",
+      "rewardXp": 40,
+      "steps": [
+        { "kind": "visit", "serviceId": "systemsmanager", "text": "Walk to the Systems Manager Depot and meet Manny" },
+        { "kind": "cards", "serviceId": "systemsmanager", "count": 5, "text": "Learn 5 Systems Manager cards about sessions, commands and patches" },
+        {
+          "kind": "choose",
+          "id": "systemsmanager-door",
+          "text": "Let an admin in without opening a door",
+          "question": "An admin needs a shell on a server in a private subnet. The team wants no open inbound ports and no SSH keys to look after. What fits?",
+          "options": [
+            { "text": "Session Manager, with IAM deciding who may connect", "why": "It opens the shell through the SSM Agent, with no inbound ports, bastion hosts or SSH keys, and can log every session.", "correct": true },
+            { "text": "Open port 22 to the whole internet", "why": "That invites attacks from anywhere, and you still have SSH keys to manage." },
+            { "text": "A bastion server in a public subnet", "why": "It works, but it's one more server to patch, pay for and protect." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "systemsmanager-settings",
+          "text": "Pick a home for an app's settings",
+          "question": "An app needs its endpoint address and a feature switch when it starts, without them being written into the code. Where should they live?",
+          "options": [
+            { "text": "In Parameter Store, part of Systems Manager", "why": "It keeps named settings, plain or encrypted with KMS, and standard parameters cost nothing extra.", "correct": true },
+            { "text": "Inside the code, as constants", "why": "Then every change needs a new release, and settings get mixed up with code." },
+            { "text": "In the server's name tag", "why": "Tags label resources. They aren't a safe or tidy place for app settings." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "no-open-doors", "text": "Design Servers With No Open Doors, patched every week" }
+      ]
+    },
+    {
+      "id": "config-survey",
+      "title": "Cora's Survey",
+      "districtId": "management",
+      "serviceIds": ["config", "systemsmanager", "s3", "sqs"],
+      "intro": "I write down how every building in town is set up, and every change since. Tell me the rules, and I'll flag anything that breaks them, even at 3 a.m.",
+      "rewardXp": 40,
+      "steps": [
+        { "kind": "visit", "serviceId": "config", "text": "Walk to the Config Survey Office and meet Cora" },
+        { "kind": "cards", "serviceId": "config", "count": 5, "text": "Learn 5 AWS Config cards about records, rules and fixes" },
+        {
+          "kind": "choose",
+          "id": "config-or-trail",
+          "text": "Find out what changed, and who changed it",
+          "question": "A security group's rules changed overnight. Which pair tells you what changed and who changed it?",
+          "options": [
+            { "text": "AWS Config for the settings before and after, and CloudTrail for who made the call", "why": "Config records each resource's settings over time. CloudTrail records the API call and who made it.", "correct": true },
+            { "text": "Amazon GuardDuty on its own", "why": "GuardDuty spots threats. It doesn't keep each resource's settings history." },
+            { "text": "Amazon CloudFront logs", "why": "Those record requests to your website, not changes to security groups." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "config-fix",
+          "text": "Put a broken setting right automatically",
+          "question": "A Config rule finds a bucket that breaks the rules. How can it be fixed without anyone logging in?",
+          "options": [
+            { "text": "Attach a remediation action: a Systems Manager Automation runbook that runs automatically", "why": "Config runs the runbook on noncompliant resources, either when you choose or automatically.", "correct": true },
+            { "text": "Do nothing: Config rules fix everything on their own", "why": "Rules only check. Remediation actions do the fixing." },
+            { "text": "Delete the bucket", "why": "That loses the photos. Remediation changes just the broken setting." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "config-autofix", "text": "Design a fix for The Bucket That Kept Opening" }
+      ]
+    },
+    {
+      "id": "organizations-council",
+      "title": "The Town Council",
+      "districtId": "management",
+      "serviceIds": ["organizations", "cloudformation", "cloudwatch", "s3"],
+      "intro": "One account per team keeps mistakes small, but who keeps all those accounts in order? I do: wards, by-laws and one bill for the whole town.",
+      "rewardXp": 50,
+      "steps": [
+        { "kind": "visit", "serviceId": "organizations", "text": "Walk to the Organizations Council House and meet Orla" },
+        { "kind": "cards", "serviceId": "organizations", "count": 5, "text": "Learn 5 Organizations cards about accounts, OUs and SCPs" },
+        {
+          "kind": "choose",
+          "id": "organizations-scp",
+          "text": "Find out what an SCP can and cannot do",
+          "question": "A service control policy on a team's OU allows Amazon S3. Can a brand-new role in that account now use S3?",
+          "options": [
+            { "text": "Only if its IAM policies allow S3 too: an SCP never grants permissions", "why": "SCPs set the most an account can do. The role still needs an IAM policy that allows the action.", "correct": true },
+            { "text": "Yes: the SCP gives every role S3 access", "why": "SCPs never grant permissions. They only set limits." },
+            { "text": "No: an SCP blocks everything it mentions", "why": "An Allow in an SCP permits the action up to that limit; IAM still decides." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "organizations-workloads",
+          "text": "Choose where the teams' apps should run",
+          "question": "Where should the teams' apps and data live?",
+          "options": [
+            { "text": "In member accounts, not the management account", "why": "SCPs don't restrict the management account, so AWS recommends keeping resources out of it.", "correct": true },
+            { "text": "In the management account, to keep the bill simple", "why": "Member accounts already share one bill through consolidated billing." },
+            { "text": "All together in one account", "why": "Separate accounts keep each team's mistakes, permissions and costs apart." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "account-baseline", "text": "Design Every New Account, Ready, with one audit trail for all" }
+      ]
+    },
+    {
+      "id": "appsync-switchboard",
+      "title": "Gracie's Switchboard",
+      "districtId": "management",
+      "serviceIds": ["appsync", "cognito", "dynamodb", "lambda"],
+      "intro": "Ask me for exactly what you need. I'll ring every source on one line, and the moment anything changes, I'll ring you back.",
+      "rewardXp": 45,
+      "steps": [
+        { "kind": "visit", "serviceId": "appsync", "text": "Walk to the AppSync Switchboard and meet Gracie" },
+        { "kind": "cards", "serviceId": "appsync", "count": 5, "text": "Learn 5 AppSync cards about GraphQL, resolvers and live updates" },
+        {
+          "kind": "choose",
+          "id": "appsync-fit",
+          "text": "Pick an API for a busy phone app",
+          "question": "A phone app's home screen needs a user's profile, their orders and today's offers, which live in three places, in a single request. Which fits best?",
+          "options": [
+            { "text": "AWS AppSync, with a GraphQL API", "why": "One GraphQL request can ask for exactly those fields from several data sources at once.", "correct": true },
+            { "text": "Amazon SQS", "why": "A queue passes messages between back-end parts. It doesn't answer an app's request." },
+            { "text": "Amazon Redshift", "why": "A data warehouse for big analysis, not quick answers for a phone app." }
+          ]
+        },
+        {
+          "kind": "choose",
+          "id": "appsync-live",
+          "text": "Make the app update by itself",
+          "question": "How can the app show a new order the moment it is saved, without asking the server every few seconds?",
+          "options": [
+            { "text": "A GraphQL subscription, which AppSync triggers when a mutation saves the order", "why": "AppSync keeps a WebSocket connection open and pushes each change to subscribed apps.", "correct": true },
+            { "text": "Ask the server again every second", "why": "Constant asking wastes requests and battery, and still lags behind." },
+            { "text": "Email the user each change", "why": "Email is slow and leaves the screen out of date." }
+          ]
+        },
+        { "kind": "puzzle", "puzzleId": "live-scores", "text": "Design Sports Day Live, with scores pushed to every phone" },
+        { "kind": "ask", "prompt": "When should I pick AWS AppSync instead of Amazon API Gateway?", "text": "Ask the agents: when one switchboard line beats many ticket counters" }
       ]
     }
   ]

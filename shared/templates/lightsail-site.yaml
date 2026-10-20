@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the sailing club's blog. A Lightsail WordPress instance with automatic daily snapshots and SSH open only to you, a static IP that survives restarts, and a Lightsail managed MySQL database for the posts. Point your domain's A record in Route 53 at the static IP.
+
+Parameters:
+  BundleId:
+    Type: String
+    Description: An instance plan, from aws lightsail get-bundles
+  DatabaseBundleId:
+    Type: String
+    Description: A database plan, from aws lightsail get-relational-database-bundles
+  AdminCidr:
+    Type: String
+    Description: Your own IP address in CIDR form (for example 203.0.113.10/32), the only place SSH is allowed from
+    AllowedPattern: '^\d{1,3}(\.\d{1,3}){3}/\d{1,2}$'
+
+Resources:
+  ClubSite:
+    Type: AWS::Lightsail::Instance
+    Properties:
+      InstanceName: club-blog
+      BlueprintId: wordpress
+      BundleId: !Ref BundleId
+      AddOns:
+        - AddOnType: AutoSnapshot
+          Status: Enabled
+      Networking:
+        Ports:
+          - Protocol: tcp
+            FromPort: 80
+            ToPort: 80
+            Cidrs:
+              - 0.0.0.0/0
+          - Protocol: tcp
+            FromPort: 443
+            ToPort: 443
+            Cidrs:
+              - 0.0.0.0/0
+          - Protocol: tcp
+            FromPort: 22
+            ToPort: 22
+            Cidrs:
+              - !Ref AdminCidr
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ClubAddress:
+    Type: AWS::Lightsail::StaticIp
+    Properties:
+      StaticIpName: club-blog-ip
+      AttachedTo: !Ref ClubSite
+
+  PostsDatabase:
+    Type: AWS::Lightsail::Database
+    Properties:
+      RelationalDatabaseName: club-posts
+      RelationalDatabaseBlueprintId: mysql_8_0
+      RelationalDatabaseBundleId: !Ref DatabaseBundleId
+      MasterDatabaseName: wordpress
+      MasterUsername: clubadmin
+      PubliclyAccessible: false
+      BackupRetention: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+Outputs:
+  StaticIp:
+    Description: Create an A record for the club's domain in Route 53 with this address
+    Value: !GetAtt ClubAddress.IpAddress
+  DatabaseName:
+    Description: Read the generated password with aws lightsail get-relational-database-master-user-password
+    Value: !Ref PostsDatabase

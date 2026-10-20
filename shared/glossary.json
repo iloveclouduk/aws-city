@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-10-11",
+  "asOf": "2026-10-18",
   "version": 1,
   "terms": [
     {
@@ -455,6 +455,283 @@
       ],
       "short": "A plain text table: one row per line, with commas between the values. Spreadsheets can open it.",
       "url": "https://docs.aws.amazon.com/athena/latest/ug/csv-serde.html"
+    },
+    {
+      "term": "tenant",
+      "aliases": [],
+      "short": "One customer of a SaaS app, often a whole company, whose users and data stay apart from every other customer's.",
+      "url": "https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/silo-pool-and-bridge-models.html"
+    },
+    {
+      "term": "multi-tenancy",
+      "aliases": [
+        "multi-tenant"
+      ],
+      "short": "One app and its infrastructure serving many tenants at once, while keeping each tenant's data separate.",
+      "url": "https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/silo-pool-and-bridge-models.html"
+    },
+    {
+      "term": "silo model",
+      "aliases": [
+        "silo"
+      ],
+      "short": "Each tenant gets its own dedicated resources, though all tenants still share one sign-in, onboarding and operations.",
+      "url": "https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/silo-pool-and-bridge-models.html"
+    },
+    {
+      "term": "pool model",
+      "aliases": [],
+      "short": "Tenants share the same resources, like one table keyed by tenant, so code and policies must keep them apart.",
+      "url": "https://docs.aws.amazon.com/whitepapers/latest/saas-tenant-isolation-strategies/pooled-storage-isolation-strategies.html"
+    },
+    {
+      "term": "bridge model",
+      "aliases": [],
+      "short": "A mix of silo and pool: for example a shared web tier with a separate app tier and storage for each tenant.",
+      "url": "https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/bridge-model.html"
+    },
+    {
+      "term": "noisy neighbour",
+      "aliases": [
+        "noisy neighbor",
+        "noisy neighbours",
+        "noisy neighbors"
+      ],
+      "short": "One user or tenant putting so much load on shared resources that everyone else's experience gets worse.",
+      "url": "https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/noisy-neighbor.html"
+    },
+    {
+      "term": "bounded context",
+      "aliases": [
+        "bounded contexts"
+      ],
+      "short": "A boundary around one business area and the words it uses. Microservices draw their service lines along them.",
+      "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_service_architecture_business_domains.html"
+    },
+    {
+      "term": "MCP",
+      "aliases": [
+        "Model Context Protocol"
+      ],
+      "short": "Model Context Protocol: a common way for AI agents to find and call tools. AgentCore Gateway turns APIs into MCP tools.",
+      "url": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-using.html"
+    },
+    {
+      "term": "A2A",
+      "aliases": [
+        "Agent2Agent",
+        "agent-to-agent protocol"
+      ],
+      "short": "Agent2Agent: a protocol that lets AI agents talk to each other. AgentCore Runtime can host A2A agents.",
+      "url": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-a2a.html"
+    },
+    {
+      "term": "AI-DLC",
+      "aliases": [
+        "AI-driven development life cycle"
+      ],
+      "short": "AWS's way to build software with AI: AI proposes, the team checks, through Inception, Construction and Operations.",
+      "url": "https://aws.amazon.com/blogs/devops/ai-driven-development-life-cycle/"
+    },
+    {
+      "term": "checkpoint",
+      "aliases": [
+        "checkpoints"
+      ],
+      "short": "A saved result of a finished step. After a pause or failure, a durable function reuses it instead of redoing the work.",
+      "url": "https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html"
+    },
+    {
+      "term": "replay",
+      "aliases": [],
+      "short": "Running a durable function's code again from the start after a pause, skipping the steps that already have checkpoints.",
+      "url": "https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html"
+    },
+    {
+      "term": "penetration test",
+      "aliases": [
+        "pen test",
+        "pentest",
+        "penetration testing"
+      ],
+      "short": "An authorised practice attack on your own app, to find weaknesses before a real attacker does.",
+      "url": "https://docs.aws.amazon.com/securityagent/latest/userguide/what-is.html"
+    },
+    {
+      "term": "capacity provider",
+      "aliases": [],
+      "short": "In Lambda Managed Instances, the setting that picks the VPC, instance types and scaling for your functions' EC2 servers.",
+      "url": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances-capacity-providers.html"
+    },
+    {
+      "term": "IOPS",
+      "aliases": [
+        "I/O operations per second"
+      ],
+      "short": "Input/output operations per second: how many reads and writes a disk can handle each second.",
+      "url": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volume-types.html"
+    },
+    {
+      "term": "SSD",
+      "aliases": [
+        "solid state drive"
+      ],
+      "short": "Solid state drive. EBS SSD volumes, like gp3 and io2, suit many small reads and writes: databases and boot disks.",
+      "url": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volume-types.html"
+    },
+    {
+      "term": "HDD",
+      "aliases": [
+        "hard disk drive"
+      ],
+      "short": "Hard disk drive. EBS HDD volumes, st1 and sc1, suit long streaming reads like logs, and can't start a server.",
+      "url": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volume-types.html"
+    },
+    {
+      "term": "instance store",
+      "aliases": [],
+      "short": "Disks attached to the host of an EC2 server. Included in the price, but wiped when the instance stops.",
+      "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-store-lifetime.html"
+    },
+    {
+      "term": "NFS",
+      "aliases": [
+        "Network File System"
+      ],
+      "short": "Network File System: the standard way computers share files over a network. Amazon EFS uses it.",
+      "url": "https://docs.aws.amazon.com/efs/latest/ug/encryption-in-transit.html"
+    },
+    {
+      "term": "Spot Instance",
+      "aliases": [
+        "Spot Instances"
+      ],
+      "short": "Spare EC2 capacity at a steep discount. AWS can take it back with two minutes' warning, for work that can stop.",
+      "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-spot-instances.html"
+    },
+    {
+      "term": "recovery point",
+      "aliases": [
+        "recovery points"
+      ],
+      "short": "One saved backup in AWS Backup that you can restore, kept in a backup vault until its retention ends.",
+      "url": "https://docs.aws.amazon.com/aws-backup/latest/devguide/plan-options-and-configuration.html"
+    },
+    {
+      "term": "JSON",
+      "aliases": [],
+      "short": "A common text format for data: named fields, lists and nested objects that both people and programs can read.",
+      "url": "https://aws.amazon.com/nosql/document/"
+    },
+    {
+      "term": "VPN",
+      "aliases": [
+        "virtual private network"
+      ],
+      "short": "An encrypted tunnel over the internet that links an office or a person to a private network, like a VPC.",
+      "url": "https://aws.amazon.com/what-is/vpn/"
+    },
+    {
+      "term": "CVE",
+      "aliases": [
+        "common vulnerabilities and exposures"
+      ],
+      "short": "A public reference number for a known security flaw in software, so everyone means the same flaw.",
+      "url": "https://docs.aws.amazon.com/inspector/latest/user/findings-types.html"
+    },
+    {
+      "term": "CSPM",
+      "aliases": [
+        "cloud security posture management"
+      ],
+      "short": "Automatic checks that your cloud setup follows security best practices, like keeping storage private.",
+      "url": "https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub.html"
+    },
+    {
+      "term": "SSML",
+      "aliases": [
+        "Speech Synthesis Markup Language"
+      ],
+      "short": "Tags around text that tell a voice service how to say it: pauses, speed, volume and pronunciation.",
+      "url": "https://docs.aws.amazon.com/polly/latest/dg/ssml.html"
+    },
+    {
+      "term": "PII",
+      "aliases": [
+        "personally identifiable information"
+      ],
+      "short": "Details that can identify a person, such as a home address, a phone number or a bank account number.",
+      "url": "https://docs.aws.amazon.com/comprehend/latest/dg/pii.html"
+    },
+    {
+      "term": "state machine",
+      "aliases": [],
+      "short": "A workflow in Step Functions: its steps, called states, and the rules for which one comes next.",
+      "url": "https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html"
+    },
+    {
+      "term": "infrastructure as code",
+      "aliases": [
+        "IaC"
+      ],
+      "short": "Writing your cloud setup down in text files, so tools can build it the same way every time.",
+      "url": "https://docs.aws.amazon.com/cdk/v2/guide/home.html"
+    },
+    {
+      "term": "YAML",
+      "aliases": [],
+      "short": "A plain text format for settings that uses indents and colons. CloudFormation templates can be written in it.",
+      "url": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cloudformation-overview.html"
+    },
+    {
+      "term": "drift",
+      "aliases": [],
+      "short": "When a resource is changed by hand, so it no longer matches its template or the setup you wanted.",
+      "url": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-stack-drift.html"
+    },
+    {
+      "term": "SSM Agent",
+      "aliases": [
+        "SSM"
+      ],
+      "short": "Software on a server that takes jobs from AWS Systems Manager, runs them and reports back.",
+      "url": "https://docs.aws.amazon.com/systems-manager/latest/userguide/ssm-agent.html"
+    },
+    {
+      "term": "runbook",
+      "aliases": [],
+      "short": "A written set of steps for a task or a fix, which Systems Manager Automation can carry out for you.",
+      "url": "https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-automation.html"
+    },
+    {
+      "term": "SCP",
+      "aliases": [
+        "service control policy"
+      ],
+      "short": "Service control policy: an AWS Organizations rule that caps what accounts can do. It never grants permissions.",
+      "url": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html"
+    },
+    {
+      "term": "OU",
+      "aliases": [
+        "organizational unit"
+      ],
+      "short": "Organizational unit: a group of AWS accounts in an organization. A policy on an OU applies to the accounts in it.",
+      "url": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_getting-started_concepts.html"
+    },
+    {
+      "term": "GraphQL",
+      "aliases": [],
+      "short": "A way for apps to ask an API for exactly the data they need, from many sources, in one request.",
+      "url": "https://docs.aws.amazon.com/appsync/latest/devguide/graphql-overview.html"
+    },
+    {
+      "term": "shard",
+      "aliases": [
+        "shards"
+      ],
+      "short": "One slice of a big job. A Kinesis stream's shards are lanes; an OpenSearch index splits into shards across servers.",
+      "url": "https://docs.aws.amazon.com/streams/latest/dev/key-concepts.html"
     }
   ]
 }

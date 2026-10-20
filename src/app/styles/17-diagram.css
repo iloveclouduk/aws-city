@@ -118,6 +118,8 @@
 }
 .slot {
   position: absolute;
+  /* Keyboard focus on a spot near the bottom scrolls it clear of the sticky Check bar (.arch-foot). */
+  scroll-margin-bottom: 8rem;
   padding: 0;
   background: transparent;
   border: 0;
@@ -181,6 +183,27 @@
 }
 .foot-row .btn {
   flex: none;
+}
+/* The side panel (~400 px): the sticky bar stays one short strip, so it never covers the diagram it sits under.
+   The message keeps two lines (the full text is still read out by aria-live), and the diagram ends with room for the bar. */
+@media (max-width: 480px) {
+  .arch-foot {
+    padding: var(--s-2) 0;
+  }
+  .foot-row {
+    gap: var(--s-2);
+  }
+  .diagram-say {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    font-size: var(--fs-xs);
+  }
+  .diagram-scroll {
+    padding-bottom: var(--s-3);
+  }
 }
 .flow-bar {
   display: grid;

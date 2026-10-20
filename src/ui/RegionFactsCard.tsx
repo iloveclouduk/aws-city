@@ -1,6 +1,8 @@
 // The Region sign: the real facts of the Region this city is (its AZs, opt-in, partition), what AWS doesn't offer
 // here yet, a few list prices next to us-east-1's, and (when the player turned it on) what they spent here this month.
 // Everything comes from shared/region-facts.json and shared/prices.json, with their sources.
+import { foundIn, TOKENS_PER_CITY } from '@/world/tokens';
+import { cityRank } from '@/state/rank';
 import { useCity } from '@/state/store';
 import {
   accountZones, availability, compare, monthlyNote, FACTS, nearestOffering, partitionName, perUnit, price, PRICES, regionFacts, regionInfo,
@@ -31,6 +33,7 @@ export function RegionFactsCard() {
   const missing = SERVICES.filter((s) => availability(s.id, region).status !== 'available');
   const prices = HEADLINE.flatMap((k) => price(k, region) ?? []);
   const here = inventory?.regions?.[region] ?? 0;
+  const progress = useCity((s) => s.progress);
 
   return (
     <div className="card culture campus region-facts">
@@ -45,6 +48,9 @@ export function RegionFactsCard() {
           🏙️ See {r?.city ?? region}'s landmark: {signatureFor(region)!.label}
         </button>
       )}
+      <p className="muted">
+        ✨ {foundIn(progress, region)}/{TOKENS_PER_CITY} golden tokens found on these streets · {cityRank(progress, region).rank.icon} {cityRank(progress, region).rank.name}
+      </p>
       <ul className="facts">
         <li>
           {f?.regionsTableAzCount !== undefined ? (

@@ -10,7 +10,26 @@ export type Surface = 'panel' | 'tab';
 /** Most vehicles on the roads at once (plan B6 budget). */
 export const VEHICLE_CAP: Record<Surface, number> = { panel: 8, tab: 14 };
 /** Most strolling citizens (the crowd, not the six Well-Architected citizens) at once (plan B6 budget). */
-export const CITIZEN_CAP: Record<Surface, number> = { panel: 12, tab: 20 };
+export const CITIZEN_CAP: Record<Surface, number> = { panel: 14, tab: 26 };
+
+/**
+ * How many people walk the streets: at least 8 so a new city feels lived in, 3 more for each open district and 1 more
+ * for each building at Practitioner (learning brings people in), less the pillar citizens (they're part of the crowd),
+ * never over the surface's cap.
+ */
+export const crowdSize = (districts: number, practitioners: number, pillarCitizens: number, cap: number) =>
+  Math.min(cap, Math.max(8, 10 + 3 * districts + practitioners - pillarCitizens));
+/**
+ * Which strollers leave so the crowd fits `keep` (indices into the list, newest first). Every walker counts inside the
+ * crowd: service workers and visiting Mayors take strollers' places, so this must always reach `keep`, even when
+ * everyone is busy (walking, chatting, on a bench, asking the player a question): idle ones leave first, then busy ones.
+ */
+export function leavers(busy: readonly boolean[], keep: number): number[] {
+  const over = busy.length - Math.max(0, keep);
+  if (over <= 0) return [];
+  const newestFirst = busy.map((_, i) => busy.length - 1 - i);
+  return [...newestFirst.filter((i) => !busy[i]), ...newestFirst.filter((i) => busy[i])].slice(0, over);
+}
 /** Narrower than this and the city is in the side panel (CityScene uses the same break). */
 export const PANEL_MAX_WIDTH = 560;
 export const surfaceFor = (width: number): Surface => (width < PANEL_MAX_WIDTH ? 'panel' : 'tab');
@@ -36,4 +55,22 @@ export function billBoost(bill: CityBillEvent | undefined, region: string): numb
 export function trafficLevel(inv: Inv | undefined, bill: CityBillEvent | undefined, region: string, surface: Surface): number {
   const level = 4 + Math.round(2 * Math.log2(1 + resourcesIn(inv, region))) + billBoost(bill, region);
   return Math.min(VEHICLE_CAP[surface], level);
+}
+
+/** A traffic light's colour: green, amber or red. */
+export type SignalColour = 'g' | 'a' | 'r';
+/** One cycle of a junction's lights, ms: each axis has GREEN_MS of green and AMBER_MS of amber, then waits. */
+export const SIGNAL_CYCLE_MS = 20_000;
+const GREEN_MS = 8_000;
+const AMBER_MS = 2_000;
+/**
+ * What a junction's lights show at time t (ms): streets along y ('ns') go first, then streets along x ('ew'); never
+ * both green. Each junction starts at its own point in the cycle (a hash of its id). Ambience only: cars don't wait.
+ */
+export function signalPhase(nodeId: number, t: number): { ns: SignalColour; ew: SignalColour } {
+  const offset = (Math.imul(nodeId + 1, 2654435761) >>> 0) % SIGNAL_CYCLE_MS;
+  const p = (((t + offset) % SIGNAL_CYCLE_MS) + SIGNAL_CYCLE_MS) % SIGNAL_CYCLE_MS;
+  const half = SIGNAL_CYCLE_MS / 2;
+  const of = (q: number): SignalColour => (q < GREEN_MS ? 'g' : q < GREEN_MS + AMBER_MS ? 'a' : 'r');
+  return p < half ? { ns: of(p), ew: 'r' } : { ns: 'r', ew: of(p - half) };
 }

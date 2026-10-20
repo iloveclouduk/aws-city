@@ -4,6 +4,8 @@ import { demoInventory } from '@/backend/mockAccount';
 import { inCity, LANDMARK_CAP, placeResources, PROPS, propLine, ZONE_CAP } from '@/world/resources';
 import { zonesFor } from '@/world/regions';
 import { serviceById } from '@/world/taxonomy';
+import { azsFor } from '@/world/layout';
+import { somePlans } from './support/plans';
 
 const item = (over: Partial<InventoryItem>): InventoryItem => ({ arn: 'arn:x', type: 'AWS::EC2::Instance', name: 'web-1', serviceId: 'ec2', districtId: 'compute', managedByGame: false, region: 'us-west-2', ...over });
 const islands = zonesFor('us-west-2');
@@ -49,5 +51,17 @@ describe('your resources in the city', () => {
       expect(type).toMatch(/^AWS::\w+::\w+$/);
     }
     expect(serviceById('ec2')).toBeDefined();
+  });
+});
+
+describe.each(somePlans().map((s) => [s.name, s] as const))('your resources on the real streets of %s', (_n, s) => {
+  it('a server stands on its own zone’s island, and every island is off the core across the river', () => {
+    const zones = zonesFor(s.region);
+    const isl = azsFor(s.region, undefined, s.plan.azSlots);
+    expect(isl).toHaveLength(Math.min(6, zones.length));
+    for (const z of isl) expect(z.rect.x + z.rect.w <= 0 || z.rect.y + z.rect.h <= 0, z.slot).toBe(true);
+    const p = placeResources([item({ az: isl[1]!.id, region: s.region })], isl, s.region);
+    expect(p.zones[1]!.shown.map((x) => x.item.name)).toEqual(['web-1']);
+    for (const svc of ['lambda', 's3']) expect(s.plan.landmarkLayout(svc), svc).toBeDefined();
   });
 });

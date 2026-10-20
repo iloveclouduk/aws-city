@@ -1,0 +1,255 @@
+/* City Clients: the businesses panel, task list and station markers (src/ui/clients/). */
+/* The panel and a job are cards over the city, like a workshop: one column that fits the 400 px side panel. */
+.clients-card,
+.job-card {
+  max-width: 560px;
+  gap: 8px;
+  padding: var(--s-4);
+}
+.job-card.job-wire {
+  max-width: 760px;
+}
+.clients-emoji {
+  font-size: 24px;
+  line-height: 1;
+}
+.clients-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.clients-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md, 8px);
+  background: var(--panel-hi);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.clients-row:hover,
+.clients-row:focus-visible {
+  border-color: var(--accent-line);
+}
+.clients-row-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.clients-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.clients-story {
+  margin: 0;
+  color: var(--ink-soft);
+}
+.clients-level {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.clients-pip {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+}
+.clients-pip.on {
+  background: var(--gold);
+  border-color: var(--gold-deep);
+}
+.clients-pip.now {
+  border-color: var(--gold);
+}
+.clients-goal {
+  margin: 4px 0 0;
+}
+.clients-all-done {
+  margin: 0;
+  color: var(--good-ink);
+}
+.clients-sources ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: var(--fs-sm);
+}
+.clients-sources a {
+  color: var(--info);
+}
+
+/* "3 of 5": the level's jobs. */
+.jobs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.jobs-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.jobs-track > span {
+  display: block;
+  height: 100%;
+  background: var(--gold);
+  transition: width 0.4s ease;
+}
+.jobs-count {
+  font-size: var(--fs-sm);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* The task list (Among Us style): a mark, the job and its station, and Go. */
+.jobs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.job {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--panel-hi);
+  border: 1px solid var(--line);
+}
+.job.done {
+  opacity: 0.75;
+}
+.job.done .job-mark {
+  color: var(--good);
+  font-weight: 900;
+}
+.job-mark {
+  width: 22px;
+  text-align: center;
+  flex: none;
+}
+.job-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.job-need {
+  color: var(--warn);
+}
+/* "How? Tap Show me…": the how, in plain ink under the warning. */
+.job-how {
+  display: block;
+  color: var(--muted, inherit);
+}
+.job-starter {
+  color: var(--good);
+}
+.job.done .job-text b {
+  text-decoration: line-through;
+  text-decoration-color: var(--good);
+}
+
+/* A job's own card. */
+.job-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.job-body > p,
+.job-why {
+  margin: 0;
+}
+.job-why {
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+}
+.job-done {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--good);
+  background: var(--sunken);
+}
+.job-done p {
+  margin: 0;
+}
+.job-click .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* "Fix it": a settings checklist. */
+.fix-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fix-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-hi);
+}
+.fix-row.right {
+  border-color: var(--good);
+}
+.fix-row.wrong {
+  border-color: var(--bad-line);
+}
+.fix-label {
+  flex: 1 1 180px;
+}
+.fix-pick {
+  display: flex;
+  gap: 4px;
+}
+.fix-pick .btn.on {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.fix-why {
+  flex-basis: 100%;
+}
+.fix-why.wrong {
+  color: var(--bad-ink);
+}
+.fix-why.right {
+  color: var(--good-ink);
+}
+.clients-cta b {
+  color: var(--gold);
+}
+/* --muted is tuned for --panel; on a job row's raised background the meta line needs the softer ink (WCAG AA). */
+.job .job-text .muted,
+.job .btn.ghost,
+.clients-row .muted,
+.fix-row .muted {
+  color: var(--ink-soft);
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Progress } from '@/backend/contract';
-import { buildingLevelName, CROWN_ROUNDS, crownsOf, crownSteps, LEGEND_NAMES, levelOf, MASTERED_DAYS } from '@/state/mastery';
+import { buildingLevelName, CROWN_ROUNDS, crownsOf, crownSteps, firstRemembered, LEGEND_NAMES, levelOf, MASTERED_DAYS, scoredPlays } from '@/state/mastery';
 import { cardsFor, PUZZLES, QUESTS } from '@/world/content';
 import { TIER_NAMES } from '@/world/places';
 
@@ -46,6 +46,22 @@ describe('crowns past Master come from real knowledge (src/state/mastery.ts)', (
     expect(crownsOf(at('s3', 200, { ...base, ...done, games: { fishing: { best: 5, plays: CROWN_ROUNDS - 1 } } }), 's3')).toBe(2);
     expect(crownsOf(at('s3', 200, { ...base, ...done, games: { fishing: { best: 5, plays: CROWN_ROUNDS } } }), 's3')).toBe(3);
     expect(levelOf(at('s3', 200, { ...base, ...done, games: { fishing: { best: 5, plays: 9 } } }), 's3')).toBe(7);
+  });
+
+  it('the game step counts only rounds that scored (an old save without `scored` counts its plays)', () => {
+    const puzzle = PUZZLES.find((z) => z.required.includes('s3'))!;
+    const quest = QUESTS.find((q) => q.serviceIds.includes('s3'))!;
+    const base = { cards: known('s3', 99), puzzles: { [puzzle.id]: { best: 80 } }, quests: { [quest.id]: { status: 'done' as const, step: 0 } } };
+    expect(crownsOf(at('s3', 200, { ...base, games: { fishing: { best: 5, plays: 20, scored: CROWN_ROUNDS - 1 } } }), 's3')).toBe(2);
+    expect(crownsOf(at('s3', 200, { ...base, games: { fishing: { best: 5, plays: 20, scored: CROWN_ROUNDS } } }), 's3')).toBe(3);
+    expect(scoredPlays({ plays: 4 })).toBe(4);
+  });
+
+  it('a card is remembered once: the first time its interval reaches a week', () => {
+    const card = { interval: 3, ease: 2.5, due: 0, reps: 2 };
+    expect(firstRemembered(card, { ...card, interval: MASTERED_DAYS })).toBe(true);
+    expect(firstRemembered(card, { ...card, interval: MASTERED_DAYS - 1 })).toBe(false);
+    expect(firstRemembered({ ...card, remembered: true }, { ...card, interval: 20 })).toBe(false);
   });
 
   it('every service has three crowns with something to do for each', () => {

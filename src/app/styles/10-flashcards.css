@@ -50,6 +50,13 @@
 .flash-face .tell-more > summary {
   pointer-events: auto;
 }
+/* The question again on the answer side, small: its glossary terms can be tapped here (on the question face they
+   only mark the word, so a tap anywhere flips the card). */
+.flash-q {
+  font-size: var(--fs-xs);
+  color: var(--paper-meta);
+  text-align: center;
+}
 /* The full answer under the simple one: smaller, left-aligned, inside the card. */
 .flash-face .tell-more {
   align-self: stretch;

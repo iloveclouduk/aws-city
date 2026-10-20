@@ -3,12 +3,32 @@ import { canDeleteAccount, canSetUpMfa, confirmMfaSetup, decideDeploy, deleteAcc
 import { useCity, type DeployView } from '@/state/store';
 import { GUARDED_BLUEPRINTS } from '@/backend/ServerBackend';
 import { TEMPLATES } from '@/world/content';
+import { TemplateView } from './TemplateView';
 import { offered, perUnit, pricesFor } from '@/world/regions';
 import { useCopy } from './feedback';
-import { offlineReason } from './logic';
+import { costLine, offlineReason } from './logic';
 import { usePending } from './usePending';
 import { ForLearners } from './Term';
 import { Plain } from './Term';
+
+/**
+ * What a build preview costs: in the practice account, plainly free (the real estimate folds away for learners);
+ * against a real account, AWS's estimate.
+ */
+export function CostNote({ note, className = 'muted' }: { note: string; className?: string }) {
+  const kind = useCity((s) => s.backendKind);
+  const line = costLine(note, kind);
+  return (
+    <div className={className}>
+      💰 {line}
+      {line !== note && (
+        <ForLearners>
+          <span className="muted small">In a real account: {note}</span>
+        </ForLearners>
+      )}
+    </div>
+  );
+}
 
 const STATUS_TEXT: Record<DeployView['status'], string> = {
   preview: 'waiting for your OK',
@@ -21,7 +41,8 @@ const STATUS_TEXT: Record<DeployView['status'], string> = {
 };
 
 /** A button that shows a spinner + busy label while its request is in flight. */
-function PendingButton({ pending, busyLabel, children, className = 'btn', disabled, onClick, title }: {
+function PendingButton({ pending, busyLabel, children, className = 'btn', disabled, onClick, title, buttonRef }: {
+  buttonRef?: (el: HTMLButtonElement | null) => void;
   pending: boolean;
   busyLabel: string;
   children: ReactNode;
@@ -31,7 +52,7 @@ function PendingButton({ pending, busyLabel, children, className = 'btn', disabl
   title?: string;
 }) {
   return (
-    <button className={className} disabled={disabled || pending} aria-busy={pending} onClick={onClick} title={title}>
+    <button ref={buttonRef} className={className} disabled={disabled || pending} aria-busy={pending} onClick={onClick} title={title}>
       {pending ? (
         <>
           <span className="spinner" aria-hidden="true" /> {busyLabel}
@@ -160,6 +181,24 @@ export function DeployPanel() {
       if (d.status !== 'complete') clear(`teardown:${d.deployId}`);
     }
   }, [deployMap, clear]);
+
+  // A new preview opens below the blueprints, off-screen in the panel: bring it up and put focus on Approve.
+  const approveRefs = useRef(new Map<string, HTMLButtonElement>());
+  const seenPreviews = useRef<Set<string> | null>(null);
+  const previewIds = stacks.filter((d) => d.status === 'preview').map((d) => d.deployId);
+  const previewKey = previewIds.join(',');
+  useEffect(() => {
+    const ids = previewKey ? previewKey.split(',') : [];
+    const seen = seenPreviews.current;
+    seenPreviews.current = new Set(ids);
+    if (!seen) return; // the first render: previews already waiting aren't news
+    const fresh = ids.find((id) => !seen.has(id));
+    const btn = fresh && approveRefs.current.get(fresh);
+    if (btn) {
+      btn.closest('.card')?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+      btn.focus({ preventScroll: true });
+    }
+  }, [previewKey]);
 
   const verify = () => {
     const requestId = verifyAccount(role);
@@ -314,9 +353,15 @@ export function DeployPanel() {
       {blueprints.map((t) => (
         <div key={t.id} className="tpl">
           <div>
-            <b>{t.title}</b> <span className="muted">· {t.costNote}</span>
+            <b>{t.title}</b>
             <div className="muted">{t.summary}</div>
-            <BlueprintPrice serviceIds={t.serviceIds} region={account.region ?? cityRegion} />
+            <BlueprintMissing serviceIds={t.serviceIds} region={account.region ?? cityRegion} />
+            {/* Prices and free allowances are for whoever wants them; a beginner reads the plain summary first. */}
+            <ForLearners>
+              <div className="muted small">💰 {t.costNote}</div>
+              <BlueprintPrice serviceIds={t.serviceIds} region={account.region ?? cityRegion} />
+            </ForLearners>
+            <TemplateView templateId={t.id} title={t.title} />
           </div>
           <PendingButton
             pending={pending.is(`plan:${t.id}`)}
@@ -368,9 +413,13 @@ export function DeployPanel() {
                     </tbody>
                   </table>
                 </ForLearners>
-                {d.costNote && <div className="muted">💰 {d.costNote}</div>}
+                {d.costNote && <CostNote note={d.costNote} />}
                 <div className="actions">
                   <PendingButton
+                    buttonRef={(el) => {
+                      if (el) approveRefs.current.set(d.deployId, el);
+                      else approveRefs.current.delete(d.deployId);
+                    }}
                     className="btn primary"
                     pending={deciding}
                     busyLabel="Starting…"
@@ -491,15 +540,19 @@ export function DeployPanel() {
   );
 }
 
-/** The list price of a blueprint's main service in the Region it deploys to (or that the service isn't offered there). */
-function BlueprintPrice({ serviceIds, region }: { serviceIds: readonly string[]; region: string }) {
+/** That a blueprint can't be built in this Region (it uses a service AWS doesn't offer there). Plain, so always shown. */
+function BlueprintMissing({ serviceIds, region }: { serviceIds: readonly string[]; region: string }) {
   const missing = serviceIds.filter((id) => !offered(id, region));
-  if (missing.length)
-    return (
-      <div className="muted small">
-        ⛔ Not offered in {region}: {missing.join(', ')}
-      </div>
-    );
+  return missing.length ? (
+    <div className="muted small">
+      ⛔ Not offered in {region}: {missing.join(', ')}
+    </div>
+  ) : null;
+}
+
+/** The list price of a blueprint's main service in the Region it deploys to (nothing when it isn't offered there). */
+function BlueprintPrice({ serviceIds, region }: { serviceIds: readonly string[]; region: string }) {
+  if (serviceIds.some((id) => !offered(id, region))) return null;
   const p = serviceIds.flatMap((id) => pricesFor(id, region))[0];
   return p ? (
     <div className="muted small">

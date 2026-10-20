@@ -5,6 +5,7 @@ import { riverLoop, seaLane } from '@/game/waterways';
 import { azsFor, GRID, isRoad } from '@/world/layout';
 import { zonesFor } from '@/world/regions';
 import { GATE, outside, RIVER, terrainFor, type Terrain } from '@/world/terrain';
+import { somePlans } from './support/plans';
 
 const REGION_CODES = Object.keys((facts as { regions: Record<string, unknown> }).regions);
 const graphFor = (code: string) => {
@@ -32,19 +33,22 @@ describe('road graph (plan B3)', () => {
 
   it.each(REGION_CODES)('%s: every lane and junction connector stays on the road', (code) => {
     const { t, g } = graphFor(code);
+    // Off-road points are collected and checked once (an expect per 0.1 tile made this the suite's slowest file).
+    const off: string[] = [];
     const check = (pts: { x: number; y: number }[], what: string) => {
       const m = measure(pts);
       for (let s = 0; s <= m.len + 1e-9; s += 0.1) {
         const p = pointAt(pts, m.cum, s);
         const x = Math.round(p.x);
         const y = Math.round(p.y);
-        expect(drivable(t, x, y), `${what} at ${p.x.toFixed(2)},${p.y.toFixed(2)}`).toBe(true);
+        if (!drivable(t, x, y)) off.push(`${what} at ${p.x.toFixed(2)},${p.y.toFixed(2)}`);
       }
     };
     for (const l of g.lanes) {
       check(l.pts, `lane ${l.from}→${l.to}`);
       for (const out of g.lanesFrom(l.to)) check(g.connector(l, out), `turn ${l.from}→${l.to}→${out.to}`);
     }
+    expect(off).toEqual([]);
   });
 
   it('lanes keep to the right of travel, 0.22 tiles off the centre line', () => {
@@ -130,5 +134,36 @@ describe('boat lanes', () => {
       const p = pointAt(lane, m.cum, s);
       expect(t.kind(Math.round(p.x), Math.round(p.y))).toBe('sea');
     }
+  });
+});
+
+describe.each(somePlans().map((s) => [s.name, s] as const))('the road graph of the real streets of %s', (_n, s) => {
+  const p = s.plan;
+  const t = terrainFor(s.region, zonesFor(s.region), [], p);
+  const g = new RoadGraph(t, p);
+  it('is one network, every road tile a graph road, a lane only empty inside an avenue crossing', () => {
+    expect(g.connected()).toBe(true);
+    for (const l of g.lanes) {
+      expect(Number.isFinite(l.len) && l.len >= 0, `lane ${l.id}`).toBe(true);
+      // Two junction tiles side by side (a 2-tile avenue's crossing): the lane runs box edge to box edge, length 0.
+      if (l.len === 0) expect(Math.abs(g.nodes[l.from].x - g.nodes[l.to].x) + Math.abs(g.nodes[l.from].y - g.nodes[l.to].y), `lane ${l.id}`).toBe(1);
+    }
+    for (let y = 0; y < p.size; y++) for (let x = 0; x < p.size; x++) if (p.isRoad({ x, y })) expect(g.isRoad(x, y)).toBe(true);
+  });
+  it('drives from the highway to every AZ island’s dead end over its bridge', () => {
+    for (const az of azsFor(s.region, undefined, p.azSlots)) {
+      const end = g.node(az.bridge.end.x, az.bridge.end.y);
+      expect(end, az.slot).toBeDefined();
+      expect(g.route(g.highwayEnd, end!).length, az.slot).toBeGreaterThan(1);
+    }
+  });
+  it('puts zebras only beside junctions, on avenues as on streets', () => {
+    for (let y = 0; y < p.size; y++)
+      for (let x = 0; x < p.size; x++) {
+        if (!isZebra(x, y, p)) continue;
+        const r = p.roadAt(x, y)!;
+        const [dx, dy] = r.axis === 'y' ? [0, 1] : [1, 0];
+        expect([p.roadAt(x + dx, y + dy)?.axis, p.roadAt(x - dx, y - dy)?.axis]).toContain('junction');
+      }
   });
 });

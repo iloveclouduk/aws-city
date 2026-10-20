@@ -1,3 +1,4 @@
+import { socialFor } from './social.js';
 import type { Knowledge } from './knowledge/mcp.js';
 import type { AwsCredentialIdentityProvider } from '@smithy/types';
 import type { AccountLinker } from './accounts/link.js';
@@ -49,6 +50,10 @@ export interface Tenant {
   /** Wraps a socket's emit: adds error codes for limit errors. */
   emitter(emit: Emit): Emit;
   snapshot(): Promise<WorldSnapshot | undefined>;
+  /** v2.11: the live city and leaderboards, for this player (server/src/social.ts). */
+  social: ReturnType<typeof socialFor>;
+  /** A fresh poll (coalesced with one in flight), or undefined with no linked account: workshop checks read it. */
+  fresh(): Promise<WorldSnapshot | undefined>;
   progress: { get(): Promise<Progress | null>; put(input: unknown): Promise<PutResult> };
   uploads: { create(contentType: ImageType): Promise<UploadTarget> };
   link(requestId: string, region: string, emit: Emit): Promise<void>;
@@ -268,7 +273,18 @@ export const createTenants = (deps: TenantDeps): TenantHub => {
       },
       emitter: (emit) => withErrorCodes(emit),
       snapshot: async () => (world.linked ? world.snapshot() : undefined),
-      progress: { get: () => deps.stores.progress.get(sub), put: (input) => deps.stores.progress.put(sub, input) },
+      fresh: async () => (world.linked && world.poller ? world.poller.refresh() : undefined),
+      progress: {
+        get: () => deps.stores.progress.get(sub),
+        put: async (input) => {
+          const was = (await deps.stores.progress.get(sub))?.profile?.public;
+          const res = await deps.stores.progress.put(sub, input);
+          // A profile turned private leaves the live city and every leaderboard at once.
+          if (res.ok && was && !(input as { profile?: { public?: boolean } })?.profile?.public) await deps.stores.social.forget(sub);
+          return res;
+        },
+      },
+      social: socialFor({ store: deps.stores.social, sub, profile: async () => (await deps.stores.progress.get(sub))?.profile }),
       uploads: { create: (contentType) => deps.uploads.create(contentType, sub) },
       link: (requestId, region, emit) => serial(async () => {
         if (!deps.linker) return emit(accountStatus(requestId));

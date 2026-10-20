@@ -190,3 +190,16 @@
     opacity: 0;
   }
 }
+
+/* What an answer grew, or the friendly daily-cap line. */
+.bubble-pay {
+  display: block;
+  margin-top: var(--s-2);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--accent);
+}
+.bubble-pay.capped {
+  color: var(--muted);
+  font-weight: 600;
+}

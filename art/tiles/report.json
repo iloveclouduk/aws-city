@@ -1,0 +1,92 @@
+{
+  "overlap": {
+    "aiml": {
+      "pair": "comprehend/rekognition",
+      "worst": 0.788
+    },
+    "compute": {
+      "pair": "beanstalk/eks",
+      "worst": 0.788
+    },
+    "database": {
+      "pair": "documentdb/opensearch",
+      "worst": 0.774
+    },
+    "management": {
+      "pair": "cloudformation/config",
+      "worst": 0.713
+    },
+    "networking": {
+      "pair": "route53/vpc",
+      "worst": 0.762
+    },
+    "security": {
+      "pair": "cloudwatch/cognito",
+      "worst": 0.795
+    },
+    "storage": {
+      "pair": "lakeformation/s3",
+      "worst": 0.755
+    }
+  },
+  "tips": {
+    "agentcore": 185,
+    "apigateway": 165,
+    "apprunner": 172,
+    "appsync": 177,
+    "athena": 172,
+    "aurora": 173,
+    "backup": 182,
+    "batch": 182,
+    "beanstalk": 177,
+    "bedrock": 188,
+    "cloudformation": 185,
+    "cloudfront": 173,
+    "cloudwatch": 187,
+    "cognito": 176,
+    "comprehend": 168,
+    "config": 168,
+    "documentdb": 183,
+    "dynamodb": 168,
+    "ebs": 168,
+    "ec2": 187,
+    "ecs": 174,
+    "efs": 163,
+    "eks": 193,
+    "elasticache": 188,
+    "eventbridge": 177,
+    "fargate": 173,
+    "globalaccelerator": 171,
+    "glue": 169,
+    "guardduty": 188,
+    "iam": 194,
+    "inspector": 170,
+    "kinesis": 177,
+    "kms": 175,
+    "lakeformation": 170,
+    "lambda": 176,
+    "lightsail": 171,
+    "macie": 161,
+    "neptune": 181,
+    "opensearch": 193,
+    "organizations": 173,
+    "polly": 163,
+    "q": 190,
+    "rds": 167,
+    "redshift": 171,
+    "rekognition": 168,
+    "route53": 177,
+    "s3": 167,
+    "sagemaker": 184,
+    "secretsmanager": 170,
+    "securityagent": 181,
+    "securityhub": 170,
+    "shield": 170,
+    "sqs": 178,
+    "stepfunctions": 181,
+    "systemsmanager": 171,
+    "textract": 166,
+    "transitgateway": 161,
+    "vpc": 177
+  }
+}

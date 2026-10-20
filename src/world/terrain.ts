@@ -5,23 +5,30 @@
 // latitude and longitude. Deterministic per Region: the same code always builds the same landscape.
 //
 // The world map is Natural Earth 1:110m on 3.75° cells, so the coast is an impression of where the sea is, not a
-// survey: small islands (Singapore, Bahrain) and narrow straits can come out wrong. The river is always there.
+// survey: small islands (Singapore, Bahrain) and narrow straits can come out wrong. A Region with a real street map
+// (plan.masks, from OpenStreetMap) uses its real water and parks instead. The river is always there.
 import { CITY_ISO, cornerScreen } from '@/game/iso';
 import { mulberry32 } from '@/game/rng';
 import { WORLD_MAP } from './culture';
-import { azSlotsFor, GATE, GRID, ISLAND_ROAD, RIVER, slotRect, type Rect, type Tile } from './layout';
-import { PARK_H, PARK_W } from './park';
+import { GATE, GRID, ISLAND_ROAD, RIVER, slotRect, type Rect, type Tile } from './layout';
+import { legacyPlan, type CityPlan } from './plan';
+import { AIRPORT_H, AIRPORT_W } from './airport';
+import { ANNEX_H, PARK_H, PARK_W } from './park';
+import { CLIENT_LOT, ringLotsNeeded } from './clients';
 import { neighbours, regionInfo, signatureFor, signatureSprite, type Zone } from './regions';
 
 /** How far the landscape reaches beyond the core, in tiles. */
 export const EXT = 18;
+/** The whole map (core + ring) round a size×size core: first and last tile on each axis, and its width in tiles. */
+export const ringOf = (size: number) => ({ min: -EXT, max: size - 1 + EXT, size: size + 2 * EXT });
+/** The legacy 40×40 core's ring (a plan's own: ringOf(plan.size)). */
 export const RING_MIN = -EXT;
 export const RING_MAX = GRID - 1 + EXT;
 /** Width of the whole map (core + ring), tiles. */
 export const RING_SIZE = GRID + 2 * EXT;
 /** The river runs RIVER.from..RIVER.to tiles out from the core (inclusive), all the way round. */
 export { GATE, RIVER };
-/** The core road lines (x or y): where they meet the river there's a bridge. */
+/** The legacy core's road lines (x or y): where they meet the river there's a bridge (a plan's own: plan.edgeLines). */
 export const ROAD_LINES = [0, 13, 26, 39] as const;
 
 export type TerrainKind = 'core' | 'river' | 'promenade' | 'beach' | 'land' | 'field' | 'forest' | 'sea' | 'highway' | 'bridge' | 'island';
@@ -93,6 +100,12 @@ export interface Terrain {
   reserved: Record<string, Rect>;
   /** re:Play Park's site (src/world/park.ts lays out the rides), when the Region has open land for it. */
   park?: Rect;
+  /** The park's annex: a row of three more rides beside it (src/world/park.ts `ANNEX_RIDES`), when there's room. */
+  parkAnnex?: Rect;
+  /** The airport's site (src/world/airport.ts lays it out), when the Region has open land for it. */
+  airport?: Rect;
+  /** City Clients' lots on the ring, for the businesses no neighbourhood in the core could take (src/world/clients.ts). */
+  clientLots: Rect[];
   /** One island per AZ (in zonesFor order), across the river. */
   islands: Island[];
   /** The whole map in world pixels (camera bounds). */
@@ -127,9 +140,13 @@ export const biomeFor = (code: string): Biome => {
   return lat >= 55 ? 'boreal' : lat < 24 ? 'tropical' : 'temperate';
 };
 
-/** Tiles beyond the core's edge (Chebyshev), 0 inside it. */
-export const outside = (x: number, y: number) => Math.max(0, -x, x - (GRID - 1), -y, y - (GRID - 1));
-const inRing = (x: number, y: number) => x >= RING_MIN && y >= RING_MIN && x <= RING_MAX && y <= RING_MAX;
+/** Tiles beyond a size×size core's edge (Chebyshev), 0 inside it. */
+export const outsideOf =
+  (size: number) =>
+  (x: number, y: number): number =>
+    Math.max(0, -x, x - (size - 1), -y, y - (size - 1));
+/** Tiles beyond the legacy core's edge (Chebyshev), 0 inside it. */
+export const outside = outsideOf(GRID);
 
 /** FNV-1a: a stable 32-bit hash of the Region code, the landscape's seed. */
 export const hashCode = (s: string) => {
@@ -138,9 +155,9 @@ export const hashCode = (s: string) => {
   return h >>> 0;
 };
 
-/** Smooth value noise in [0, 1] on a lattice `cell` tiles apart. */
-function valueNoise(rng: () => number, cell: number) {
-  const n = Math.ceil(RING_SIZE / cell) + 2;
+/** Smooth value noise in [0, 1] on a lattice `cell` tiles apart, over a map `size` tiles wide from RING_MIN. */
+function valueNoise(rng: () => number, cell: number, size: number) {
+  const n = Math.ceil(size / cell) + 2;
   const lattice = Array.from({ length: n * n }, rng);
   const at = (i: number, j: number) => lattice[Math.max(0, Math.min(n - 1, j)) * n + Math.max(0, Math.min(n - 1, i))];
   const smooth = (t: number) => t * t * (3 - 2 * t);
@@ -174,9 +191,6 @@ const km = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) =>
   return 2 * 6371 * Math.asin(Math.sqrt(h));
 };
 
-/** Highway row and its verge. */
-const HIGHWAY_ROW = GATE.y;
-
 const BIOME_TREES: Record<Biome, string[]> = {
   temperate: ['tree1', 'pine', 'tree0', 'bush'],
   boreal: ['pineSnow', 'pine', 'pineSnow'],
@@ -196,22 +210,34 @@ export const MAX_PROPS = 240;
 /** Homes in the suburbs, at most. */
 export const SUBURB_HOMES = 36;
 
-/** The landscape for a Region. `zones` decides which island slots stay clear; `linked` adds signs for account links. */
-export function terrainFor(region: string, zones: Zone[] = [], linked: string[] = []): Terrain {
+/**
+ * The landscape for a Region. `zones` decides which island slots stay clear; `linked` adds signs for account links;
+ * `plan` is the city's street plan (its size, gate, edge roads and island slots). `opts.clientLots: false` leaves out
+ * the City Clients' lots (the plan snapshot proves nothing else moved).
+ */
+export function terrainFor(region: string, zones: Zone[] = [], linked: string[] = [], plan: CityPlan = legacyPlan(), opts: { clientLots?: boolean } = {}): Terrain {
+  const GRID = plan.size;
+  const GATE = plan.gate;
+  /** Highway row and its verge. */
+  const HIGHWAY_ROW = GATE.y;
+  const { min: RING_MIN, max: RING_MAX, size: RING_SIZE } = ringOf(GRID);
+  const outside = outsideOf(GRID);
+  const inRing = (x: number, y: number) => x >= RING_MIN && y >= RING_MIN && x <= RING_MAX && y <= RING_MAX;
   const rng = mulberry32(hashCode(region));
   const info = regionInfo(region);
   const lat = info?.lat ?? 40;
   const lon = info?.lon ?? 0;
   const biome = biomeFor(region);
-  const coarse = valueNoise(rng, 9);
-  const fine = valueNoise(rng, 4);
-  const woods = valueNoise(rng, 7);
-  const farms = valueNoise(rng, 8);
+  const coarse = valueNoise(rng, 9, RING_SIZE);
+  const fine = valueNoise(rng, 4, RING_SIZE);
+  const woods = valueNoise(rng, 7, RING_SIZE);
+  const farms = valueNoise(rng, 8, RING_SIZE);
   const bias = COAST_OVERRIDES[region] ?? 0;
 
-  const slots = azSlotsFor(zones.length || 3);
+  const slots = plan.azSlots(zones.length || 3);
   const reserved: Record<string, Rect> = Object.fromEntries(slots.map((s) => [s, slotRect(s)]));
-  const inReserve = (x: number, y: number) => Object.values(reserved).some((r) => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h);
+  const reservedRects = Object.values(reserved);
+  const inReserve = (x: number, y: number) => reservedRects.some((r) => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h);
 
   const N = RING_SIZE;
   const idx = (x: number, y: number) => (y - RING_MIN) * N + (x - RING_MIN);
@@ -223,8 +249,12 @@ export function terrainFor(region: string, zones: Zone[] = [], linked: string[] 
 
   // 1. Land or sea, from the world map round the Region: each tile looks out in its own direction from the city,
   //    from ~0.6° at the river to ~4.5° at the edge of the map.
+  // A real street map (plan.masks) brings its own water: land and sea round the city are the real ones (the river
+  // still rings downtown), and the map's last two rows drop to the sea so the land ends in a coast.
+  const masks = plan.masks;
   const isLand = (x: number, y: number) => {
     const d = outside(x, y);
+    if (masks) return d < EXT - 1 && !masks.water(x, y);
     const dx = x - (GRID - 1) / 2;
     const dy = y - (GRID - 1) / 2;
     const east = dx - dy; // screen right
@@ -272,7 +302,7 @@ export function terrainFor(region: string, zones: Zone[] = [], linked: string[] 
   const out = (side: Side, line: number, d: number): Tile =>
     side === 'N' ? { x: line, y: -d } : side === 'S' ? { x: line, y: GRID - 1 + d } : side === 'W' ? { x: -d, y: line } : { x: GRID - 1 + d, y: line };
   for (const side of ['N', 'W', 'S', 'E'] as Side[])
-    for (const line of ROAD_LINES) {
+    for (const line of plan.edgeLines[side]) {
       const axis = side === 'N' || side === 'S' ? 'y' : 'x';
       const beyond = out(side, line, RIVER.to + 1);
       const island = get(beyond.x, beyond.y) === 'island';
@@ -314,7 +344,7 @@ export function terrainFor(region: string, zones: Zone[] = [], linked: string[] 
       const verge = Math.abs(y - HIGHWAY_ROW) <= 1 && x >= GRID;
       if (seaNear(x, y) && (biome !== 'boreal' ? fine(x, y) > 0.3 : fine(x, y) > 0.62)) set(x, y, 'beach');
       else if (inReserve(x, y) || verge || d <= RIVER.to + 1) continue;
-      else if (woods(x, y) > cover.forest) set(x, y, 'forest');
+      else if (masks ? masks.green(x, y) : woods(x, y) > cover.forest) set(x, y, 'forest');
       else if (farms(x, y) > cover.field && d >= 6) set(x, y, 'field');
     }
 
@@ -413,6 +443,8 @@ export function terrainFor(region: string, zones: Zone[] = [], linked: string[] 
       }
     if (park) for (let j = park.y; j < park.y + park.h; j++) for (let i = park.x; i < park.x + park.w; i++) used.add(idx(i, j));
   }
+  // What the airport must keep clear of (it's placed last, below, so it never changes a random draw).
+  const planned = new Set(used);
 
   // A lighthouse on the most exposed bit of coast, a pier off a beach.
   const coast: Tile[] = [];
@@ -500,6 +532,55 @@ export function terrainFor(region: string, zones: Zone[] = [], linked: string[] 
       }
     }
 
+  // Sites placed after every other prop, against only the planned sites (gate, bridges, signature, park): the props
+  // that grew where one lands are cleared, so no rng() draw shifts and nothing else in the Region moves.
+  const siteGround = (k: TerrainKind) => k === 'land' || k === 'field' || k === 'forest' || k === 'beach';
+  const clear = (x: number, y: number) => inRing(x, y) && !planned.has(idx(x, y)) && !isRoad(x, y) && !inReserve(x, y) && siteGround(get(x, y));
+  const lateSite = (w: number, h: number, aim: Tile, minOut: number): Rect | undefined => {
+    // Which tiles are clear, read once (a candidate site then costs w×h array reads, not w×h closure calls).
+    const open = new Uint8Array(N * N);
+    for (let y = RING_MIN; y <= RING_MAX; y++) for (let x = RING_MIN; x <= RING_MAX; x++) open[idx(x, y)] = clear(x, y) ? 1 : 0;
+    let at: Rect | undefined;
+    let best = Infinity;
+    for (let y = RING_MIN; y <= RING_MAX - h + 1; y++)
+      for (let x = RING_MIN; x <= RING_MAX - w + 1; x++) {
+        if (outside(x, y) <= minOut) continue;
+        if (y <= HIGHWAY_ROW + 1 && y + h - 1 >= HIGHWAY_ROW - 1) continue; // off the highway's verge
+        const d = Math.hypot(x - aim.x, y - aim.y);
+        if (d >= best) continue;
+        let ok = true;
+        for (let j = y; j < y + h && ok; j++) for (let i = x; i < x + w && ok; i++) ok = open[idx(i, j)] === 1;
+        if (ok) (best = d), (at = { x, y, w, h });
+      }
+    if (at) {
+      const a = at;
+      for (let j = a.y; j < a.y + a.h; j++) for (let i = a.x; i < a.x + a.w; i++) planned.add(idx(i, j));
+      const hits = (p: TerrainProp) => p.x < a.x + a.w && p.x + p.w > a.x && p.y < a.y + a.h && p.y + p.h > a.y;
+      for (let k = props.length - 1; k >= 0; k--) if (hits(props[k])) props.splice(k, 1);
+    }
+    return at;
+  };
+  // The park's annex: three more rides in a row right behind the park (its back edge), or as near as there's room.
+  const parkAnnex = park ? lateSite(PARK_W, ANNEX_H, { x: park.x, y: park.y - ANNEX_H }, RIVER.to + 1) : undefined;
+
+  // The airport (src/world/airport.ts): a 10×4 site on open land north of the highway, beyond the park.
+  const airport = lateSite(AIRPORT_W, AIRPORT_H, { x: GATE.x + 9, y: HIGHWAY_ROW - 8 }, RIVER.to + 1);
+
+  // City Clients (src/world/clients.ts) that found no neighbourhood lot in the core: a 4×4 lot each on open land beside
+  // the highway (5×5 cleared, so neighbouring businesses keep a tile apart). Placed last, like the airport.
+  const clientLots: Rect[] = [];
+  // Up to one lot per business (the classic city has no neighbourhoods, so all 17 stand out here): south of the highway
+  // first, then north, beyond the park and the airport. Each aim is only a wish: the nearest open 5×5 wins.
+  const aims = [
+    { x: 6, y: 5 }, { x: 12, y: 5 }, { x: 6, y: 11 }, { x: 12, y: 11 }, { x: 16, y: -7 },
+    { x: 18, y: 5 }, { x: 18, y: 11 }, { x: 6, y: 17 }, { x: 12, y: 17 }, { x: 18, y: 17 }, { x: 22, y: -7 },
+    { x: 24, y: 5 }, { x: 24, y: 11 }, { x: 16, y: -13 }, { x: 22, y: -13 }, { x: 24, y: 17 }, { x: 28, y: -7 },
+  ];
+  for (let i = 0; opts.clientLots !== false && i < ringLotsNeeded(plan) && i < aims.length; i++) {
+    const lot = lateSite(CLIENT_LOT + 1, CLIENT_LOT + 1, { x: GATE.x + aims[i].x, y: HIGHWAY_ROW + aims[i].y }, RIVER.to + 1);
+    if (lot) clientLots.push({ x: lot.x, y: lot.y, w: CLIENT_LOT, h: CLIENT_LOT });
+  }
+
   // 6. Ground sprites for the bake.
   const ground = (x: number, y: number): string | undefined => {
     const k = get(x, y);
@@ -545,6 +626,9 @@ export function terrainFor(region: string, zones: Zone[] = [], linked: string[] 
     destinations,
     reserved,
     ...(park ? { park } : {}),
+    ...(parkAnnex ? { parkAnnex } : {}),
+    ...(airport ? { airport } : {}),
+    clientLots,
     islands,
     bounds: { x: left, y: top, w: right - left, h: bottom - top },
   };

@@ -144,6 +144,90 @@
     "textract": {
       "discovered": true,
       "xp": 60
+    },
+    "apprunner": {
+      "discovered": true,
+      "xp": 60
+    },
+    "batch": {
+      "discovered": true,
+      "xp": 60
+    },
+    "lightsail": {
+      "discovered": true,
+      "xp": 60
+    },
+    "backup": {
+      "discovered": true,
+      "xp": 60
+    },
+    "kinesis": {
+      "discovered": true,
+      "xp": 60
+    },
+    "opensearch": {
+      "discovered": true,
+      "xp": 60
+    },
+    "documentdb": {
+      "discovered": true,
+      "xp": 60
+    },
+    "transitgateway": {
+      "discovered": true,
+      "xp": 60
+    },
+    "globalaccelerator": {
+      "discovered": true,
+      "xp": 60
+    },
+    "secretsmanager": {
+      "discovered": true,
+      "xp": 60
+    },
+    "inspector": {
+      "discovered": true,
+      "xp": 60
+    },
+    "securityhub": {
+      "discovered": true,
+      "xp": 60
+    },
+    "macie": {
+      "discovered": true,
+      "xp": 60
+    },
+    "polly": {
+      "discovered": true,
+      "xp": 60
+    },
+    "comprehend": {
+      "discovered": true,
+      "xp": 60
+    },
+    "stepfunctions": {
+      "discovered": true,
+      "xp": 60
+    },
+    "cloudformation": {
+      "discovered": true,
+      "xp": 60
+    },
+    "systemsmanager": {
+      "discovered": true,
+      "xp": 60
+    },
+    "config": {
+      "discovered": true,
+      "xp": 60
+    },
+    "organizations": {
+      "discovered": true,
+      "xp": 60
+    },
+    "appsync": {
+      "discovered": true,
+      "xp": 60
     }
   },
   "cards": {
@@ -230,6 +314,9 @@
     "thumbnails": {
       "best": 90
     },
+    "multi-tenant-api": {
+      "best": 90
+    },
     "static-site": {
       "best": 90
     },
@@ -258,6 +345,81 @@
       "best": 90
     },
     "region-down": {
+      "best": 90
+    },
+    "beanstalk-app": {
+      "best": 90
+    },
+    "container-platform": {
+      "best": 90
+    },
+    "analytics-warehouse": {
+      "best": 90
+    },
+    "document-ai": {
+      "best": 90
+    },
+    "knowledge-graph": {
+      "best": 90
+    },
+    "ml-platform": {
+      "best": 90
+    },
+    "chat-alerts": {
+      "best": 90
+    },
+    "pen-test-prep": {
+      "best": 90
+    },
+    "runner-handover": {
+      "best": 90
+    },
+    "overnight-renders": {
+      "best": 90
+    },
+    "harbour-blog": {
+      "best": 90
+    },
+    "locked-backups": {
+      "best": 90
+    },
+    "live-scoreboard": {
+      "best": 90
+    },
+    "product-search": {
+      "best": 90
+    },
+    "recipe-box": {
+      "best": 90
+    },
+    "network-hub": {
+      "best": 90
+    },
+    "ticket-express": {
+      "best": 90
+    },
+    "secret-password": {
+      "best": 90
+    },
+    "security-findings-hub": {
+      "best": 90
+    },
+    "voice-of-the-people": {
+      "best": 90
+    },
+    "order-saga": {
+      "best": 90
+    },
+    "no-open-doors": {
+      "best": 90
+    },
+    "config-autofix": {
+      "best": 90
+    },
+    "account-baseline": {
+      "best": 90
+    },
+    "live-scores": {
       "best": 90
     }
   },

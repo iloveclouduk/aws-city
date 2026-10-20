@@ -9,6 +9,7 @@ import { activeSteps } from '@/state/ladder';
 import { isTourDone, markTourDone, readPref, TIP_ASK_KEY, TIP_COPILOT_KEY, writePref } from './logic';
 import { Portrait } from './Portrait';
 import { walkTo } from '@/state/walk';
+import { isSimple } from '@/state/simple';
 
 interface Step {
   title: string;
@@ -17,16 +18,16 @@ interface Step {
   targets: string[];
 }
 
-/** Three steps, then the first job: the city, where the next job always is, and what a building does. */
-const STEPS: Step[] = [
+/** Three steps, then the first job: Kai, where the next job always is (Connie points, Kai walks), and what a building does. */
+const EVERYTHING_STEPS: Step[] = [
   {
     title: 'Welcome! This is you, Kai',
     body: 'AWS is a giant set of computers anyone can rent over the internet. This city is made of its tools. Walk with the arrow keys or a click.',
     targets: ['@kai', '.stage'],
   },
   {
-    title: 'Connie’s next job is always here',
-    body: 'Your next step waits on Home. Press Go and Connie shows you the way.',
+    title: 'Connie points the way',
+    body: 'Today’s shift waits in the City tab. Its big button says exactly what happens next, like “Walk to S3 Lake”. Press it and Kai walks there.',
     targets: ['.next'],
   },
   {
@@ -35,6 +36,18 @@ const STEPS: Step[] = [
     targets: ['.stage'],
   },
 ];
+
+/** Simple mode (the default, src/state/simple.ts): step 2 points at the To-do list instead of the shift's big button. */
+const SIMPLE_STEPS: Step[] = EVERYTHING_STEPS.map((s, i) =>
+  i === 1
+    ? {
+        title: 'Your To-do list',
+        body: 'Your To-do list waits in the City tab. Each task has one button that says exactly what happens, like “Walk to S3 Lake”. Tick them all off, then come back tomorrow.',
+        targets: ['.todo', '.next'],
+      }
+    : s,
+);
+export const tourSteps = (simple: boolean) => (simple ? SIMPLE_STEPS : EVERYTHING_STEPS);
 
 /** Where the first job starts: the first quest's current step, when it points at a landmark. */
 function firstJobTarget(): string | undefined {
@@ -76,7 +89,8 @@ export function Tour({ layout }: { layout: Layout }) {
   const [rect, setRect] = useState<Rect>();
   const card = useRef<HTMLDivElement>(null);
   const opener = useRef<Element | null>(null);
-  const list = STEPS;
+  const simple = useCity((s) => isSimple(s.prefs));
+  const list = tourSteps(simple);
   const step = list[Math.min(i, list.length - 1)];
   const last = i === list.length - 1;
 
@@ -96,7 +110,7 @@ export function Tour({ layout }: { layout: Layout }) {
         // Straight to the first job's landmark: one place built, one toast, no tour of the whole city.
         const target = firstJobTarget();
         bus.emit('flyTo', { id: target ?? 'plaza' });
-        // Kai walks there: the first visit step counts when he arrives (src/ui/QuestLog.tsx walkTo)
+        // Kai walks there: the first visit step counts when he arrives (src/state/walk.ts walkTo)
         if (target) walkTo(target);
       }
       if (opener.current instanceof HTMLElement) opener.current.focus();
@@ -113,7 +127,7 @@ export function Tour({ layout }: { layout: Layout }) {
 
   useLayoutEffect(() => {
     if (!open) return;
-    const targets = STEPS[i]?.targets ?? [];
+    const targets = list[i]?.targets ?? [];
     const place = () =>
       setRect((prev) => {
         const r = findTarget(targets);
@@ -128,7 +142,7 @@ export function Tour({ layout }: { layout: Layout }) {
       clearTimeout(t);
       clearTimeout(t2);
     };
-  }, [open, i, layout]);
+  }, [open, i, layout, list]);
 
   // Focus the primary button on each step so Enter advances.
   useEffect(() => {
@@ -206,7 +220,7 @@ export function Tour({ layout }: { layout: Layout }) {
 
 // ── Coach tips: one card, once each, when the thing it explains first shows up (instead of more tour steps) ──
 
-type TipId = 'ask' | 'copilot';
+type TipId = 'ask' | 'copilot' | 'rank' | 'workshop';
 const TIPS: Record<TipId, { key: string; title: string; body: (layout: Layout) => string; target: string }> = {
   ask: {
     key: TIP_ASK_KEY,
@@ -219,11 +233,25 @@ const TIPS: Record<TipId, { key: string; title: string; body: (layout: Layout) =
     title: 'Console Copilot: let it drive your console',
     body: (layout) =>
       layout === 'panel'
-        ? 'Press the screen button beside the box and an agent clicks through your AWS console tab, explaining each step. Stop it any time.'
-        : `Open the ${SURFACE_NAME[SURFACE]} and press the screen button beside the box.`,
+        ? 'Turn on the Do it in my console switch above the box and an agent clicks through your AWS console tab, explaining each step. Stop it any time.'
+        : `Open the ${SURFACE_NAME[SURFACE]} and turn on the Do it in my console switch above the box.`,
     target: '.console-btn',
   },
+  rank: {
+    key: 'awscity.tip.rank',
+    title: 'You are the Mayor',
+    body: () => 'Your city has a rank, from Village to Global City. Every building level and golden token raises it. Tap it to see everything you have earned.',
+    target: '.rank-chip',
+  },
+  workshop: {
+    key: 'awscity.tip.workshop',
+    title: 'Workshops: hands on, step by step',
+    body: () => 'Practise each command in the terminal here, or run it for real in AWS CloudShell. Every step grows the building.',
+    target: '.workshop-list',
+  },
 };
+/** Tips that show the first time their target appears on screen (after the city has given the player a reason). */
+const WATCHED: TipId[] = ['workshop'];
 
 /** "Ask" on the first ask step (or the first time the box is used); "Copilot" when its button first shows (panel only). */
 export function CoachTips({ layout }: { layout: Layout }) {
@@ -248,6 +276,23 @@ export function CoachTips({ layout }: { layout: Layout }) {
   useEffect(() => {
     if (askStep) offer('ask');
   }, [askStep, offer]);
+  // The rank tip waits for the first building, so there's something to be Mayor of.
+  const built = useCity((s) => Object.values(s.progress.cities?.[s.cityRegion]?.landmarks ?? {}).some((l) => l.discovered));
+  useEffect(() => {
+    if (built) offer('rank');
+  }, [built, offer]);
+  useEffect(() => {
+    const left = WATCHED.filter((id) => readPref(TIPS[id].key) !== '1');
+    if (!left.length) return;
+    const check = () => {
+      for (const id of left) if (document.querySelector(TIPS[id].target)) offer(id);
+      if (left.every((id) => readPref(TIPS[id].key) === '1')) mo.disconnect();
+    };
+    const mo = new MutationObserver(check);
+    check();
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, [offer]);
   useEffect(() => {
     const onFocus = (e: FocusEvent) => e.target instanceof Element && e.target.closest('.composer') && offer('ask');
     document.addEventListener('focusin', onFocus);

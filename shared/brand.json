@@ -1,0 +1,4 @@
+{
+  "about": "One switch for real brand names and liveries (src/world/brand.ts). true: the Amazon Air hub and its livery; a store build that can't use them sets it to false and the generic names show.",
+  "amazon": true
+}

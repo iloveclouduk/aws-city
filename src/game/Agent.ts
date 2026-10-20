@@ -47,8 +47,26 @@ export interface AgentConfig {
 
 type Mode = 'idle' | 'walking' | 'working' | 'emote';
 
+/** A citizen everyone has: stands in for a sheet that didn't load (or was never generated). */
+const FALLBACK_SHEETS = ['citizen0-crowd', 'citizen0'];
+
+/** The sheet to draw: `id` when its texture loaded, else a citizen, so Phaser's missing-texture box never shows. */
+function usableSheet(scene: Phaser.Scene, id: string): string {
+  if (scene.textures.exists(`char:${id}`)) return id;
+  return FALLBACK_SHEETS.find((f) => scene.textures.exists(`char:${f}`)) ?? id;
+}
+
+/**
+ * Speech bubbles are UI: above every building, sign, cloud, storm and the night overlay (DayNight 70_000, its lights
+ * 70_001–2), so a line is never hidden by a tower or darkened at night.
+ */
+export const BUBBLE_DEPTH = 75_000;
+
 /** Every live agent, per scene: how many bubbles are up decides whether an ambient line may speak. */
 const live = new WeakMap<Phaser.Scene, Set<Agent>>();
+/** Screen px at the top of each scene's view that an overlay covers (the AWS status ticker): bubbles stay below it. */
+const topInsets = new WeakMap<Phaser.Scene, number>();
+export const setBubbleTopInset = (scene: Phaser.Scene, px: number) => void topInsets.set(scene, px);
 
 /**
  * A Habbo-style character: walks tile to tile in 4 directions, idles, emotes and works.
@@ -96,7 +114,7 @@ export class Agent {
     this.cfg = cfg;
     this.id = cfg.id;
     this.name = cfg.name;
-    this.sheet = cfg.sheet ?? cfg.id;
+    this.sheet = usableSheet(scene, cfg.sheet ?? cfg.id);
     this.gx = cfg.tile.x;
     this.gy = cfg.tile.y;
 
@@ -131,6 +149,7 @@ export class Agent {
 
   /** Swap the character sheet (e.g. Kai's earned golden jacket). */
   setSheet(sheet: string) {
+    sheet = usableSheet(this.scene, sheet);
     if (sheet === this.sheet) return;
     this.sheet = sheet;
     this.currentAnim = '';
@@ -252,6 +271,23 @@ export class Agent {
   setDetail(detail?: string) {
     this.detail = detail;
     this.syncTag();
+  }
+
+  /** The name tag sits over the head, not at the feet (Kai's, when a building's sign is right there). */
+  private tagAbove = false;
+  setTagAbove(on: boolean) {
+    if (on === this.tagAbove) return;
+    this.tagAbove = on;
+    this.tag.setOrigin(0.5, on ? 1 : 0);
+    this.sync();
+  }
+
+  /** Where the name tag stands at the feet (world px), while it shows: the scene checks it against building signs. */
+  tagAtFeet(): Phaser.Geom.Rectangle | undefined {
+    if (!this.tag.visible) return undefined;
+    const { x, y } = this.screen;
+    const w = this.tag.displayWidth;
+    return new Phaser.Geom.Rectangle(x - w / 2, y + 3, w, this.tag.displayHeight);
   }
 
   /** Whether the name tag shows at rest (the scene's label budget). Hover and work always show it. */
@@ -411,7 +447,7 @@ export class Agent {
     this.sprite.setPosition(Math.round(x), Math.round(y)).setDepth(d);
     const top = y - Math.round(58 * this.k);
     this.busy.setPosition(x + Math.round(10 * this.k), top + 6).setDepth(d + 1);
-    this.tag.setPosition(x, y + 3).setDepth(50_000);
+    this.tag.setPosition(x, this.tagAbove ? top - 2 : y + 3).setDepth(50_000);
     const b = this.bubble;
     if (!b.visible) return;
     // Keep the bubble inside the camera view, so a line spoken at the edge of the city stays readable.
@@ -421,7 +457,9 @@ export class Agent {
     const half = (b.boxW / 2) * k;
     const h = b.boxH * k;
     const bx = !view.width || 2 * (half + pad) >= view.width ? x : Math.min(Math.max(x, view.x + half + pad), view.right - half - pad);
-    let by = view.height ? Math.min(Math.max(top, view.y + h + pad), view.bottom - pad) : top;
+    // The top edge sits under the ticker, when it shows (screen px → world units at this zoom).
+    const viewTop = view.y + (topInsets.get(this.scene) ?? 0) / (this.scene.cameras.main.zoom || 1);
+    let by = view.height ? Math.min(Math.max(top, viewTop + h + pad), view.bottom - pad) : top;
     // Another agent's bubble here already (an older one): step up above it rather than cover it.
     for (const a of live.get(this.scene) ?? []) {
       const o = a.bubble;
@@ -430,6 +468,8 @@ export class Agent {
       const ohalf = (o.boxW / 2) * k;
       if (Math.abs(o.x - bx) < half + ohalf + pad && by > o.y - oh - pad && by - h < o.y + pad) by = o.y - oh - pad;
     }
-    b.setPosition(bx, by).setDepth(60_000 + (this.spokeAt % 1000) / 1000);
+    // Stepping up can push it off the top of the view: clamp again (overlapping an older bubble beats losing the line).
+    if (view.height) by = Math.min(Math.max(by, viewTop + h + pad), view.bottom - pad);
+    b.setPosition(bx, by).setDepth(BUBBLE_DEPTH + (this.spokeAt % 1000) / 1000);
   }
 }

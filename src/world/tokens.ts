@@ -42,7 +42,18 @@ export function tokensFor(region: string, candidates: Tile[]): Token[] {
 /** How many of this city's tokens the player has found. */
 export const foundIn = (p: Progress, region: string) => Object.keys(p.finds ?? {}).filter((id) => id.startsWith(`${region}:`)).length;
 
-/** What a token says when it's found. */
+/** What a golden token adds to its city's rank (src/state/rank.ts cityPoints). */
+export const TOKEN_POINTS = 5;
+
+/**
+ * What Kai says on finding a token: short, gold, and only the count and the reward ("✨ Golden token! 2 of 6 · +5
+ * points"). The certification it stands for (tokenFact) goes to the activity feed and My City, never into the bubble.
+ */
+export function tokenMessage(found: number, of: number) {
+  return found >= of ? `🏆 All ${of} golden tokens found! +${TOKEN_POINTS} points` : `✨ Golden token! ${found} of ${of} · +${TOKEN_POINTS} points`;
+}
+
+/** The certification a token stands for (the feed line when it's found). */
 export function tokenFact(certId: string) {
   const c = CERTS.certifications.find((x) => x.id === certId);
   if (!c) return 'A golden token!';

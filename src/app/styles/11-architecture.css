@@ -81,6 +81,10 @@
 .result {
   animation: enter var(--dur-2) var(--ease-step);
 }
+/* Scrolled into view after Check design (ArchitectureBoard): a little air above it. */
+.arch-result {
+  scroll-margin-top: var(--s-4);
+}
 .result.pass {
   border-color: var(--good);
 }

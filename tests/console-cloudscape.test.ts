@@ -6,7 +6,8 @@ import { Pacer, nextSpeed, parseSpeed, SPEEDS } from '@/console/pacing';
 import { mayAct, mayChoose } from '@/console/safety';
 import { isBusy, settle } from '@/console/settle';
 import { elementFor, takeSnapshot } from '@/console/snapshot';
-import { flowFor } from '@/backend/consoleMock';
+import { ConsoleMock, flowFor, PRACTICE_ONLY } from '@/backend/consoleMock';
+import type { ServerEvent } from '@/backend/contract';
 
 const snap = () => takeSnapshot(document, { requireLayout: false });
 
@@ -223,16 +224,42 @@ describe('pacing', () => {
   });
 });
 
-describe('mock flows are routed by goal, then by the console URL', () => {
+describe('mock flows are routed by the task’s service, then the console URL, then a service the goal names', () => {
   it('picks the flow', () => {
-    expect(flowFor('Launch an EC2 instance')).toBe('ec2');
-    expect(flowFor('Create a DynamoDB table')).toBe('dynamodb');
-    expect(flowFor('Make me a Lambda function')).toBe('lambda');
-    expect(flowFor('Create an S3 bucket')).toBe('s3');
-    expect(flowFor('do the thing', 'https://us-west-2.console.aws.amazon.com/dynamodbv2/home#tables')).toBe('dynamodb');
-    expect(flowFor('help me here', 'https://us-west-2.console.aws.amazon.com/lambda/home')).toBe('lambda');
-    expect(flowFor('help me here', 'https://us-west-2.console.aws.amazon.com/iam/home')).toBeUndefined();
-    expect(flowFor('serverless', '')).toBe('lambda');
+    expect(flowFor('rds', '', 'Create an RDS database instance')).toBe('rds');
+    expect(flowFor('cloudfront', '', 'Create a CloudFront distribution with functions for my S3 bucket')).toBe('cloudfront');
+    expect(flowFor('sqs', '', 'Make a queue for Lambda')).toBe('sqs');
+    expect(flowFor('iam', '', 'Create a role for my EC2 instance')).toBe('iam');
+    expect(flowFor('ecs', '', 'Create an ECS cluster on EC2')).toBeUndefined();
+    expect(flowFor('dynamodb', 'https://us-west-2.console.aws.amazon.com/s3/home', 'make a table')).toBe('dynamodb');
+    expect(flowFor(undefined, '', 'Launch an EC2 instance')).toBe('ec2');
+    expect(flowFor(undefined, '', 'Create a DynamoDB table')).toBe('dynamodb');
+    expect(flowFor(undefined, '', 'Make me a Lambda function')).toBe('lambda');
+    expect(flowFor(undefined, '', 'Create an S3 bucket')).toBe('s3');
+    expect(flowFor(undefined, '', 'Create an RDS instance')).toBe('rds');
+    expect(flowFor(undefined, '', 'Put CloudFront in front of my S3 bucket')).toBeUndefined(); // two services: no guess
+    expect(flowFor(undefined, 'https://us-east-1.console.aws.amazon.com/iamv2/home#/roles', 'help')).toBe('iam');
+    expect(flowFor(undefined, 'https://us-east-1.console.aws.amazon.com/ecs/home', 'Create an S3 bucket')).toBeUndefined();
+    expect(flowFor(undefined, '', 'serverless')).toBeUndefined();
+    expect(flowFor(undefined, 'https://us-west-2.console.aws.amazon.com/dynamodbv2/home#tables', 'do the thing')).toBe('dynamodb');
+    expect(flowFor(undefined, 'https://us-west-2.console.aws.amazon.com/lambda/home', 'help me here')).toBe('lambda');
+    expect(flowFor(undefined, 'https://us-west-2.console.aws.amazon.com/iam/home', 'make an S3 bucket')).toBe('iam');
+    expect(flowFor(undefined, 'https://us-west-2.console.aws.amazon.com/console/home', 'make an S3 bucket')).toBe('s3');
+  });
+
+  it('an unscripted service ends as practice only, never done for real', async () => {
+    vi.useFakeTimers();
+    const events: ServerEvent[] = [];
+    const m = new ConsoleMock((e) => events.push(e));
+    const snapshot = { url: 'https://us-east-1.console.aws.amazon.com/ecs/home', title: 'ECS', items: [{ id: 'a', role: 'button', name: 'Create cluster' }] };
+    m.start('t1', 'Create a cluster', snapshot, 'ecs');
+    for (let i = 0; i < 5 && !events.some((e) => e.type === 'task.done'); i++) {
+      m.observe('t1', true, undefined, snapshot);
+      await vi.advanceTimersByTimeAsync(400);
+    }
+    const done = events.find((e) => e.type === 'task.done');
+    expect(done).toMatchObject({ ok: false, result: PRACTICE_ONLY, xp: [] });
+    vi.useRealTimers();
   });
 });
 

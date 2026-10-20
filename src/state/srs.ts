@@ -2,7 +2,7 @@
 // player has met and is due to see again, plus what the active quest's cards step still wants. New cards never
 // nag; the Due deck takes at most NEW_CARDS_PER_DAY of them a day.
 
-import type { Progress } from '@/backend/contract';
+import type { CardState, Progress } from '@/backend/contract';
 import { isDue } from '@/learning/srs';
 import { cardsFor, questById, type Flashcard } from '@/world/content';
 
@@ -18,6 +18,12 @@ export function badgeCount(p: Progress, now = Date.now()): number {
   }, 0);
   return due + quest;
 }
+
+/**
+ * A card the player knows: last answered Knew it or Easy (Again resets `reps` to 0), or once remembered for a week.
+ * The Learn tab's "learned" count; a card answered "Didn't know" isn't learned yet.
+ */
+export const isKnown = (c: CardState | undefined) => !!c && (c.reps > 0 || !!c.remembered);
 
 /** One service's reviewed cards that are due again now: the number its building's sign shows (🃏). */
 export function dueFor(p: Progress, serviceId: string, now = Date.now()): number {

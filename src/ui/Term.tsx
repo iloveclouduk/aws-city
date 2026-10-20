@@ -3,6 +3,7 @@ import { isSafeDocsUrl } from '@/app/runtime';
 import { ALL_TERMS, GLOSSARY, splitTerms, termsWithout, type GlossaryEntry } from '@/world/glossary';
 import { useCity } from '@/state/store';
 import { feel } from './feedback';
+import { withCoins } from './icons';
 
 /** Clicks and keys inside a term never reach the card or row around it (a flashcard must not flip). */
 const stop = (e: SyntheticEvent) => e.stopPropagation();
@@ -95,7 +96,8 @@ export function Term({ text, entries = GLOSSARY, still = false }: { text: string
   return (
     <>
       {parts.map((p, i) => {
-        if (typeof p === 'string') return <Fragment key={i}>{p}</Fragment>;
+        // A 🪙 the state layer wrote is drawn as the coin icon (the emoji is a grey ball without a colour emoji font).
+        if (typeof p === 'string') return <Fragment key={i}>{withCoins(p)}</Fragment>;
         const term = still ? (
           <span className="term still" title={`${p.entry.term}: ${p.entry.short}`}>
             {p.text}

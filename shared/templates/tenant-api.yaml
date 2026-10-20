@@ -1,0 +1,218 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - one API, many tenants. Each user's token carries a tenantId that the user can't change; CloudFront fronts an HTTP API whose JWT authorizer checks the token, and the Lambda function reads and writes only that tenant's partition of a pooled DynamoDB table.
+
+Resources:
+  TenantPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${AWS::StackName}-tenants'
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      Schema:
+        - Name: tenantId
+          AttributeDataType: String
+          Mutable: false
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      UserPoolTags:
+        managed-by: aws-city
+
+  TenantClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref TenantPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      ReadAttributes:
+        - email
+        - custom:tenantId
+      # Users may change their email, never their tenant.
+      WriteAttributes:
+        - email
+
+  TenantTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: tenantId
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tenantId
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  TenantRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: this-table-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                Resource: !GetAtt TenantTable.Arn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  TenantFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Role: !GetAtt TenantRole.Arn
+      MemorySize: 128
+      Timeout: 5
+      Environment:
+        Variables:
+          TABLE: !Ref TenantTable
+      Code:
+        ZipFile: |
+          const { DynamoDBClient, QueryCommand } = require('@aws-sdk/client-dynamodb');
+          const db = new DynamoDBClient({});
+          // The tenant comes from the checked token, never from the request body or path.
+          exports.handler = async (event) => {
+            const tenant = event.requestContext.authorizer.jwt.claims['custom:tenantId'];
+            if (!tenant) return { statusCode: 403, body: 'No tenant' };
+            const out = await db.send(new QueryCommand({
+              TableName: process.env.TABLE,
+              KeyConditionExpression: 'tenantId = :t',
+              ExpressionAttributeValues: { ':t': { S: tenant } },
+            }));
+            return { statusCode: 200, body: JSON.stringify({ tenant, items: out.Count }) };
+          };
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  TenantApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-api'
+      ProtocolType: HTTP
+      Tags:
+        managed-by: aws-city
+
+  TenantAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref TenantApi
+      Name: cognito
+      AuthorizerType: JWT
+      IdentitySource:
+        - $request.header.Authorization
+      JwtConfiguration:
+        Issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${TenantPool}'
+        Audience:
+          - !Ref TenantClient
+
+  TenantIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref TenantApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt TenantFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  TenantRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref TenantApi
+      RouteKey: GET /items
+      AuthorizationType: JWT
+      AuthorizerId: !Ref TenantAuthorizer
+      Target: !Sub 'integrations/${TenantIntegration}'
+
+  TenantStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref TenantApi
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 100
+        ThrottlingRateLimit: 50
+      Tags:
+        managed-by: aws-city
+
+  TenantPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref TenantFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${TenantApi}/*'
+
+  TenantDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        HttpVersion: http2and3
+        Origins:
+          - Id: api
+            DomainName: !Select [2, !Split ['/', !GetAtt TenantApi.ApiEndpoint]]
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+        DefaultCacheBehavior:
+          TargetOriginId: api
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+          # Managed policies: CachingDisabled (answers differ per tenant), AllViewerExceptHostHeader (keeps the token).
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+Outputs:
+  ApiUrl:
+    Description: Call GET /items through CloudFront with a user's token
+    Value: !Sub 'https://${TenantDistribution.DomainName}'
+  UserPoolId:
+    Description: Create each user with their custom:tenantId here
+    Value: !Ref TenantPool
+  UserPoolClientId:
+    Description: The app client your sign-in page uses
+    Value: !Ref TenantClient

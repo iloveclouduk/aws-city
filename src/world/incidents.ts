@@ -55,6 +55,24 @@ export function incidentLine(i: AwsIncident) {
   return `${incidentWhere(i)}: ${what} ${how}`;
 }
 
+/** "Oregon", "the UAE": the Region's place name for a sentence. */
+const placeOf = (i: AwsIncident) => {
+  if (i.region === 'global') return 'several Regions';
+  const city = regionInfo(i.region)?.city;
+  if (!city) return i.regionName ?? i.region;
+  return /^[A-Z]{2,4}$/.test(city) ? `the ${city}` : city;
+};
+
+/**
+ * The plain line a player reads first (a 12-year-old included): a drill says it's practice, real AWS trouble says it's
+ * AWS's, not the player's. `incidentLine` keeps the exact Region and counts, after it.
+ */
+export function plainIncidentLead(i: AwsIncident) {
+  if (i.drill) return i.status === 'resolved' ? 'Practice storm over: your city kept running' : 'Practice storm: nothing is wrong with your city';
+  if (i.status === 'resolved') return `AWS fixed its trouble in ${placeOf(i)}`;
+  return `AWS has trouble in ${placeOf(i)} right now; your city is fine`;
+}
+
 /** "3 min ago", "2 h ago", "4 days ago", "7 months ago". */
 export function ago(iso: string, now = Date.now()) {
   const s = Math.max(0, (now - Date.parse(iso)) / 1000);

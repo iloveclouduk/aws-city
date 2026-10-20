@@ -6,6 +6,7 @@ import { bus } from '@/state/bus';
 import { useCity } from '@/state/store';
 import { QUESTS } from '@/world/content';
 import { TIER_XP } from '@/world/places';
+import { WORKSHOPS } from '@/world/workshops';
 
 // One moment, one celebration: a big event gets one channel, never a toast stacked on the city's own celebration.
 const s = () => useCity.getState();
@@ -59,9 +60,11 @@ describe('moments', () => {
     s().applyServerEvent({ type: 'deploy.status', deployId: 'd1', status: 'complete' } as never);
     expect(s().celebration).toBe(q.id);
     expect(s().toasts).toHaveLength(0);
-    // Not a quest's last step: the toast says where it was built (the demo's practice account).
+    // Not a quest's last step: the toast says where it was built (the demo's practice account), once the card closes.
     useCity.setState({ deploys: { d2: { deployId: 'd2', templateId, stackName: 'again', region: 'us-west-2', changes: [], status: 'running' } } } as never);
     s().applyServerEvent({ type: 'deploy.status', deployId: 'd2', status: 'complete' } as never);
+    expect(s().toasts).toHaveLength(0);
+    s().celebrate(undefined);
     expect(s().toasts.at(-1)?.text).toBe('again is built in the practice account!');
   });
 
@@ -97,6 +100,86 @@ describe('moments', () => {
     s().applyServerEvent({ type: 'aws.health', incidents: [], asOf: new Date().toISOString() } as never);
     s().applyServerEvent({ type: 'aws.health', incidents: [incident('open')], asOf: new Date().toISOString() } as never);
     expect(s().toasts).toHaveLength(0);
+  });
+
+  it('while a celebration card is up, toasts wait and come one by one after it closes', () => {
+    useCity.setState({ view: { name: 'city' } });
+    s().celebrate(QUESTS[0].id);
+    s().toast('🏅', 'Badge earned: Questing.');
+    s().toast('⛈️', 'AWS has trouble somewhere.');
+    expect(s().toasts).toHaveLength(0);
+    s().celebrate(undefined);
+    expect(s().toasts.map((t) => t.text)).toEqual(['Badge earned: Questing.']);
+    s().dismissToast(s().toasts[0].id);
+    vi.advanceTimersByTime(200);
+    expect(s().toasts.map((t) => t.text)).toEqual(['AWS has trouble somewhere.']);
+  });
+
+  it('a toast already showing steps aside for the card and comes back after it', () => {
+    useCity.setState({ view: { name: 'city' } });
+    s().toast('🔓', 'Learn is open');
+    expect(s().toasts).toHaveLength(1);
+    s().celebrate(QUESTS[0].id);
+    vi.advanceTimersByTime(200);
+    expect(s().toasts).toHaveLength(0);
+    s().celebrate(undefined);
+    expect(s().toasts.map((t) => t.text)).toEqual(['Learn is open']);
+  });
+
+  it('a finished workshop holds toasts (its "Established" badge too) until its card closes', () => {
+    useCity.setState({ view: { name: 'city' } });
+    const w = WORKSHOPS[0];
+    s().toast('🔓', 'Learn is open');
+    for (const st of w.steps) s().workshopStep(w.id, st.id, 'practice');
+    expect(s().workshopDone).toBe(w.id);
+    s().toast('🏅', 'Badge earned: Established.');
+    vi.advanceTimersByTime(200);
+    expect(s().toasts.filter((t) => !t.leaving)).toHaveLength(0);
+    s().celebrateWorkshop(undefined);
+    expect(s().toasts.map((t) => t.text)).toEqual(['Learn is open']);
+    s().dismissToast(s().toasts[0].id);
+    vi.advanceTimersByTime(200);
+    expect(s().toasts.map((t) => t.text)).toEqual(['Badge earned: Established.']);
+  });
+
+  it('a mini-game holds toasts (nothing covers its timer or score) until it closes; errors still show', () => {
+    useCity.setState({ view: { name: 'city' } });
+    s().setView({ name: 'game', game: 'fishing' });
+    s().toast('🏅', 'Badge earned: Angler.');
+    expect(s().toasts).toHaveLength(0);
+    s().toast('⚠️', 'Sign-in didn’t finish.', 'error');
+    expect(s().toasts.map((t) => t.kind)).toEqual(['error']);
+    s().clearToasts();
+    s().toast('🏅', 'Badge earned: Angler.');
+    s().setView({ name: 'city' });
+    expect(s().toasts.map((t) => t.text)).toEqual(['Badge earned: Angler.']);
+  });
+
+  it('a practice drill after the first quest says plainly that nothing is wrong, after the card closes', () => {
+    useCity.setState({ view: { name: 'city' } });
+    const drill = {
+      id: 'drill-1',
+      title: 'Practice drill',
+      region: s().cityRegion,
+      services: ['Amazon S3'],
+      serviceIds: ['s3'],
+      serviceCount: 2,
+      severity: 'degradation',
+      status: 'open',
+      drill: true,
+      started: new Date().toISOString(),
+      updated: new Date().toISOString(),
+      log: [],
+    } as unknown as AwsIncident;
+    const q = QUESTS[0];
+    useCity.setState({ progress: { ...s().progress, quests: { [q.id]: { status: 'done', step: q.steps.length } } } });
+    s().celebrate(q.id);
+    s().applyServerEvent({ type: 'aws.health', incidents: [], asOf: new Date().toISOString() } as never);
+    s().applyServerEvent({ type: 'aws.health', incidents: [drill], asOf: new Date().toISOString() } as never);
+    expect(s().toasts).toHaveLength(0);
+    s().celebrate(undefined);
+    expect(s().toasts[0]?.text).toMatch(/^Practice storm: nothing is wrong with your city\. \(/);
+    expect(s().toasts[0]?.kind).toBe('info');
   });
 
   it('players see stars, never "XP" (outside comments and identifiers)', () => {

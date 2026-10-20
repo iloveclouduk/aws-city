@@ -1,14 +1,107 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { canReconnect, canSignIn, openFullCity, reconnect, setAutoSnap, signIn, type Layout } from '@/app/runtime';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { canReconnect, canSignIn, openFullCity, openLeaderboard, reconnect, setAutoSnap, signIn, type Layout } from '@/app/runtime';
 import { chime, isMuted, onMuteChange, setMuted } from '@/game/audio';
+import { isRushNow, subscribeRush } from '@/game/rush';
 import { bus } from '@/state/bus';
-import { isDiscovered, useCity } from '@/state/store';
-import { districtById, SERVICES } from '@/world/taxonomy';
+import { useCity } from '@/state/store';
+import { districtById } from '@/world/taxonomy';
+import { starsEarned } from '@/state/buildmode';
+import { coins } from '@/state/wallet';
+import { lightsLine } from '@/state/lights';
+import { glowingNow } from './Loops';
 import { useBump } from './feedback';
-import { connectionLabel, DEMO_KEY, isDemo, setDemo } from './logic';
-import { Icon } from './icons';
+import { connectionLabel, DEMO_KEY, GAME_NAMES, isDemo, readPref, setDemo, TIP_COINS_KEY, writePref } from './logic';
+import { Coin, Icon } from './icons';
+import { RankChip } from './Collection';
 import { openEverything, useLocked } from './useLadder';
+import { OsmCredit } from './Minimap';
+import { BuildToggle } from './BuildDrawer';
+import { isSimple, shows } from '@/state/simple';
+import { useTodo } from './today';
 
+
+/**
+ * The first time the player has City Coins, a one-time note under the counter says where they go (Decorate). "Got it"
+ * (or opening Decorate) puts it away for good on this device. It hangs just under the coin counter but always inside
+ * the map (the full tab's side column and tab bar sit under the HUD too; the panel's map is short): placed from both
+ * boxes, and only its button takes taps, so it never covers the tabs or blocks a click.
+ */
+function CoinsTip({ wallet }: { wallet: number }) {
+  const [seen, setSeen] = useState(() => readPref(TIP_COINS_KEY) === '1');
+  const building = useCity((s) => !!s.build);
+  // Only on the city itself: a mini-game, an HQ or the world map keeps its own screen clear.
+  const inCity = useCity((s) => s.view.name === 'city');
+  const done = () => (writePref(TIP_COINS_KEY, '1'), setSeen(true));
+  useEffect(() => {
+    if (building && !seen) done();
+  }, [building, seen]);
+  const ref = useRef<HTMLSpanElement>(null);
+  const [at, setAt] = useState<CSSProperties>({});
+  const show = !seen && wallet > 0 && inCity;
+  useLayoutEffect(() => {
+    if (!show) return;
+    const place = () => {
+      const chip = ref.current?.parentElement?.getBoundingClientRect();
+      const map = document.querySelector('.stage')?.getBoundingClientRect();
+      // No map on this page (a test, a game's own screen): the stylesheet's place under the counter.
+      if (!chip || !map) return setAt({});
+      if (map.width < 120) return setAt({ visibility: 'hidden' });
+      const pad = 8;
+      const right = Math.min(chip.right, map.right - pad);
+      setAt({ position: 'fixed', top: Math.max(chip.bottom + 6, map.top + pad), right: window.innerWidth - right, maxWidth: Math.min(260, right - map.left - pad) });
+    };
+    place();
+    // The panel's map grows and shrinks on request: follow it, and the window.
+    const stage = document.querySelector('.stage');
+    const ro = typeof ResizeObserver === 'function' && stage ? new ResizeObserver(place) : undefined;
+    if (stage) ro?.observe(stage);
+    window.addEventListener('resize', place);
+    return () => (ro?.disconnect(), window.removeEventListener('resize', place));
+  }, [show]);
+  if (!show) return null;
+  return (
+    <span ref={ref} className="hud-tip" role="note" style={at}>
+      <span>
+        <b>City Coins</b>: spend them on decorations in 🌳 Decorate. Stars ⭐ are never spent.
+      </span>
+      <button className="btn tiny" onClick={done}>
+        Got it
+      </button>
+    </span>
+  );
+}
+
+/** "🚦 Rush hour" while the city's rush hour runs (src/game/rush.ts, set by the city scene): why the roads are busy. */
+function RushChip() {
+  const rush = useSyncExternalStore(subscribeRush, isRushNow, isRushNow);
+  if (!rush) return null;
+  return (
+    <span className="hud-rush" role="status" title="Rush hour (8–9 and 17–18): more learning couriers drive between buildings, and Auto Scaling adds workers at EC2 and Lambda.">
+      <span aria-hidden="true">🚦</span>
+      <span className="hud-rush-word"> Rush hour</span>
+    </span>
+  );
+}
+
+/** Simple mode's "To do 2/4": how many of today's tasks are done (the City tab's To-do list says which). */
+function TodoChip() {
+  const { done, of } = useTodo();
+  if (!of) return null;
+  return (
+    <>
+      <span className="sep" aria-hidden="true">
+        ·
+      </span>
+      <span className={`hud-todo ${done >= of ? 'all' : ''}`} title="Today’s To-do list is in the City tab">
+        <span aria-hidden="true">{done >= of ? '✅' : '☑️'} </span>
+        To do{' '}
+        <b>
+          {done}/{of}
+        </b>
+      </span>
+    </>
+  );
+}
 
 /** Switches between the offline demo and signing in. The backend is picked once at startup, so the page reloads. */
 function switchDemo(on: boolean) {
@@ -37,8 +130,15 @@ function ConnectionPill() {
 
   return (
     <span className="conn">
+      {/* In the 400 px side panel the word hides (still read out) and the dot alone stays: nothing truncates. */}
       <span className={`dot ${cls}`} role="status" title={`Backend: ${where} · ${label}`}>
-        {label}
+        <span className="dot-word">{label}</span>
+        {/* The panel has room for one short word: the demo says so ("Demo"), not just a grey dot. */}
+        {kind === 'mock' && (
+          <span className="dot-short" aria-hidden="true">
+            Demo
+          </span>
+        )}
       </span>
       {kind !== 'mock' && (status === 'disconnected' || status === 'error') && canReconnect() && (
         <button className="btn tiny" onClick={reconnect}>
@@ -69,6 +169,7 @@ function MoreMenu({ layout }: { layout: Layout }) {
   const mapDetails = useCity((s) => !!s.prefs.mapDetails);
   // A postcard is of the city: not offered on the world map (the caption names the city).
   const inCity = useCity((s) => s.view.name !== 'world');
+  const cityView = useCity((s) => s.view.name === 'city');
   const textSize = useCity((s) => s.prefs.textSize ?? 100);
   const contrast = useCity((s) => !!s.prefs.contrast);
   const easyFont = useCity((s) => !!s.prefs.easyFont);
@@ -79,6 +180,7 @@ function MoreMenu({ layout }: { layout: Layout }) {
   const setTourOpen = useCity((s) => s.setTourOpen);
   const inDemo = useCity((s) => s.backendKind) === 'mock' && isDemo();
   const locked = useLocked();
+  const simple = useCity((s) => isSimple(s.prefs));
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -166,12 +268,31 @@ function MoreMenu({ layout }: { layout: Layout }) {
             <span>I already build on AWS</span>
             <span className={`switch ${builder ? 'on' : ''}`} aria-hidden="true" />
           </button>
-          {locked.length > 0 && (
-            <button role="menuitem" title="Open every tab and panel now, instead of one at a time as you play" onClick={run(openEverything)}>
-              Peek at everything
+          {/* Simple mode (the default) ↔ Everything: one switch, and "Show everything" also opens every locked area. */}
+          {simple ? (
+            <button
+              role="menuitem"
+              title="Show every extra (rank, City Lights, season road, Codex, news, the Drawing board…) and open every tab and panel now"
+              onClick={run(() => {
+                setPref('simple', false);
+                if (locked.length > 0) openEverything();
+              })}
+            >
+              Show everything
+            </button>
+          ) : (
+            <button role="menuitem" title="Back to a plain To-do list: the extras hide (nothing you earned is lost)" onClick={run(() => setPref('simple', undefined))}>
+              Keep it simple
             </button>
           )}
           <hr />
+          <button role="menuitem" onClick={run(() => useCity.getState().openCollection(true))}>
+            🏙️ My City: everything you've earned
+          </button>
+          <button role="menuitem" title="Weekly leaderboards, and whether other players can see you" onClick={run(() => openLeaderboard(`mayors:${useCity.getState().cityRegion}`))}>
+            🏆 Leaderboards and live city
+          </button>
+          {cityView && <BuildToggle menu={() => setOpen(false)} />}
           {inCity && (
             <button role="menuitem" title="Download a picture of your city as it is now (nothing is uploaded)" onClick={run(() => bus.emit('postcard'))}>
               📸 Save a postcard of my city
@@ -196,6 +317,13 @@ function MoreMenu({ layout }: { layout: Layout }) {
               Sign in to save your city
             </button>
           )}
+          <hr />
+          <div className="menu-label" role="presentation">
+            Credits
+          </div>
+          <div className="menu-credit" role="presentation">
+            Street maps: <OsmCredit /> (ODbL 1.0)
+          </div>
         </div>
       )}
     </div>
@@ -207,13 +335,16 @@ export function Hud({ layout }: { layout: Layout }) {
   const view = useCity((s) => s.view);
   const setView = useCity((s) => s.setView);
   const hasCity = useCity((s) => !!s.prefs.region);
+  const prefs = useCity((s) => s.prefs);
+  const simple = isSimple(prefs);
 
-  const cityRegion = useCity((s) => s.cityRegion);
-  // Buildings: this Region's city. Stars: everything you've earned, in every city.
-  const discovered = SERVICES.filter((s) => isDiscovered(progress, s.id, cityRegion)).length;
-  const xp = [progress.landmarks, ...Object.values(progress.cities ?? {}).map((c) => c.landmarks)].reduce((n, ls) => n + Object.values(ls).reduce((m, l) => m + l.xp, 0), 0);
+  // Three numbers, one meaning each: ⭐ knowledge (every city's buildings; never spent), 🪙 City Coins (what Decorate
+  // spends), 💡 City Lights (a window for each learning day, src/state/lights.ts). Everything else earned lives in My City.
+  const xp = starsEarned(progress);
+  const wallet = coins(progress);
+  const lights = glowingNow(progress);
   const xpBump = useBump(xp);
-  const foundBump = useBump(discovered);
+  const coinBump = useBump(wallet);
 
   return (
     <header className="hud">
@@ -228,18 +359,43 @@ export function Hud({ layout }: { layout: Layout }) {
         </span>
       )}
       {view.name === 'interior' && <span className="where">{view.districtId === 'spheres' ? 'The Spheres' : districtById(view.districtId)?.hq}</span>}
-      {view.name === 'game' && <span className="where">Mini-game</span>}
-      <span className="progress-readout" title={`${xp} stars earned · ${discovered} of ${SERVICES.length} buildings in this city`}>
-        <span className={xpBump ? 'bump' : undefined}>
-          ⭐ <b>{xp}</b>
+      {/* The game's own name ("Sorting Office"), never a cut-off "M…"; the panel drops the rank and online chips for it. */}
+      {view.name === 'game' && (
+        <span className="where" title="Mini-game">
+          {GAME_NAMES[view.game] ?? 'Mini-game'}
+        </span>
+      )}
+      <span className="progress-readout">
+        <span className={xpBump ? 'bump' : undefined} title={`${xp} stars: what you've learned. Stars grow your buildings and are never spent.`}>
+          <span aria-hidden="true">⭐ </span>
+          <b>{xp}</b>
+          <span className="sr-only"> stars</span>
         </span>
         <span className="sep" aria-hidden="true">
           ·
         </span>
-        <span className={foundBump ? 'bump' : undefined}>
-          🏙️ <b>{discovered}</b>/{SERVICES.length}
+        <span className={`hud-coins ${coinBump ? 'bump' : ''}`} title={`${wallet} City Coins to spend on decorations. Jobs, mini-games, workshops and the drawing board pay them.`}>
+          <Coin size={14} /> <b>{wallet}</b>
+          <span className="sr-only"> City Coins</span>
+          <CoinsTip wallet={wallet} />
         </span>
+        {simple && hasCity && <TodoChip />}
+        {shows('cityLights', prefs) && (
+          <>
+        <span className="sep" aria-hidden="true">
+          ·
+        </span>
+        <button className="hud-streak hud-lights" title={`City Lights: ${lightsLine(lights)}`} onClick={() => useCity.getState().openCollection(true)}>
+          <span aria-hidden="true">💡 </span>
+          <b>{lights.glowing}</b>
+          <span className="sr-only"> {lights.glowing === 1 ? 'window' : 'windows'} lit</span>
+        </button>
+          </>
+        )}
       </span>
+      {hasCity && view.name === 'city' && shows('rushSurge', prefs) && <RushChip />}
+      {hasCity && view.name === 'city' && <BuildToggle />}
+      {hasCity && shows('rank', prefs) && <RankChip />}
       <ConnectionPill />
       <MoreMenu layout={layout} />
     </header>

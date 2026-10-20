@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AwsHealthEvent, AwsIncident } from '@/backend/contract';
 import { demoHealth } from '@/backend/mockAccount';
-import { ago, cityImpact, incidentLine, incidentsIn, lessonFor, openIncidents, worstByRegion } from '@/world/incidents';
+import { ago, cityImpact, incidentLine, incidentsIn, lessonFor, openIncidents, plainIncidentLead, worstByRegion } from '@/world/incidents';
 import { puzzleById } from '@/world/content';
 import { SERVICES, serviceById } from '@/world/taxonomy';
 import { tickerItems } from '@/ui/NewsTicker';
@@ -55,6 +55,14 @@ describe('reading AWS Health events in the city', () => {
       expect(serviceById(l.practise)).toBeTruthy();
       if (l.puzzleId) expect(puzzleById(l.puzzleId)).toBeTruthy();
     }
+  });
+
+  it('leads with plain words: a drill is practice, and AWS trouble is never the player\'s city', () => {
+    expect(plainIncidentLead(inc({ region: 'me-central-1', severity: 'disruption' }))).toBe('AWS has trouble in the UAE right now; your city is fine');
+    expect(plainIncidentLead(inc({ region: 'us-west-2' }))).toBe('AWS has trouble in Oregon right now; your city is fine');
+    expect(plainIncidentLead(inc({ region: 'us-west-2', drill: true }))).toBe('Practice storm: nothing is wrong with your city');
+    expect(plainIncidentLead(inc({ region: 'us-west-2', drill: true, status: 'resolved' }))).toMatch(/^Practice storm over/);
+    expect(plainIncidentLead(inc({ region: 'me-south-1', status: 'resolved' }))).toBe('AWS fixed its trouble in Bahrain');
   });
 
   it('says it in one line, with a plain time', () => {

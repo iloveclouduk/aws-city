@@ -1,3 +1,4 @@
+import { whoOf } from '../src/social.js';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { AddressInfo } from 'node:net';
 import { ConditionalCheckFailedException, DynamoDBClient } from '@aws-sdk/client-dynamodb';
@@ -189,15 +190,34 @@ describe('DynamoDB store', () => {
 
   it('DELETE /me removes every page of items and retries throttled deletes', async () => {
     const item = (sk: string) => ({ pk: 'USER#u1', sk });
-    ddb.on(QueryCommand).resolvesOnce({ Items: [item('A'), item('B')], LastEvaluatedKey: { pk: 'USER#u1', sk: 'B' } }).resolvesOnce({ Items: [item('C')] });
+    // The first query finds the player's live-city and leaderboard rows (none here); then every page of their items.
+    ddb
+      .on(QueryCommand)
+      .resolvesOnce({ Items: [] })
+      .resolvesOnce({ Items: [item('A'), item('B')], LastEvaluatedKey: { pk: 'USER#u1', sk: 'B' } })
+      .resolvesOnce({ Items: [item('C')] });
     ddb
       .on(BatchWriteCommand)
       .resolvesOnce({ UnprocessedItems: { 'aws-city-test': [{ DeleteRequest: { Key: item('B') } }] } })
       .resolves({});
     await stores().deleteUser('u1');
-    expect(ddb.commandCalls(QueryCommand)).toHaveLength(2);
+    expect(ddb.commandCalls(QueryCommand)).toHaveLength(3);
     const deleted = ddb.commandCalls(BatchWriteCommand).flatMap((c) => (c.args[0].input.RequestItems as Record<string, { DeleteRequest: { Key: { sk: string } } }[]>)['aws-city-test']!.map((r) => r.DeleteRequest.Key.sk));
     expect(deleted).toEqual(['A', 'B', 'B', 'C']);
+  });
+
+  it('DELETE /me also removes the player\'s presence and leaderboard rows (v2.11)', async () => {
+    const who = whoOf('u1');
+    ddb
+      .on(QueryCommand)
+      .resolvesOnce({ Items: [{ pk: 'USER#u1', sk: 'SOCIAL#LB#shield#2026-W42', target: 'LB#shield#2026-W42' }, { pk: 'USER#u1', sk: 'SOCIAL#PRESENCE#us-west-2', target: 'PRESENCE#us-west-2' }] })
+      .resolves({ Items: [] });
+    ddb.on(BatchWriteCommand).resolves({});
+    ddb.on(PutCommand).resolves({});
+    await stores().deleteUser('u1');
+    const keys = ddb.commandCalls(BatchWriteCommand).flatMap((c) => (c.args[0].input.RequestItems as Record<string, { DeleteRequest: { Key: { pk: string; sk: string } } }[]>)['aws-city-test']!.map((r) => r.DeleteRequest.Key));
+    expect(keys).toEqual(expect.arrayContaining([{ pk: 'LB#shield#2026-W42', sk: who }, { pk: 'PRESENCE#us-west-2', sk: who }, { pk: 'USER#u1', sk: 'SOCIAL#LB#shield#2026-W42' }]));
+    expect(JSON.stringify(keys)).not.toContain('"sk":"u1"');
   });
 
   it('progress: newest wins atomically, an older copy is accepted but not written', async () => {

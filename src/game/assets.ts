@@ -97,10 +97,32 @@ export function createCharacterAnims(scene: Phaser.Scene) {
   }
 }
 
-/** Place an atlas sprite so its generator anchor (footprint N corner) sits at world (x, y). */
+/**
+ * The season each scene draws in (src/world/seasons.ts): the city sets its own; interiors, games and the world map have
+ * none, so a conservatory's trees never get snow. Per scene, so nothing leaks from one scene to another.
+ */
+const seasons = new WeakMap<Phaser.Scene, string>();
+export const setSeason = (scene: Phaser.Scene, season: string | undefined) => (season ? seasons.set(scene, season) : seasons.delete(scene));
+/**
+ * The frame a sprite name draws as in this scene: `season:<season>:<name>` when the art has that season's version (same
+ * canvas and anchor, art/tiles), else the name itself. Every way the city draws the atlas goes through it (addSprite,
+ * the baked ground, the infill's composed blocks), so the season costs no extra draw calls.
+ */
+export function seasonal(scene: Phaser.Scene | undefined, name: string): string {
+  const s = scene && seasons.get(scene);
+  if (!s) return name;
+  const k = `season:${s}:${name}`;
+  return k in anchors ? k : name;
+}
+
+/**
+ * Place an atlas sprite so its generator anchor (footprint N corner) sits at world (x, y). Atlas frames are trimmed to
+ * their opaque pixels (atlas.json `spriteSourceSize`), and Phaser draws them at that offset inside the full w×h canvas,
+ * so the anchor, setFrame swaps, crops and getPixelAlpha all work in untrimmed pixels.
+ */
 export function addSprite(scene: Phaser.Scene, name: string, x: number, y: number) {
   const a = anchors[name];
-  const img = scene.add.image(x, y, CITY_ATLAS, name);
+  const img = scene.add.image(x, y, CITY_ATLAS, seasonal(scene, name));
   if (a) img.setOrigin(a.ax / a.w, a.ay / a.h);
   return img;
 }

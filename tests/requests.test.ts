@@ -27,6 +27,14 @@ describe('citizen requests (src/state/requests.ts)', () => {
     }
   });
 
+  it('takes its wrong answers from the same building’s other cards first', () => {
+    for (let seed = 0; seed < 20; seed++) {
+      const r = pickRequest(city(['s3', 'lambda', 'ec2']), 'us-west-2', seed)!;
+      const own = cardsFor(r.serviceId).map((c) => c.simple ?? c.a);
+      for (const o of r.options) expect(own).toContain(o);
+    }
+  });
+
   it('never asks about another city’s buildings', () => {
     const r = pickRequest(city(['s3', 'lambda']), 'eu-west-2', 3);
     expect(r).toBeUndefined();

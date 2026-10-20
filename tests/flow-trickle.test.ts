@@ -54,14 +54,14 @@ describe('FlowTrickle', () => {
     expect(run(flow.serviceIds.slice(0, 2), false)).toBeGreaterThan(0);
   });
 
-  it('every flow can play: each hop between work spots has a path', () => {
-    for (const f of FLOWS) expect(run(f.serviceIds, false), f.serviceIds.join(' → ')).toBeGreaterThan(0);
+  it('every flow in the classic city can play: each hop between work spots has a path', () => {
+    for (const f of FLOWS.filter((x) => x.serviceIds.every((id) => landmarkLayout(id)))) expect(run(f.serviceIds, false), f.serviceIds.join(' → ')).toBeGreaterThan(0);
   });
 
-  it('every work spot of every service reaches the roads', () => {
+  it('every work spot of every service in the classic city reaches the roads', () => {
     const packets = new Packets(scene, { halfW: 16, halfH: 8 }, GRID, travel);
     const from = landmarkLayout('plaza')!.workSpot;
-    for (const s of SERVICES) {
+    for (const s of SERVICES.filter((x) => landmarkLayout(x.id))) {
       packets.clear();
       packets.sendAmbient(from, landmarkLayout(s.id)!.workSpot, 0xffffff);
       expect(packets.ambientCount, s.id).toBe(1);

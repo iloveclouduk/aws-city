@@ -1,0 +1,267 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the network interchange. One transit gateway links three VPCs (shop, payments and a test copy of the shop) through their own route tables, so the shop reaches both, while the test copy can never reach payments. Attach head office's Site-to-Site VPN to the same hub later.
+
+Resources:
+  CityHub:
+    Type: AWS::EC2::TransitGateway
+    Properties:
+      Description: The city's network interchange
+      # Every attachment gets its own route table below: nothing joins or learns routes by default.
+      DefaultRouteTableAssociation: disable
+      DefaultRouteTablePropagation: disable
+      DnsSupport: enable
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ShopVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.1.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ShopSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref ShopVpc
+      CidrBlock: 10.1.0.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ShopRoutes:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref ShopVpc
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ShopSubnetRoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref ShopSubnet
+      RouteTableId: !Ref ShopRoutes
+
+  ShopAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      TransitGatewayId: !Ref CityHub
+      VpcId: !Ref ShopVpc
+      SubnetIds:
+        - !Ref ShopSubnet
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ShopToHub:
+    Type: AWS::EC2::Route
+    DependsOn: ShopAttachment
+    Properties:
+      RouteTableId: !Ref ShopRoutes
+      DestinationCidrBlock: 10.0.0.0/8
+      TransitGatewayId: !Ref CityHub
+
+  ShopHubTable:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    Properties:
+      TransitGatewayId: !Ref CityHub
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ShopHubAssociation:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId: !Ref ShopAttachment
+      TransitGatewayRouteTableId: !Ref ShopHubTable
+
+  PaymentsVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.2.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  PaymentsSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref PaymentsVpc
+      CidrBlock: 10.2.0.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  PaymentsRoutes:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref PaymentsVpc
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  PaymentsSubnetRoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PaymentsSubnet
+      RouteTableId: !Ref PaymentsRoutes
+
+  PaymentsAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      TransitGatewayId: !Ref CityHub
+      VpcId: !Ref PaymentsVpc
+      SubnetIds:
+        - !Ref PaymentsSubnet
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  PaymentsToHub:
+    Type: AWS::EC2::Route
+    DependsOn: PaymentsAttachment
+    Properties:
+      RouteTableId: !Ref PaymentsRoutes
+      DestinationCidrBlock: 10.0.0.0/8
+      TransitGatewayId: !Ref CityHub
+
+  PaymentsHubTable:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    Properties:
+      TransitGatewayId: !Ref CityHub
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  PaymentsHubAssociation:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId: !Ref PaymentsAttachment
+      TransitGatewayRouteTableId: !Ref PaymentsHubTable
+
+  TestVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.3.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  TestSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref TestVpc
+      CidrBlock: 10.3.0.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  TestRoutes:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref TestVpc
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  TestSubnetRoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref TestSubnet
+      RouteTableId: !Ref TestRoutes
+
+  TestAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      TransitGatewayId: !Ref CityHub
+      VpcId: !Ref TestVpc
+      SubnetIds:
+        - !Ref TestSubnet
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  TestToHub:
+    Type: AWS::EC2::Route
+    DependsOn: TestAttachment
+    Properties:
+      RouteTableId: !Ref TestRoutes
+      DestinationCidrBlock: 10.0.0.0/8
+      TransitGatewayId: !Ref CityHub
+
+  TestHubTable:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    Properties:
+      TransitGatewayId: !Ref CityHub
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  TestHubAssociation:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId: !Ref TestAttachment
+      TransitGatewayRouteTableId: !Ref TestHubTable
+
+  # Each table learns only the networks its VPC may reach. Payments' and Test's tables never learn each other.
+  ShopLearnsShop:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayRouteTableId: !Ref ShopHubTable
+      TransitGatewayAttachmentId: !Ref ShopAttachment
+
+  ShopLearnsPayments:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayRouteTableId: !Ref ShopHubTable
+      TransitGatewayAttachmentId: !Ref PaymentsAttachment
+
+  ShopLearnsTest:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayRouteTableId: !Ref ShopHubTable
+      TransitGatewayAttachmentId: !Ref TestAttachment
+
+  PaymentsLearnsShop:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayRouteTableId: !Ref PaymentsHubTable
+      TransitGatewayAttachmentId: !Ref ShopAttachment
+
+  PaymentsLearnsPayments:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayRouteTableId: !Ref PaymentsHubTable
+      TransitGatewayAttachmentId: !Ref PaymentsAttachment
+
+  TestLearnsShop:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayRouteTableId: !Ref TestHubTable
+      TransitGatewayAttachmentId: !Ref ShopAttachment
+
+  TestLearnsTest:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayRouteTableId: !Ref TestHubTable
+      TransitGatewayAttachmentId: !Ref TestAttachment
+
+Outputs:
+  TransitGatewayId:
+    Description: The hub; attach head office's VPN here
+    Value: !Ref CityHub
+  ShopVpcId:
+    Description: The shop's VPC, which reaches payments and the test copy
+    Value: !Ref ShopVpc

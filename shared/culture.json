@@ -846,6 +846,186 @@
     "note": "Deploy and operate AI agents securely at scale.",
     "source": "https://aws.amazon.com/blogs/aws/introducing-amazon-bedrock-agentcore-securely-deploy-and-operate-ai-agents-at-any-scale/",
     "asOf": "2026-09-26"
+   },
+   {
+    "year": 2011,
+    "service": "AWS Elastic Beanstalk",
+    "serviceId": "beanstalk",
+    "event": "Launch",
+    "note": "Upload your code and it runs the servers for you.",
+    "source": "https://aws.amazon.com/blogs/compute/introducing-a-new-generation-of-aws-elastic-beanstalk-platforms/",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2008,
+    "service": "Amazon EBS",
+    "serviceId": "ebs",
+    "event": "Launch",
+    "note": "Disks for EC2 that keep their data when a server stops.",
+    "source": "https://aws.amazon.com/blogs/storage/amazon-elastic-block-store-at-15-years/",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2016,
+    "service": "Amazon EFS",
+    "serviceId": "efs",
+    "event": "GA (announced 2015)",
+    "note": "A shared file system many servers can use at once.",
+    "source": "https://aws.amazon.com/blogs/aws/amazon-elastic-file-system-update-sub-millisecond-read-latency/",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2017,
+    "service": "AWS Glue",
+    "serviceId": "glue",
+    "event": "Launch",
+    "note": "Serverless data prep: crawlers, a data catalog and ETL jobs.",
+    "source": "https://docs.aws.amazon.com/glue/latest/dg/doc-history.html",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2019,
+    "service": "AWS Lake Formation",
+    "serviceId": "lakeformation",
+    "event": "Launch",
+    "note": "Build a data lake and control who sees which data.",
+    "source": "https://docs.aws.amazon.com/lake-formation/latest/dg/doc-history.html",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2009,
+    "service": "Amazon RDS",
+    "serviceId": "rds",
+    "event": "Launch",
+    "note": "Managed relational databases, starting with MySQL.",
+    "source": "https://aws.amazon.com/blogs/aws/amazon-rds-for-postgresql-now-available/",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2011,
+    "service": "Amazon ElastiCache",
+    "serviceId": "elasticache",
+    "event": "Launch",
+    "note": "A managed in-memory cache for faster apps.",
+    "source": "https://aws.amazon.com/blogs/aws/aws-elasticache-now-available-in-two-more-regions/",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2009,
+    "service": "Amazon VPC",
+    "serviceId": "vpc",
+    "event": "Launch",
+    "note": "Your own isolated network inside AWS.",
+    "source": "https://aws.amazon.com/blogs/aws/amazon-ec2-update-virtual-private-clouds-for-everyone/",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2010,
+    "service": "Amazon Route 53",
+    "serviceId": "route53",
+    "event": "Launch",
+    "note": "AWS's own DNS: turns names into addresses.",
+    "source": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/History.html",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2008,
+    "service": "Amazon CloudFront",
+    "serviceId": "cloudfront",
+    "event": "Launch",
+    "note": "A content delivery network, starting with 14 locations.",
+    "source": "https://aws.amazon.com/blogs/aws/98-99-100-cloudfront-points-of-presence/",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2015,
+    "service": "Amazon API Gateway",
+    "serviceId": "apigateway",
+    "event": "Launch",
+    "note": "A managed front door for your APIs.",
+    "source": "https://docs.aws.amazon.com/apigateway/latest/developerguide/history.html",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2006,
+    "service": "Amazon SQS",
+    "serviceId": "sqs",
+    "event": "Launch",
+    "note": "Message queues, one of AWS's first three services.",
+    "source": "https://aws.amazon.com/blogs/aws/amazon-sqs-turns-20-two-decades-of-reliable-messaging-at-scale/",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2011,
+    "service": "AWS IAM",
+    "serviceId": "iam",
+    "event": "Launch",
+    "note": "Users, groups and policies for fine-grained access.",
+    "source": "https://aws.amazon.com/blogs/aws/happy-10th-birthday-aws-identity-and-access-management/",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2014,
+    "service": "Amazon Cognito",
+    "serviceId": "cognito",
+    "event": "General availability",
+    "note": "Sign-in and identity for web and mobile apps.",
+    "source": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-document-history.html",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2014,
+    "service": "AWS KMS",
+    "serviceId": "kms",
+    "event": "Launch",
+    "note": "Create and control the keys that encrypt your data.",
+    "source": "https://docs.aws.amazon.com/kms/latest/developerguide/dochistory.html",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2015,
+    "service": "AWS WAF",
+    "serviceId": "shield",
+    "event": "Launch",
+    "note": "A web firewall: rules that block bad requests.",
+    "source": "https://docs.aws.amazon.com/waf/latest/developerguide/doc-history-early-changes.html",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2017,
+    "service": "Amazon GuardDuty",
+    "serviceId": "guardduty",
+    "event": "Launch",
+    "note": "Threat detection that reads your account's logs.",
+    "source": "https://docs.aws.amazon.com/guardduty/latest/ug/doc-history.html",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2009,
+    "service": "Amazon CloudWatch",
+    "serviceId": "cloudwatch",
+    "event": "Launch",
+    "note": "Monitoring, launched with Auto Scaling and Elastic Load Balancing.",
+    "source": "https://aws.amazon.com/blogs/aws/attach-and-detach-elastic-load-balancers-from-auto-scaling-groups/",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2025,
+    "service": "AWS Security Agent",
+    "serviceId": "securityagent",
+    "event": "Preview at re:Invent, then GA",
+    "note": "A frontier agent that tests your own apps like an attacker.",
+    "source": "https://aws.amazon.com/blogs/security/aws-launches-ai-enhanced-security-innovations-at-reinvent-2025/",
+    "asOf": "2026-10-17"
+   },
+   {
+    "year": 2019,
+    "service": "Amazon Textract",
+    "serviceId": "textract",
+    "event": "GA (preview 2018)",
+    "note": "Reads text, tables and forms from scanned documents.",
+    "source": "https://docs.aws.amazon.com/textract/latest/dg/document-history.html",
+    "asOf": "2026-10-17"
    }
   ],
   "quest": {

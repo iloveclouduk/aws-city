@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CityFinding } from '@/backend/contract';
 import { demoFindings } from '@/backend/mockAccount';
 import { bus } from '@/state/bus';
-import { DRIP_MS, heldFindingIds, MAX_OPEN_FINDINGS, openFindings, severityRank, useCity } from '@/state/store';
+import { ADVANCED_RULES, DRIP_MS, heldFindingIds, MAX_OPEN_FINDINGS, openFindings, severityRank, useCity } from '@/state/store';
 import { SERVICES } from '@/world/taxonomy';
 import { landmarkOf } from '@/state/cities';
 
@@ -25,6 +25,28 @@ afterEach(() => {
   s().resetSession();
   useCity.setState({ backendKind: 'mock' });
   vi.useRealTimers();
+});
+
+describe('hardware-choice advice waits for a beginner (round 3 step 5)', () => {
+  it('x86 → Graviton and older-hardware findings stay held until a quest is finished, then come last', async () => {
+    const base = findings(1)[0];
+    const graviton = { ...base, id: 'g1', ruleId: 'ec2-graviton-candidate', severity: 'low' as const };
+    const plain = { ...base, id: 'p1', ruleId: 'ebs-unattached', severity: 'medium' as const };
+    expect(ADVANCED_RULES.has('ec2-graviton-candidate')).toBe(true);
+    send(graviton);
+    send(plain);
+    s().releaseCare();
+    // The plain one first, though it's more severe; the Graviton advice waits.
+    expect(shown()).toEqual(['p1']);
+    s().openFinding('p1');
+    await vi.advanceTimersByTimeAsync(DRIP_MS * 3);
+    expect(shown()).toEqual(['p1']);
+    expect(heldFindingIds()).toEqual(['g1']);
+    // A quest finished: it drips in.
+    useCity.setState({ progress: { ...s().progress, quests: { q: { status: 'done', step: 1 } } } });
+    await vi.advanceTimersByTimeAsync(DRIP_MS);
+    expect(shown().sort()).toEqual(['g1', 'p1']);
+  });
 });
 
 describe('findings wait until city care unlocks', () => {

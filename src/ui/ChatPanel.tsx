@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { askDistrict } from '@/app/runtime';
 import { agentName, useCity } from '@/state/store';
 import { districtById, servicesIn, type DistrictId } from '@/world/taxonomy';
+import { placeFor } from '@/world/places';
 import { ChipRow } from './ChipRow';
 import { feel } from './feedback';
 import { districtStyle, offlineReason } from './logic';
@@ -65,6 +66,9 @@ export function ChatPanel({ districtId }: { districtId: string }) {
                     <i />
                   </span>
                 )}
+                {/* What the answer grew, or the friendly daily-cap line (store chat.answer: CHAT_PAID_A_DAY a building). */}
+                {m.stars ? <span className="bubble-pay">+{m.stars} ⭐ {placeFor(m.agentId ?? '')?.place ?? ''}</span> : null}
+                {m.capped && <span className="bubble-pay capped">Today’s answer stars here are used up: full stars again tomorrow. Ask away anyway!</span>}
               </div>
             </div>
           ) : (

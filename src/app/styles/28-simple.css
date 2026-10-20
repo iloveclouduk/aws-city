@@ -1,0 +1,153 @@
+/* ── Simple mode (src/state/simple.ts, the default): the City tab's To-do list and the HUD's "To do 2/4" ── */
+.todo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-5);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+.todo-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-4);
+}
+.todo-head h3 {
+  flex: 1;
+  margin: 0;
+  font-size: var(--fs-lg);
+  color: var(--ink-hi);
+}
+.todo-count {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.todo-bar {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--sunken);
+  overflow: hidden;
+}
+.todo-bar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--good);
+  transition: width var(--dur-3) var(--ease-out);
+}
+.todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.todo-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+.todo-check {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--line-strong);
+  border-radius: var(--r-md);
+  font-size: var(--fs-md);
+  font-weight: 900;
+  line-height: 1;
+}
+.todo-check.on {
+  background: var(--good);
+  border-color: var(--good);
+  color: var(--bg-deep);
+}
+.todo-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.todo-text b {
+  font-size: var(--fs-md);
+  color: var(--ink-hi);
+}
+.todo-of {
+  color: var(--muted);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.todo-why {
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.todo-go {
+  margin-top: var(--s-2);
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+.todo-where {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  opacity: 0.8;
+}
+.todo-row.done {
+  background: none;
+}
+.todo-row.done .todo-text b {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.todo-done {
+  margin: 0;
+  padding: var(--s-4) var(--s-5);
+  border: 1px solid var(--good);
+  border-radius: var(--r-lg);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* The HUD's "To do 2/4" (Simple mode): the To-do list's count, one glance. */
+.progress-readout .hud-todo b {
+  color: var(--good);
+}
+.progress-readout .hud-todo.all b {
+  color: var(--good-ink);
+}
+
+/* "+2 more": the goals over the list's five rows (still counted), one tap away. */
+.todo-more {
+  align-self: flex-start;
+}
+/* Once the day is done: the next thing on offer, quiet (not a row to tick). */
+.todo-extra {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-3);
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+}
+.todo-extra .todo-go {
+  margin-top: 0;
+}

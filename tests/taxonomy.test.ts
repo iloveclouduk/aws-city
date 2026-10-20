@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CONSOLE_SERVICE, FEATURED_REQUESTS, matchText, matchUrl, serviceById, SERVICES } from '@/world/taxonomy';
+import { consoleUrl, DEFAULT_CONSOLE_SERVICE, FEATURED_REQUESTS, matchText, matchUrl, serviceById, SERVICES } from '@/world/taxonomy';
 import { PLACES, tierForXp } from '@/world/places';
-import { CAMPUS_PLOT, DISTRICT_PLOTS, GLOBAL_LANDMARKS, homeRectFor, inRect, isRoad, LANDMARKS, GRID } from '@/world/layout';
+import { CAMPUS_PLOT, DISTRICT_PLOTS, GLOBAL_LANDMARKS, homeRectFor, inRect, isRoad, LANDMARKS, GRID, UNPLACED_SERVICES } from '@/world/layout';
 import { FACTS, isGlobalService } from '@/world/regions';
 
 describe('matchUrl', () => {
@@ -13,8 +13,20 @@ describe('matchUrl', () => {
     ['https://eu-west-2.console.aws.amazon.com/dynamodbv2/home?region=eu-west-2#tables', 'console', 'dynamodb'],
     ['https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html', 'docs', 's3'],
     ['https://docs.aws.amazon.com/lambda/latest/dg/welcome.html', 'docs', 'lambda'],
+    ['https://us-east-1.console.aws.amazon.com/vpcconsole/home?region=us-east-1#TransitGateways:', 'console', 'transitgateway'],
+    ['https://us-east-1.console.aws.amazon.com/vpcconsole/home?region=us-east-1#TransitGatewayAttachments:', 'console', 'transitgateway'],
+    ['https://us-east-1.console.aws.amazon.com/vpcconsole/home?region=us-east-1#vpcs:', 'console', 'vpc'],
+    ['https://lightsail.aws.amazon.com/ls/webapp/home/instances', 'console', 'lightsail'],
   ])('%s → %s/%s', (url, kind, serviceId) => {
     expect(matchUrl(url)).toEqual({ kind, serviceId });
+  });
+
+  it('opens each console where AWS serves it: hash routes and own hosts too', () => {
+    expect(consoleUrl('s3')).toBe('https://console.aws.amazon.com/s3/home');
+    expect(consoleUrl('transitgateway')).toBe('https://console.aws.amazon.com/vpcconsole/home#TransitGateways:');
+    expect(consoleUrl('lightsail')).toBe('https://lightsail.aws.amazon.com/ls/webapp/home');
+    for (const id of ['transitgateway', 'lightsail', 'vpc', 'aurora']) expect(matchUrl(consoleUrl(id)), id).toEqual({ kind: 'console', serviceId: id });
+    expect(matchUrl('https://example.aws.amazon.com/lightsail').kind).toBe('other');
   });
 
   it('recognises the console home page', () => {
@@ -49,11 +61,13 @@ describe('matchText', () => {
 });
 
 describe('world data', () => {
-  it('every service has a place and a landmark inside the grid', () => {
+  // Every real street plan gives every service a lot: tests/plan.test.ts.
+  it('every service has a place, and a lot in the classic city unless it is full', () => {
     for (const s of SERVICES) {
       expect(PLACES.find((p) => p.serviceId === s.id), s.id).toBeTruthy();
       const l = LANDMARKS.find((x) => x.id === s.id);
-      expect(l, s.id).toBeTruthy();
+      expect(!!l, s.id).toBe(!UNPLACED_SERVICES.includes(s.id));
+      if (!l) continue;
       expect(l!.workSpot.x).toBeLessThan(GRID);
       expect(l!.workSpot.y).toBeLessThan(GRID);
     }
@@ -68,7 +82,7 @@ describe('world data', () => {
     for (const l of LANDMARKS.filter((x) => serviceById(x.id))) {
       const f = l.footprint;
       const corners = [{ x: f.x, y: f.y }, { x: f.x + f.w - 1, y: f.y + f.h - 1 }];
-      const plot = isGlobalService(l.id) ? CAMPUS_PLOT.rect : DISTRICT_PLOTS[serviceById(l.id)!.districtId].rect;
+      const plot = isGlobalService(l.id) ? CAMPUS_PLOT.rect : DISTRICT_PLOTS[serviceById(l.id)!.districtId]!.rect;
       for (const c of corners) expect(inRect(c, plot), `${l.id} inside its plot`).toBe(true);
       // Its work spot is in the same plot and its agent roams there.
       expect(inRect(l.workSpot, plot), `${l.id} work spot in its plot`).toBe(true);
@@ -110,6 +124,8 @@ describe('world data', () => {
       expect(serviceById(id), id).toBeTruthy();
       expect(PLACES.find((p) => p.serviceId === id), id).toBeTruthy();
     }
+    // Each request's words route to the agent offering it (the mock backend and taskStory both use matchText).
+    for (const r of FEATURED_REQUESTS) expect(matchText(r.prompt), r.prompt).toBe(r.agent);
   });
 
   it('tiers follow XP thresholds', () => {

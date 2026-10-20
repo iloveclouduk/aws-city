@@ -105,6 +105,21 @@ describe('quests and puzzles', () => {
     off();
   });
 
+  it('a walk asked for from a mini-game goes back to the city first, so Kai walks where the player can see', async () => {
+    const { walkTo } = await import('@/state/walk');
+    const { bus } = await import('@/state/bus');
+    useCity.setState({ view: { name: 'game', game: 'fishing' }, progress: { version: 1, landmarks: {}, updatedAt: '2026-01-01T00:00:00Z', quests: { 'compute-first-function': { status: 'active', step: 0, count: 0 } } } });
+    // The city takes the walk only when it's on screen (like CityScene's sys.isActive()).
+    const off = bus.on('walkTo', ({ accept }) => {
+      if (useCity.getState().view.name === 'city') accept();
+    });
+    walkTo('lambda');
+    expect(useCity.getState().view.name).toBe('city');
+    // Taken by the city: the visit counts on arrival, not at once.
+    expect(useCity.getState().progress.quests?.['compute-first-function']?.step).toBe(0);
+    off();
+  });
+
   it('selecting a landmark no quest points at does not discover it', () => {
     useCity.setState({ progress: { version: 1, landmarks: {}, updatedAt: '2026-01-01T00:00:00Z' } });
     useCity.getState().select('ec2');

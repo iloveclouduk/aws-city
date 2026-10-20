@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { memoryLedger } from '@/learning/dailyLedger';
 import { FIRST_PASS_BONUS, firstTryToday, IMPROVE_XP, passHint, PASS_XP, puzzleReward, TRY_XP } from '@/learning/puzzleRewards';
 import { useCity } from '@/state/store';
 
@@ -21,7 +22,7 @@ describe('puzzle rewards', () => {
     const r = puzzleReward(p, { passed: false, score: 50, missing: ['cloudfront'] }, 0, false);
     expect(r).toEqual({ kind: 'try', xp: { s3: TRY_XP, lambda: TRY_XP } });
     expect(puzzleReward(p, { passed: false, score: 50, missing: ['cloudfront'] }, 0, true).kind).toBe('none');
-    const seen = new Map<string, string>();
+    const seen = memoryLedger();
     expect(firstTryToday('x', '2026-10-13', seen)).toBe(true);
     expect(firstTryToday('x', '2026-10-13', seen)).toBe(false);
     expect(firstTryToday('x', '2026-10-14', seen)).toBe(true);

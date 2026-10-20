@@ -202,3 +202,76 @@ code.api {
   margin-top: var(--s-3);
   color: var(--good-ink);
 }
+
+/* Watch it done (TaskCard, src/state/watch.ts): the story before, one live line while watching, the result after. */
+.task-head .btn + .btn {
+  margin-left: var(--s-2);
+}
+.watch-btn.on {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.watch-framing {
+  margin: var(--s-3) 0 0;
+  color: var(--ink);
+  font-weight: 600;
+}
+.watch-live {
+  margin: var(--s-3) 0 0;
+  color: var(--highlight);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.watch-count {
+  display: inline-block;
+  min-width: 2.4em;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  background: var(--sunken);
+  color: var(--warn);
+  font-size: var(--fs-xs);
+  text-align: center;
+}
+.watch-result p {
+  margin: var(--s-3) 0 0;
+}
+.watch-teaches {
+  color: var(--ink);
+}
+.watch-paid {
+  color: var(--accent);
+  font-weight: 700;
+}
+.watch-paid.capped {
+  color: var(--muted);
+  font-weight: 600;
+}
+.watch-result .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+}
+
+/* An agent's offer, told as a little story ("Watch it done"). */
+.agent-offer {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-3);
+}
+.agent-offer-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+  flex: 1;
+}
+.agent-offer-ask {
+  color: var(--quote);
+  font-style: italic;
+}

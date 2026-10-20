@@ -5,7 +5,7 @@ import world from '../shared/world.json' with { type: 'json' };
 import { FACTS, monthly, usd } from '@/world/regions';
 
 const SERVICE_IDS = world.services.map((s) => s.id);
-const STATUSES = ['available', 'planned', 'considering', 'not-planned', 'outside-partition'];
+const STATUSES = ['available', 'planned', 'considering', 'not-planned', 'not-listed', 'outside-partition'];
 
 describe('Region facts (shared/region-facts.json, from the AWS Knowledge MCP server)', () => {
   it('covers every Region on the map, with sources and a date', () => {

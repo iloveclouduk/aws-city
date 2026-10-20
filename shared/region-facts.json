@@ -2,17 +2,18 @@
  "source": "https://knowledge-mcp.global.api.aws (AWS Knowledge MCP Server: https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-availability-zones.html, https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-regions.html, tool aws___get_regional_availability)",
  "docs": {
   "azs": "https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-availability-zones.html",
-  "overrides": "https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/regions.html https://docs.aws.amazon.com/neptune/latest/userguide/limits.html",
+  "overrides": "https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/regions.html https://docs.aws.amazon.com/neptune/latest/userguide/limits.html https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html https://docs.aws.amazon.com/general/latest/gr/macie.html https://docs.aws.amazon.com/general/latest/gr/pol.html https://docs.aws.amazon.com/organizations/latest/userguide/region-support.html https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html",
   "regions": "https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-regions.html",
   "availability": "https://aws.amazon.com/about-aws/global-infrastructure/regional-product-services/",
   "azIds": "https://docs.aws.amazon.com/global-infrastructure/latest/regions/az-ids.html"
  },
- "asOf": "2026-10-10",
+ "asOf": "2026-10-19",
  "note": "AZ IDs are the same physical place in every account; AZ names (us-east-1a) may map to different AZ IDs per account in the oldest Regions. Regions outside the commercial partition (GovCloud, European Sovereign Cloud) have no published AZ ID table: azIds is empty and the city draws the documented minimum of three. Service status: available, planned (with a launch quarter), considering, not-planned, or outside-partition. Where a service's own Regions page disagrees with the tool, the page wins (docs.overrides).",
  "global": [
-  "iam",
   "route53",
-  "cloudfront"
+  "cloudfront",
+  "iam",
+  "globalaccelerator"
  ],
  "products": {
   "ec2": [
@@ -127,6 +128,72 @@
   ],
   "textract": [
    "Amazon Textract"
+  ],
+  "securityagent": [
+   "AWS Security Agent"
+  ],
+  "apprunner": [
+   "AWS App Runner"
+  ],
+  "batch": [
+   "AWS Batch"
+  ],
+  "lightsail": [
+   "Amazon Lightsail"
+  ],
+  "backup": [
+   "AWS Backup"
+  ],
+  "kinesis": [
+   "Amazon Kinesis Data Streams"
+  ],
+  "opensearch": [
+   "Amazon OpenSearch Service"
+  ],
+  "documentdb": [
+   "Amazon DocumentDB (with MongoDB compatibility)"
+  ],
+  "transitgateway": [
+   "AWS Transit Gateway"
+  ],
+  "globalaccelerator": [
+   "AWS Global Accelerator"
+  ],
+  "secretsmanager": [
+   "AWS Secrets Manager"
+  ],
+  "inspector": [
+   "Amazon Inspector"
+  ],
+  "securityhub": [
+   "AWS Security Hub"
+  ],
+  "macie": [
+   "Amazon Macie"
+  ],
+  "polly": [
+   "Amazon Polly"
+  ],
+  "comprehend": [
+   "Amazon Comprehend"
+  ],
+  "stepfunctions": [
+   "AWS Step Functions"
+  ],
+  "cloudformation": [
+   "AWS CloudFormation"
+  ],
+  "systemsmanager": [
+   "AWS Systems Manager"
+  ],
+  "config": [
+   "AWS Config"
+  ],
+  "organizations": [
+   "AWS Organizations"
+  ],
+  "appsync": [
+   "AWS AppSync"
   ]
  },
  "regions": {
@@ -299,6 +366,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -471,6 +607,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -641,6 +846,76 @@
      "status": "not-planned"
     },
     "textract": {
+     "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "planned",
+     "launch": "2026 Q4"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
      "status": "not-planned"
     }
    }
@@ -815,6 +1090,77 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "available",
+     "note": "Closed to new customers; existing customers carry on",
+     "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -987,6 +1333,75 @@
     },
     "textract": {
      "status": "available"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -1158,6 +1573,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -1328,6 +1812,77 @@
      "status": "available"
     },
     "textract": {
+     "status": "available"
+    },
+    "securityagent": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "available",
+     "note": "Closed to new customers; existing customers carry on",
+     "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
      "status": "available"
     }
    }
@@ -1502,6 +2057,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -1673,6 +2297,77 @@
      "status": "available"
     },
     "textract": {
+     "status": "available"
+    },
+    "securityagent": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "available",
+     "note": "Closed to new customers; existing customers carry on",
+     "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
      "status": "available"
     }
    }
@@ -1846,6 +2541,77 @@
     },
     "textract": {
      "status": "available"
+    },
+    "securityagent": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "available",
+     "note": "Closed to new customers; existing customers carry on",
+     "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -2018,6 +2784,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -2191,6 +3026,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -2364,6 +3268,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -2534,6 +3507,77 @@
      "status": "not-planned"
     },
     "textract": {
+     "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "planned",
+     "launch": "2026 Q4"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "planned",
+     "launch": "2027 Q1"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
      "status": "not-planned"
     }
    }
@@ -2707,6 +3751,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -2877,6 +3990,75 @@
      "status": "available"
     },
     "textract": {
+     "status": "available"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
      "status": "available"
     }
    }
@@ -3051,6 +4233,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -3220,6 +4471,77 @@
      "status": "available"
     },
     "textract": {
+     "status": "available"
+    },
+    "securityagent": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "available",
+     "note": "Closed to new customers; existing customers carry on",
+     "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
      "status": "available"
     }
    }
@@ -3393,6 +4715,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -3564,6 +4955,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -3737,6 +5197,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -3910,6 +5439,75 @@
     },
     "textract": {
      "status": "available"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -4081,6 +5679,77 @@
      "status": "available"
     },
     "textract": {
+     "status": "available"
+    },
+    "securityagent": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "available",
+     "note": "Closed to new customers; existing customers carry on",
+     "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
      "status": "available"
     }
    }
@@ -4255,6 +5924,77 @@
     },
     "textract": {
      "status": "available"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "available",
+     "note": "Closed to new customers; existing customers carry on",
+     "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -4426,6 +6166,77 @@
     },
     "textract": {
      "status": "available"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "available",
+     "note": "Closed to new customers; existing customers carry on",
+     "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -4592,6 +6403,76 @@
      "status": "not-planned"
     },
     "textract": {
+     "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "considering"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "planned",
+     "launch": "2027 Q1"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
      "status": "not-planned"
     }
    }
@@ -4765,6 +6646,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -4937,6 +6887,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -5109,6 +7128,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "considering"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -5282,6 +7370,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "not-planned"
     }
    }
   },
@@ -5454,6 +7611,75 @@
     },
     "textract": {
      "status": "not-planned"
+    },
+    "securityagent": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -5634,6 +7860,77 @@
     },
     "textract": {
      "status": "available"
+    },
+    "securityagent": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "available",
+     "note": "Closed to new customers; existing customers carry on",
+     "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -5805,6 +8102,77 @@
     },
     "textract": {
      "status": "available"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "available",
+     "note": "Closed to new customers; existing customers carry on",
+     "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -5972,6 +8340,75 @@
     },
     "textract": {
      "status": "available"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "not-planned"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "not-planned"
     }
    }
   },
@@ -6139,6 +8576,75 @@
     },
     "textract": {
      "status": "available"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "not-planned"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "not-planned"
     }
    }
   },
@@ -6312,6 +8818,75 @@
     },
     "textract": {
      "status": "available"
+    },
+    "securityagent": {
+     "status": "not-listed",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "not-planned"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "not-planned"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "considering"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "not-planned"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
+     "status": "available"
     }
    }
   },
@@ -6484,6 +9059,77 @@
      "status": "available"
     },
     "textract": {
+     "status": "available"
+    },
+    "securityagent": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/resilience.html"
+    },
+    "apprunner": {
+     "status": "available",
+     "note": "Closed to new customers; existing customers carry on",
+     "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+    },
+    "batch": {
+     "status": "available"
+    },
+    "lightsail": {
+     "status": "available"
+    },
+    "backup": {
+     "status": "available"
+    },
+    "kinesis": {
+     "status": "available"
+    },
+    "opensearch": {
+     "status": "available"
+    },
+    "documentdb": {
+     "status": "available"
+    },
+    "transitgateway": {
+     "status": "available"
+    },
+    "globalaccelerator": {
+     "status": "available"
+    },
+    "secretsmanager": {
+     "status": "available"
+    },
+    "inspector": {
+     "status": "available"
+    },
+    "securityhub": {
+     "status": "available"
+    },
+    "macie": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/macie.html"
+    },
+    "polly": {
+     "status": "available",
+     "source": "https://docs.aws.amazon.com/general/latest/gr/pol.html"
+    },
+    "comprehend": {
+     "status": "available"
+    },
+    "stepfunctions": {
+     "status": "available"
+    },
+    "cloudformation": {
+     "status": "available"
+    },
+    "systemsmanager": {
+     "status": "available"
+    },
+    "config": {
+     "status": "available"
+    },
+    "organizations": {
+     "status": "available"
+    },
+    "appsync": {
      "status": "available"
     }
    }

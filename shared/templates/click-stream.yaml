@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - Kenzie's live scoreboard. An on-demand Kinesis data stream, encrypted with KMS, takes the clicks; a Lambda function reads each shard in order and updates each player's score in DynamoDB, with limited retries, split batches and an SQS queue for records it can't process.
+
+Resources:
+  ClickStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      StreamModeDetails:
+        StreamMode: ON_DEMAND
+      RetentionPeriodHours: 24
+      StreamEncryption:
+        EncryptionType: KMS
+        KeyId: alias/aws/kinesis
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ScoresTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: playerId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: playerId
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  FailedBatches:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ScorerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: read-stream-update-scores
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - kinesis:DescribeStream
+                  - kinesis:DescribeStreamSummary
+                  - kinesis:GetRecords
+                  - kinesis:GetShardIterator
+                  - kinesis:ListShards
+                Resource: !GetAtt ClickStream.Arn
+              - Effect: Allow
+                Action: dynamodb:UpdateItem
+                Resource: !GetAtt ScoresTable.Arn
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt FailedBatches.Arn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ScorerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.13
+      Handler: index.handler
+      Role: !GetAtt ScorerRole.Arn
+      MemorySize: 256
+      Timeout: 30
+      Environment:
+        Variables:
+          TABLE: !Ref ScoresTable
+      Code:
+        ZipFile: |
+          import base64, json, os, boto3
+          db = boto3.client('dynamodb')
+
+          def handler(event, context):
+              # Records arrive in order per shard; each click is {"points": n} keyed by the player's id.
+              for r in event['Records']:
+                  click = json.loads(base64.b64decode(r['kinesis']['data']))
+                  db.update_item(
+                      TableName=os.environ['TABLE'],
+                      Key={'playerId': {'S': r['kinesis']['partitionKey']}},
+                      UpdateExpression='ADD score :p',
+                      ExpressionAttributeValues={':p': {'N': str(int(click.get('points', 1)))}},
+                  )
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  StreamMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt ClickStream.Arn
+      FunctionName: !Ref ScorerFunction
+      StartingPosition: LATEST
+      BatchSize: 100
+      MaximumRetryAttempts: 3
+      MaximumRecordAgeInSeconds: 3600
+      BisectBatchOnFunctionError: true
+      DestinationConfig:
+        OnFailure:
+          Destination: !GetAtt FailedBatches.Arn
+
+Outputs:
+  StreamName:
+    Value: !Ref ClickStream
+  TableName:
+    Value: !Ref ScoresTable

@@ -1,0 +1,167 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - a members-only API. Cognito signs members in, an HTTP API checks their token (JWT authorizer) and invokes a Lambda function that reads and writes one DynamoDB table.
+
+Resources:
+  MembersPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${AWS::StackName}-members'
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      UserPoolTags:
+        managed-by: aws-city
+
+  MembersClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref MembersPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+
+  MembersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  MembersRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: this-table-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                Resource: !GetAtt MembersTable.Arn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  MembersFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Role: !GetAtt MembersRole.Arn
+      MemorySize: 128
+      Timeout: 5
+      Environment:
+        Variables:
+          TABLE: !Ref MembersTable
+      Code:
+        ZipFile: |
+          // The authorizer has already checked the token; its claims say who is asking.
+          exports.handler = async (event) => {
+            const who = event.requestContext.authorizer.jwt.claims.sub;
+            return { statusCode: 200, body: JSON.stringify({ hello: who, table: process.env.TABLE }) };
+          };
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  MembersApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-api'
+      ProtocolType: HTTP
+      Tags:
+        managed-by: aws-city
+
+  MembersAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref MembersApi
+      Name: cognito
+      AuthorizerType: JWT
+      IdentitySource:
+        - $request.header.Authorization
+      JwtConfiguration:
+        Issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${MembersPool}'
+        Audience:
+          - !Ref MembersClient
+
+  MembersIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref MembersApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt MembersFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  MembersRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MembersApi
+      RouteKey: GET /members
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MembersAuthorizer
+      Target: !Sub 'integrations/${MembersIntegration}'
+
+  MembersStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref MembersApi
+      StageName: $default
+      AutoDeploy: true
+      Tags:
+        managed-by: aws-city
+
+  MembersPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref MembersFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MembersApi}/*'
+
+Outputs:
+  ApiUrl:
+    Description: Call GET /members with a member's token in the Authorization header
+    Value: !GetAtt MembersApi.ApiEndpoint
+  UserPoolId:
+    Description: Where members sign up and sign in
+    Value: !Ref MembersPool
+  UserPoolClientId:
+    Description: The app client your sign-in page uses
+    Value: !Ref MembersClient

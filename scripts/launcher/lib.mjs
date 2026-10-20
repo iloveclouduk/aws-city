@@ -4,7 +4,7 @@ import path from 'node:path';
 
 /** Browsers AWS City can open in. `cft` is Playwright's Chrome for Testing, the one that loads the extension by itself. */
 export const BROWSERS = [
-  { id: 'cft', name: 'AWS City browser', hint: 'Chrome for Testing — opens with AWS City already loaded', build: 'chrome', auto: true },
+  { id: 'cft', name: 'AWS City browser', hint: 'Chrome for Testing, AWS City already loaded', build: 'chrome', auto: true },
   { id: 'chrome', name: 'Google Chrome', app: 'Google Chrome.app', build: 'chrome', auto: false },
   { id: 'edge', name: 'Microsoft Edge', app: 'Microsoft Edge.app', build: 'chrome', auto: false },
   { id: 'brave', name: 'Brave', app: 'Brave Browser.app', build: 'chrome', auto: false },
@@ -144,39 +144,81 @@ export const browserFromArg = (value) => {
   return BROWSERS.some((b) => b.id === id) ? id : undefined;
 };
 
+export const REGION_RE = /^[a-z]{2}(-gov)?-[a-z]+-\d$/;
+
 /**
- * `npm start` flags → { help, mode?, browser?, intro, error? }. Pure, so it's unit-tested.
+ * `npm start` flags → { help, mode?, browser?, intro?, rebuild?, profile?, region?, error? }. Pure, so it's unit-tested.
+ * `intro` is set only by --intro / --no-intro (the intro plays every run unless --no-intro).
  * `npm start --demo` (no `--`) never reaches argv: npm keeps it as npm_config_demo, so that's read too.
  */
 export const parseArgs = (argv, env = {}) => {
-  const out = { help: false, intro: true };
+  const out = { help: false };
   const fail = (error) => ({ ...out, error });
   let args = [...argv];
   if (!args.length && env.npm_lifecycle_event === 'start') {
     if (env.npm_config_demo === 'true') args.push('--demo');
     if (env.npm_config_live === 'true') args.push('--live');
     if (env.npm_config_intro === 'false') args.push('--no-intro');
+    if (env.npm_config_intro === 'true') args.push('--intro');
+    if (env.npm_config_rebuild === 'true') args.push('--rebuild');
     if (env.npm_config_browser === 'true') return fail('npm kept the browser name for itself: put -- before the flags, e.g. npm start -- --demo --browser chrome');
     if (env.npm_config_browser) args.push('--browser', env.npm_config_browser);
   }
   for (let i = 0; i < args.length; i++) {
     const [flag, inline] = args[i].startsWith('--') && args[i].includes('=') ? [args[i].slice(0, args[i].indexOf('=')), args[i].slice(args[i].indexOf('=') + 1)] : [args[i], undefined];
+    const value = () => inline ?? args[++i];
     if (flag === '-h' || flag === '--help') out.help = true;
     else if (flag === '--demo' || flag === '--live') {
       const mode = flag.slice(2);
       if (out.mode && out.mode !== mode) return fail('Pick one: --demo or --live.');
       out.mode = mode;
     } else if (flag === '--no-intro') out.intro = false;
+    else if (flag === '--intro') out.intro = true;
+    else if (flag === '--rebuild') out.rebuild = true;
     else if (flag === '--browser' || flag === '-b') {
-      const value = inline ?? args[++i];
-      if (!value || value.startsWith('-')) return fail('--browser needs a name, e.g. --browser chrome');
-      const id = browserFromArg(value);
-      if (!id) return fail(`Unknown browser "${value}".`);
+      const v = value();
+      if (!v || v.startsWith('-')) return fail('--browser needs a name, e.g. --browser chrome');
+      const id = browserFromArg(v);
+      if (!id) return fail(`Unknown browser "${v}".`);
       out.browser = id;
+    } else if (flag === '--profile') {
+      const v = value();
+      if (!v || v.startsWith('-')) return fail('--profile needs the name of an AWS profile, e.g. --profile workshop');
+      out.profile = v;
+    } else if (flag === '--region') {
+      const v = value();
+      if (!v || !REGION_RE.test(v)) return fail(`--region needs an AWS Region, e.g. --region us-west-2${v && !v.startsWith('-') ? ` ("${v}" isn't one)` : ''}`);
+      out.region = v;
     } else return fail(`Unknown option "${args[i]}".`);
   }
+  if ((out.profile || out.region) && out.mode === 'demo') return fail('--profile and --region are for real AWS (--live); the demo needs no AWS account.');
   return out;
 };
+
+/**
+ * What the launcher asks before it starts. Pure (unit-tested).
+ * - options given (--demo/--live): nothing, last time's browser unless --browser says otherwise;
+ * - played before (demo or live remembered), in a terminal: one "Play again?" line (Enter, or c to change);
+ * - first time, in a terminal: the two questions;
+ * - no terminal: the remembered choice, else the demo in the AWS City browser.
+ * `installed` is the list of browser ids found on this computer.
+ */
+export const startPlan = (args, prefs = {}, { interactive = true, installed = ['cft'] } = {}) => {
+  const usable = (id) => (id && installed.includes(id) ? id : undefined);
+  const remembered = prefs.mode === 'demo' || prefs.mode === 'live' ? prefs.mode : undefined;
+  const browser = args.browser ?? usable(prefs.browser) ?? 'cft';
+  if (args.mode) return { kind: 'go', mode: args.mode, browser };
+  if (!interactive) return { kind: 'go', mode: remembered ?? 'demo', browser };
+  if (remembered) return { kind: 'again', mode: remembered, browser };
+  return { kind: 'ask', browser: args.browser };
+};
+
+/** Does the title animation play? Every run (about 2 s, any key skips it), unless --no-intro. */
+export const introPlays = (args) => args.intro !== false;
+
+/** "demo · Chrome for Testing" / "real AWS · Firefox · us-west-2" (from a browser id): the header and the "Play again?" line. */
+export const choiceLabel = (mode, browser, region) =>
+  [mode === 'live' ? 'real AWS' : mode === 'deploy' ? 'put it online' : 'demo', browser === 'cft' ? 'Chrome for Testing' : BROWSERS.find((b) => b.id === browser)?.name, mode === 'live' ? region : undefined].filter(Boolean).join(' · ');
 
 const HELP_NOTES = {
   cft: 'AWS City browser (Chrome for Testing): opens with AWS City loaded, zero clicks (also: city)',
@@ -188,14 +230,17 @@ export const helpText = () =>
   [
     'AWS City: npm start',
     '',
-    'Run it with no options and it asks how you want to play and which browser to use.',
+    'The first time it asks how you want to play and which browser; after that it offers "Play again?" (Enter).',
     'Options skip the questions (put -- after npm start so npm passes them on):',
     '',
     '  --demo               play the demo: a practice account, nothing touches AWS',
     '  --live               real AWS on this computer (asks to sign in only if it has to)',
     '  --browser <name>     open in this browser:',
     ...BROWSERS.map((b) => `                         ${b.id.padEnd(9)}${HELP_NOTES[b.id] ?? `${b.name} (3 guided clicks the first time)`}`),
-    '  --no-intro           skip the title animation',
+    '  --profile <name>     real AWS: the AWS profile to use (default: the one that worked last time)',
+    '  --region <name>      real AWS: where Claude runs (default: last time, or us-west-2)',
+    '  --rebuild            build the extension even if nothing changed since the last build',
+    '  --no-intro           skip the 2 s title animation (any key skips it too)',
     '  -h, --help           show this help',
     '',
     'Examples:',
@@ -204,6 +249,7 @@ export const helpText = () =>
     '  npm start -- --live --browser firefox    real AWS in Firefox',
     '',
     'Without --browser it uses the browser you picked last time (or the AWS City browser).',
+    'Once the city is open, the terminal is its remote: c city, p practice console, a AWS console, r reopen, q quit.',
   ].join('\n');
 
 // ── a Chrome for Testing window that's already open ─────────────────────────────────────────────

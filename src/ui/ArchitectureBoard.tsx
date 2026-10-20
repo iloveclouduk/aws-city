@@ -13,11 +13,12 @@ import { ResultPanel } from './diagram/ResultPanel';
 import { useDragPlace } from './diagram/useDragPlace';
 import { feel } from './feedback';
 import { Portrait } from './Portrait';
-import { districtStyle, featuredPuzzle, shuffle } from './logic';
+import { districtStyle, featuredPuzzle, readPref, shuffle, writePref } from './logic';
 import { Plain, Term } from './Term';
 import { EmptyState } from './EmptyState';
 import { firstTryToday, puzzleReward, type PuzzleReward } from '@/learning/puzzleRewards';
 import { PUZZLE_PASS } from '@/state/ladder';
+import { deckFor, draftKey, parseDraft, serializeDraft } from '@/learning/puzzleDraft';
 
 /** Architecture builder: drag services onto an AWS diagram, then watch the data flow through it. */
 export function ArchitectureBoard() {
@@ -71,24 +72,34 @@ export function ArchitectureBoard() {
 
 type Phase = 'build' | 'flow';
 
-/** One attempt at one puzzle (remounted when the puzzle changes, so nothing leaks between them). */
-function Builder({ p }: { p: Puzzle }) {
+/**
+ * One attempt at one puzzle (remounted when the puzzle changes, so nothing leaks between them). With `job` it's a City
+ * Clients "Wire it" job (src/learning/jobPuzzle.ts): nothing goes into Progress.puzzles and no puzzle stars are paid;
+ * a pass calls `job.onPass` (the job pays once, store.clientTaskDone).
+ */
+export function Builder({ p, job }: { p: Puzzle; job?: { onPass: () => void } }) {
   const best = useCity((s) => s.progress.puzzles?.[p.id]?.best ?? 0);
   const recordPuzzle = useCity((s) => s.recordPuzzle);
   const d = p.diagram!;
   const slots = useMemo(() => slotsOf(p), [p]);
   const required = slots.filter((s) => s.required);
-  const [placements, setPlacements] = useState<Placements>({});
+  /** The unfinished design from last time (per device), restored as it was. */
+  const [draft] = useState(() => parseDraft(p, readPref(draftKey(p.id))));
+  /** A player who hasn't passed any puzzle yet gets the gentler first deck (fixed while this attempt lasts). */
+  const [firstPuzzle] = useState(() => !Object.values(useCity.getState().progress.puzzles ?? {}).some((x) => (x?.best ?? 0) >= PUZZLE_PASS));
+  const [placements, setPlacements] = useState<Placements>(draft.placements);
   const [armed, setArmed] = useState<string>();
   const [hint, setHint] = useState<string>();
   /** The hint went on to show which card fits (costs points; the first nudge is free). */
   const [hintShown, setHintShown] = useState(false);
   /** Spots whose card a hint has shown (each costs once, however often you ask). */
-  const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  const [revealed, setRevealed] = useState<Set<string>>(() => new Set(draft.revealed));
   const [rejected, setRejected] = useState<string>();
-  const [say, setSay] = useState('Drag a service onto the diagram, or tap a card and then a spot.');
-  const [drops, setDrops] = useState<string[]>([]);
-  const [misdrops, setMisdrops] = useState(0);
+  const [say, setSay] = useState(
+    Object.keys(draft.placements).length ? 'Welcome back: your design is where you left it.' : 'Drag a service onto the diagram, or tap a card and then a spot.',
+  );
+  const [drops, setDrops] = useState<string[]>(draft.drops);
+  const [misdrops, setMisdrops] = useState(draft.misdrops);
   const [result, setResult] = useState<PuzzleScore>();
   const [phase, setPhase] = useState<Phase>('build');
   const [step, setStep] = useState(0);
@@ -112,7 +123,19 @@ function Builder({ p }: { p: Puzzle }) {
   );
 
   // A fresh random order each time a puzzle is opened, stable while you play it.
-  const deck = useMemo(() => shuffle([...new Set([...p.required, ...p.optional, ...p.distractors])]), [p]);
+  const deck = useMemo(() => shuffle(deckFor(p, firstPuzzle)), [p, firstPuzzle]);
+  /** Set once this design passes: its draft is cleared and never written back. */
+  const passed = useRef(false);
+  // Keep the draft as it changes; a pass clears it (the next visit starts fresh).
+  useEffect(() => {
+    if (passed.current) return;
+    writePref(draftKey(p.id), serializeDraft({ placements, drops, misdrops, revealed: [...revealed] }) ?? '');
+  }, [p.id, placements, drops, misdrops, revealed]);
+  const resultRef = useRef<HTMLDivElement>(null);
+  // A checked design's result opens below the sticky footer: bring it into view.
+  useEffect(() => {
+    if (result) resultRef.current?.scrollIntoView?.({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  }, [result]);
   const left = remainingCards(p, placements);
   const filledReq = required.filter((s) => placements[s.id]).length;
   const hintSlot = hint ? slots.find((s) => s.id === hint) : undefined;
@@ -184,12 +207,19 @@ function Builder({ p }: { p: Puzzle }) {
     setResult(r);
     // src/learning/puzzleRewards.ts: a first pass pays most, a better pass a little, a try below the mark pays for the
     // pieces already right (once a day); re-checking the same answer pays nothing.
-    const reward = puzzleReward(p, r, best, !r.passed && !firstTryToday(p.id));
-    setEarned(reward);
-    recordPuzzle(p.id, r.score, r.passed, r.pillars);
-    if (r.passed) pendingXp.current = reward.xp;
-    else for (const [s, n] of Object.entries(reward.xp)) useCity.getState().addXp(s, n);
-    if (!r.passed) return feel.bad();
+    if (job) {
+      if (!r.passed) return feel.bad();
+      job.onPass();
+    } else {
+      const reward = puzzleReward(p, r, best, !r.passed && !firstTryToday(p.id));
+      setEarned(reward);
+      recordPuzzle(p.id, r.score, r.passed, r.pillars);
+      if (r.passed) pendingXp.current = reward.xp;
+      else for (const [s, n] of Object.entries(reward.xp)) useCity.getState().addXp(s, n);
+      if (!r.passed) return feel.bad();
+    }
+    passed.current = true;
+    writePref(draftKey(p.id), '');
     feel.win();
     setStep(0);
     setPhase('flow');
@@ -339,7 +369,11 @@ function Builder({ p }: { p: Puzzle }) {
           </div>
         )}
       </div>
-      {result && <ResultPanel puzzle={p} result={result} earned={earned} />}
+      {result && (
+        <div ref={resultRef} className="arch-result">
+          <ResultPanel puzzle={p} result={result} earned={earned} />
+        </div>
+      )}
       {ghost && (
         <div className="drag-ghost" style={{ transform: `translate(${ghost.x}px, ${ghost.y}px)` }} aria-hidden="true">
           <AwsIcon serviceId={ghost.svc} size={24} />

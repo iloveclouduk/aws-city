@@ -19,12 +19,21 @@ const activeOn = (kind: string) => {
 const doneQuest = { [QUESTS[0].id]: { status: 'done' as const, step: QUESTS[0].steps.length } };
 
 describe('the unlock ladder', () => {
-  it('starts with Home and Quests only, and everything else locked', () => {
+  it('starts with the City tab only, and everything else locked', () => {
     const l = ladder(input());
-    expect([...l.tabs]).toEqual(['home', 'quests']);
-    expect(l).toMatchObject({ learnBuild: false, care: false, day1: true, worldList: false, news: false });
+    expect([...l.tabs]).toEqual(['home']);
+    expect(l).toMatchObject({ places: false, learnBuild: false, care: false, day1: true, worldList: false, news: false, clients: false });
     expect(nextUnlock(input())?.area).toBe('learn');
-    expect(lockedAreas(input())).toHaveLength(7);
+    expect(lockedAreas(input())).toHaveLength(8);
+  });
+
+  it('opens City Clients (the Jobs tab) after the first quest (or when the player peeked at everything)', () => {
+    expect(ladder(input()).clients).toBe(false);
+    expect(ladder(input()).tabs.has('jobs')).toBe(false);
+    expect(ladder(input({ progress: { ...input().progress, quests: doneQuest } })).clients).toBe(true);
+    expect(ladder(input({ progress: { ...input().progress, quests: doneQuest } })).tabs.has('jobs')).toBe(true);
+    expect(ladder(input({ opened: new Set(['clients']) })).clients).toBe(true);
+    expect(ALL_AREAS).toContain('clients');
   });
 
   it('keeps AWS news (the ticker and its toasts) quiet until the first quest is done, or an account is linked', () => {
@@ -43,7 +52,7 @@ describe('the unlock ladder', () => {
     expect(ladder(input({ progress: p({ quests: activeOn('visit') }) })).tabs.has('learn')).toBe(false);
   });
 
-  it('opens Architecture (in Learn) on a puzzle step or a passed puzzle', () => {
+  it('opens Puzzles (in Learn) on a puzzle step or a passed puzzle', () => {
     const step = ladder(input({ progress: p({ quests: activeOn('puzzle') }) }));
     expect(step.learnBuild).toBe(true);
     expect(step.tabs.has('learn')).toBe(true);
@@ -51,10 +60,10 @@ describe('the unlock ladder', () => {
     expect(ladder(input({ progress: p({ puzzles: { x: { best: PUZZLE_PASS - 1 } } }) })).learnBuild).toBe(false);
   });
 
-  it('opens Places and "Where AWS runs" at 3 landmarks', () => {
-    expect(ladder(input({ progress: p({ landmarks: landmarks(PLACES_AT - 1) }) })).tabs.has('map')).toBe(false);
+  it('opens the places list (in City) and "Where AWS runs" at 3 landmarks', () => {
+    expect(ladder(input({ progress: p({ landmarks: landmarks(PLACES_AT - 1) }) })).places).toBe(false);
     const l = ladder(input({ progress: p({ landmarks: landmarks(PLACES_AT) }) }));
-    expect(l.tabs.has('map')).toBe(true);
+    expect(l.places).toBe(true);
     expect(l.worldList).toBe(true);
   });
 
@@ -80,22 +89,31 @@ describe('the unlock ladder', () => {
     expect(ladder(input({ hasDeploys: true })).tabs.has('deploy')).toBe(true);
   });
 
-  it('keeps everything reachable: anything opened anyway stays open', () => {
-    const l = ladder(input({ opened: new Set(['map', 'deploy', 'learnBuild', 'day1']) }));
-    expect([...l.tabs].sort()).toEqual(['deploy', 'home', 'learn', 'map', 'quests']);
-    expect(l.learnBuild && l.day1).toBe(true);
+  it('Peek at everything opens every area, and what it opened stays open', () => {
+    const l = ladder(input({ opened: new Set(ALL_AREAS) }));
+    expect([...l.tabs].sort()).toEqual(['deploy', 'home', 'jobs', 'learn']);
+    expect(l).toMatchObject({ places: true, learnBuild: true, care: true, day1: true, worldList: true, news: true, clients: true });
     expect(lockedAreas(input({ opened: new Set(['learn']) }))[0].area).toBe('map');
+  });
+
+  it('unlocks are earned: the hint says how, never "tap" or "open" (moving around opens nothing for good)', () => {
+    for (const u of lockedAreas(input())) {
+      expect(u.how).not.toMatch(/\btap\b|\bopen\b/i);
+      expect(u.label).not.toMatch(/Places$|Architecture|Build for real|City clients/);
+    }
+    // The first hint names the Learn tab and how to earn it.
+    expect(nextUnlock(input())).toMatchObject({ area: 'learn', label: 'the Learn tab' });
   });
 
   it('unlocks everything for a seasoned player (tests/fixtures/progress-all.json)', () => {
     const i = input({ progress: all as Progress });
-    expect([...ladder(i).tabs].sort()).toEqual(['deploy', 'home', 'learn', 'map', 'quests']);
-    expect(ladder(i)).toMatchObject({ learnBuild: true, care: true, day1: true, worldList: true, news: true });
+    expect([...ladder(i).tabs].sort()).toEqual(['deploy', 'home', 'jobs', 'learn']);
+    expect(ladder(i)).toMatchObject({ places: true, learnBuild: true, care: true, day1: true, worldList: true, news: true, clients: true });
     expect(nextUnlock(i)).toBeUndefined();
   });
 });
 
-describe('Architecture offers one puzzle first', () => {
+describe('Puzzles offers one puzzle first', () => {
   it("the quest's puzzle, else the next quest's unpassed one, else the first unpassed", async () => {
     const { featuredPuzzle } = await import('@/ui/logic');
     expect(featuredPuzzle(p(), 'global-db')).toBe('global-db');

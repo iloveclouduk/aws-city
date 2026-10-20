@@ -1,0 +1,310 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - containers with no servers to manage. API Gateway reaches a private load balancer through a VPC link; ECS keeps two Fargate tasks running behind it, with an ElastiCache Serverless cache and an Aurora Serverless v2 PostgreSQL cluster, all in your private subnets. The subnets need a way out (a NAT gateway or VPC endpoints) so tasks can pull their image.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC to build in
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Two or more private subnets, in different Availability Zones
+  Image:
+    Type: String
+    Default: public.ecr.aws/nginx/nginx:stable
+    Description: The container image to run (it must listen on port 80)
+
+Resources:
+  AppCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AppLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AppTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      RequiresCompatibilities:
+        - FARGATE
+      NetworkMode: awsvpc
+      Cpu: '256'
+      Memory: '512'
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: app
+          Image: !Ref Image
+          Essential: true
+          PortMappings:
+            - ContainerPort: 80
+          Environment:
+            - Name: DB_HOST
+              Value: !GetAtt CatalogDb.Endpoint.Address
+            - Name: CACHE_HOST
+              Value: !GetAtt AppCache.Endpoint.Address
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AppLogs
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: app
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  VpcLinkSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: API Gateway VPC link
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Private load balancer, reachable only from the VPC link
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref VpcLinkSecurityGroup
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Fargate tasks, reachable only from the load balancer
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Aurora, reachable only from the tasks
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  CacheSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ElastiCache, reachable only from the tasks
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AppLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internal
+      Subnets: !Ref PrivateSubnetIds
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      LoadBalancerAttributes:
+        - Key: routing.http.drop_invalid_header_fields.enabled
+          Value: 'true'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AppTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VpcId
+      TargetType: ip
+      Protocol: HTTP
+      Port: 80
+      HealthCheckPath: /
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AppListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref AppLoadBalancer
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref AppTargetGroup
+
+  AppService:
+    Type: AWS::ECS::Service
+    DependsOn: AppListener
+    Properties:
+      Cluster: !Ref AppCluster
+      LaunchType: FARGATE
+      TaskDefinition: !Ref AppTaskDefinition
+      # Two tasks, so ECS can keep one in each Availability Zone.
+      DesiredCount: 2
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets: !Ref PrivateSubnetIds
+          SecurityGroups:
+            - !Ref AppSecurityGroup
+      LoadBalancers:
+        - ContainerName: app
+          ContainerPort: 80
+          TargetGroupArn: !Ref AppTargetGroup
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  DbSubnets:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Private subnets for the catalogue database
+      SubnetIds: !Ref PrivateSubnetIds
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  CatalogDb:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      Engine: aurora-postgresql
+      MasterUsername: catalog
+      # RDS keeps the password in Secrets Manager and rotates it; it never appears here.
+      ManageMasterUserPassword: true
+      StorageEncrypted: true
+      BackupRetentionPeriod: 7
+      DBSubnetGroupName: !Ref DbSubnets
+      VpcSecurityGroupIds:
+        - !Ref DbSecurityGroup
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 0.5
+        MaxCapacity: 4
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  CatalogDbWriter:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: aurora-postgresql
+      DBInstanceClass: db.serverless
+      DBClusterIdentifier: !Ref CatalogDb
+      PubliclyAccessible: false
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AppCache:
+    Type: AWS::ElastiCache::ServerlessCache
+    Properties:
+      ServerlessCacheName: !Sub '${AWS::StackName}-cache'
+      Engine: valkey
+      SubnetIds: !Ref PrivateSubnetIds
+      SecurityGroupIds:
+        - !Ref CacheSecurityGroup
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AppVpcLink:
+    Type: AWS::ApiGatewayV2::VpcLink
+    Properties:
+      Name: !Sub '${AWS::StackName}-link'
+      SubnetIds: !Ref PrivateSubnetIds
+      SecurityGroupIds:
+        - !Ref VpcLinkSecurityGroup
+      Tags:
+        managed-by: aws-city
+
+  AppApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-api'
+      ProtocolType: HTTP
+      Tags:
+        managed-by: aws-city
+
+  AppIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref AppApi
+      IntegrationType: HTTP_PROXY
+      IntegrationMethod: ANY
+      ConnectionType: VPC_LINK
+      ConnectionId: !Ref AppVpcLink
+      IntegrationUri: !Ref AppListener
+      PayloadFormatVersion: '1.0'
+
+  AppRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref AppApi
+      RouteKey: $default
+      Target: !Sub 'integrations/${AppIntegration}'
+
+  AppStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref AppApi
+      StageName: $default
+      AutoDeploy: true
+      Tags:
+        managed-by: aws-city
+
+Outputs:
+  ApiUrl:
+    Description: The front door (API Gateway, then the VPC link to your tasks)
+    Value: !GetAtt AppApi.ApiEndpoint
+  ClusterName:
+    Description: Watch the tasks in the ECS console
+    Value: !Ref AppCluster

@@ -90,6 +90,271 @@
    "explain": "DNS points at a load balancer that spreads requests across the tasks of an ECS service on Fargate. The tasks keep their data in a managed RDS database.",
    "source": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-load-balancing.html",
    "asOf": "2026-09-26"
+  },
+  {
+   "id": "agentic-microservice",
+   "name": "Agentic microservice",
+   "serviceIds": [
+    "apigateway",
+    "agentcore",
+    "bedrock",
+    "lambda",
+    "dynamodb"
+   ],
+   "explain": "An API passes the request to an agent on AgentCore Runtime. The agent asks a model on Bedrock what to do, then calls its tools through AgentCore Gateway: a Lambda function that reads and writes a table.",
+   "source": "https://docs.aws.amazon.com/help-panel/bedrock-agentcore/latest/console/hp-gateway-target-set-up.html",
+   "asOf": "2026-10-17"
+  },
+  {
+   "id": "apprunner-database",
+   "name": "App Runner with a private database",
+   "serviceIds": [
+    "apprunner",
+    "rds"
+   ],
+   "explain": "An App Runner service reaches an RDS database in private subnets through a VPC connector.",
+   "source": "https://docs.aws.amazon.com/apprunner/latest/dg/network-vpc.html",
+   "asOf": "2026-10-19"
+  },
+  {
+   "id": "apprunner-handover",
+   "name": "App Runner to ECS Express Mode",
+   "serviceIds": [
+    "route53",
+    "apprunner",
+    "ecs",
+    "fargate"
+   ],
+   "explain": "Route 53 weighted records shift visitors step by step from App Runner to an ECS Express Mode service on Fargate.",
+   "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html",
+   "asOf": "2026-10-19"
+  },
+  {
+   "id": "batch-on-upload",
+   "name": "Batch job on upload",
+   "serviceIds": [
+    "s3",
+    "eventbridge",
+    "batch"
+   ],
+   "explain": "An object uploaded to S3 matches an EventBridge rule, which submits an AWS Batch job with the bucket and key as parameters.",
+   "source": "https://docs.aws.amazon.com/batch/latest/userguide/batch-cwe-target.html",
+   "asOf": "2026-10-19"
+  },
+  {
+   "id": "lightsail-site",
+   "name": "Lightsail website",
+   "serviceIds": [
+    "route53",
+    "lightsail"
+   ],
+   "explain": "An A record in Route 53 points the domain at a Lightsail instance's static IP address.",
+   "source": "https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-using-route-53-to-point-a-domain-to-an-instance.html",
+   "asOf": "2026-10-19"
+  },
+  {
+   "id": "central-backup",
+   "name": "Central backups",
+   "serviceIds": [
+    "dynamodb",
+    "efs",
+    "ebs",
+    "backup"
+   ],
+   "explain": "One AWS Backup plan backs up tagged tables, file systems and volumes into an encrypted backup vault on a schedule.",
+   "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html",
+   "asOf": "2026-10-19"
+  },
+  {
+   "id": "stream-processing",
+   "name": "Real-time stream",
+   "serviceIds": [
+    "kinesis",
+    "lambda",
+    "dynamodb"
+   ],
+   "explain": "Producers write records to a Kinesis stream; Lambda reads each shard's records in order and updates a DynamoDB table.",
+   "source": "https://docs.aws.amazon.com/lambda/latest/dg/with-kinesis.html",
+   "asOf": "2026-10-19"
+  },
+  {
+   "id": "stream-archive",
+   "name": "Stream archive",
+   "serviceIds": [
+    "kinesis",
+    "s3"
+   ],
+   "explain": "A stream's data delivery writes its raw records to an S3 bucket for archive, replay and later analysis.",
+   "source": "https://docs.aws.amazon.com/streams/latest/dev/key-concepts.html",
+   "asOf": "2026-10-19"
+  },
+  {
+   "id": "search-sync",
+   "name": "Searchable catalogue",
+   "serviceIds": [
+    "dynamodb",
+    "opensearch"
+   ],
+   "explain": "An OpenSearch Ingestion pipeline copies a table's items into OpenSearch and follows DynamoDB Streams, so every item can be searched by any word.",
+   "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/OpenSearchIngestionForDynamoDB.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "log-search",
+   "name": "Log search",
+   "serviceIds": [
+    "cloudwatch",
+    "opensearch"
+   ],
+   "explain": "CloudWatch Logs streams log data to OpenSearch Service, where it can be searched and charted.",
+   "source": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/what-is.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "document-changes",
+   "name": "React to document changes",
+   "serviceIds": [
+    "documentdb",
+    "lambda"
+   ],
+   "explain": "A Lambda function reads a DocumentDB change stream and runs each time data in the cluster changes.",
+   "source": "https://docs.aws.amazon.com/lambda/latest/dg/with-documentdb.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "network-hub",
+   "name": "Network hub",
+   "serviceIds": [
+    "vpc",
+    "transitgateway"
+   ],
+   "explain": "Each VPC attaches once to a transit gateway, which routes traffic between VPCs and to on-premises networks.",
+   "source": "https://docs.aws.amazon.com/vpc/latest/tgw/what-is-transit-gateway.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "global-entry",
+   "name": "Global front door",
+   "serviceIds": [
+    "globalaccelerator",
+    "ec2"
+   ],
+   "explain": "Users connect to an accelerator's static IP addresses at the nearest edge location, and it carries them over the AWS network to healthy load balancers or EC2 instances.",
+   "source": "https://docs.aws.amazon.com/global-accelerator/latest/dg/introduction-how-it-works.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "db-credentials",
+   "name": "Database login from a secret",
+   "serviceIds": [
+    "lambda",
+    "secretsmanager",
+    "rds"
+   ],
+   "explain": "A function fetches the database login from Secrets Manager when it runs, then connects to RDS. Secrets Manager rotates the password in both places.",
+   "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/hardcoded-db-creds.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "security-findings",
+   "name": "Security findings to one board",
+   "serviceIds": [
+    "guardduty",
+    "inspector",
+    "macie",
+    "securityhub",
+    "eventbridge"
+   ],
+   "explain": "GuardDuty, Inspector and Macie send their findings to Security Hub, which correlates and ranks them and passes them to EventBridge for automated responses.",
+   "source": "https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub-v2.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "long-speech",
+   "name": "Long text to speech",
+   "serviceIds": [
+    "lambda",
+    "polly",
+    "s3"
+   ],
+   "explain": "A function starts a Polly speech synthesis task for a long text; Polly saves the audio file to an S3 bucket and can notify an SNS topic.",
+   "source": "https://docs.aws.amazon.com/polly/latest/dg/asynchronous.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "text-insights",
+   "name": "Text insights from uploads",
+   "serviceIds": [
+    "s3",
+    "lambda",
+    "comprehend",
+    "dynamodb"
+   ],
+   "explain": "Text files land in S3, a function asks Comprehend for the sentiment, entities and personal data in each, and saves the results.",
+   "source": "https://docs.aws.amazon.com/comprehend/latest/dg/concepts-processing-modes.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "saga-workflow",
+   "name": "Order workflow with undo steps",
+   "serviceIds": [
+    "apigateway",
+    "stepfunctions",
+    "lambda",
+    "dynamodb"
+   ],
+   "explain": "An API starts a workflow. Step Functions runs each function in order, retries short glitches and runs undo steps if one fails; each step records its work in a table.",
+   "source": "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/saga-orchestration.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "private-servers",
+   "name": "Servers with no open doors",
+   "serviceIds": [
+    "systemsmanager",
+    "ec2",
+    "cloudwatch"
+   ],
+   "explain": "Session Manager opens a shell on a server through its SSM Agent, with no inbound ports, and logs the session to CloudWatch Logs.",
+   "source": "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "config-remediation",
+   "name": "Spot and fix a broken setting",
+   "serviceIds": [
+    "s3",
+    "config",
+    "systemsmanager"
+   ],
+   "explain": "Config records a change to a bucket, a rule finds it breaks the rules, and a Systems Manager Automation runbook puts the setting right.",
+   "source": "https://docs.aws.amazon.com/config/latest/developerguide/remediation.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "account-baseline",
+   "name": "Same baseline in every account",
+   "serviceIds": [
+    "organizations",
+    "cloudformation",
+    "cloudwatch",
+    "s3"
+   ],
+   "explain": "A new account joins an OU, a StackSet deploys the baseline stack to it, and its CloudTrail trail sends logs to a central bucket.",
+   "source": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-orgs-manage-auto-deployment.html",
+   "asOf": "2026-10-18"
+  },
+  {
+   "id": "realtime-api",
+   "name": "Live updates over GraphQL",
+   "serviceIds": [
+    "cognito",
+    "appsync",
+    "dynamodb"
+   ],
+   "explain": "A signed-in user sends a mutation, a resolver saves it in DynamoDB, and AppSync pushes the change to every subscribed app.",
+   "source": "https://docs.aws.amazon.com/appsync/latest/devguide/aws-appsync-real-time-data.html",
+   "asOf": "2026-10-18"
   }
  ]
 }

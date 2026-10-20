@@ -101,6 +101,11 @@
 .icon {
   flex: none;
 }
+/* A City Coin sits on the text's baseline like the emoji it replaces (src/ui/icons.tsx Coin). */
+.icon.coin {
+  display: inline-block;
+  vertical-align: -0.15em;
+}
 .spinner {
   width: 11px;
   height: 11px;

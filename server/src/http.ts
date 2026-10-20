@@ -11,6 +11,8 @@ import type { ProgressStore } from './contract/progress.js';
 import { MAX_UPLOAD_BYTES, type MemoryUploadStore, UPLOAD_PATH } from './contract/uploads.js';
 import { MFA_REQUIRED_MESSAGE } from './accounts/mfa.js';
 import { log, publicError, who } from './log.js';
+import { verifyStep } from './workshops/checks.js';
+import { isBoard, memorySocial, socialFor } from './social.js';
 import type { Poller } from './state/poller.js';
 import type { Tenant, TenantHub } from './tenants.js';
 import { CLOSE_CODES, type ServerEvent } from './world.js';
@@ -18,6 +20,8 @@ import { CLOSE_CODES, type ServerEvent } from './world.js';
 const JSON_LIMIT = 64 * 1024;
 const MAX_TASKS_PER_SOCKET = 2;
 const MAX_REQUESTS_PER_SOCKET = 3;
+/** v2.11: presence beats closer together than this are ignored (the client beats every 30 s). */
+const BEAT_MIN_MS = 20_000;
 const HEARTBEAT_MS = 25_000;
 /** Frames per socket: a burst of 30, refilled at 10 a second. */
 const FRAME_BURST = 30;
@@ -91,6 +95,8 @@ export type Deps = { config: Config } & (SingleTenantDeps | HubDeps);
 
 /** Adapts the local pieces to the multi-player hub: one player, "local". */
 export const singleTenant = (d: SingleTenantDeps & { config: Config }): TenantHub => {
+  // One player: the live city is just them (still useful to try the feature locally).
+  const localSocial = memorySocial();
   const tenant: Tenant = {
     sub: 'local',
     region: d.config.region,
@@ -103,7 +109,9 @@ export const singleTenant = (d: SingleTenantDeps & { config: Config }): TenantHu
     subscribe: () => () => undefined,
     emitter: (emit) => emit,
     snapshot: async () => d.poller.current() ?? (await d.poller.refresh()),
+    fresh: () => d.poller.refresh(),
     progress: { get: () => d.progress.get(), put: (input) => d.progress.put(input) },
+    social: socialFor({ store: localSocial, sub: 'local', profile: async () => (await d.progress.get())?.profile }),
     uploads: { create: (contentType) => d.uploads.create(contentType, 'local') },
     link: async (requestId, _region, emit) => emit({ type: 'account.status', requestId, linked: true, message: 'The local server uses the workshop AWS profile.' }),
     verify: async (requestId, _arn, emit) => emit({ type: 'account.status', requestId, linked: true, message: 'The local server uses the workshop AWS profile.' }),
@@ -139,6 +147,19 @@ const Command = z.discriminatedUnion('action', [
   z.object({ action: z.literal('bill.enable'), on: z.boolean() }).strict(),
   // contract v2.8: live traffic on or off
   z.object({ action: z.literal('flow.enable'), on: z.boolean() }).strict(),
+  // contract v2.11: the live city and leaderboards (server/src/social.ts)
+  z.object({ action: z.literal('presence.beat'), region: z.string().regex(/^[a-z]{2}(-[a-z]+)+-\d$/), rank: z.enum(['Village', 'Town', 'City', 'Metropolis', 'Megacity', 'Global City']).optional() }).strict(),
+  z.object({ action: z.literal('score.submit'), board: z.string().min(1).max(40), score: z.number().finite().min(0).max(1_000_000) }).strict(),
+  z.object({ action: z.literal('leaderboard.get'), board: z.string().min(1).max(40) }).strict(),
+  // contract v2.10: check a workshop step in the account (read-only; server/src/workshops/checks.ts)
+  z
+    .object({
+      action: z.literal('workshop.verify'),
+      workshopId: Id,
+      stepId: Id,
+      values: z.record(z.string().regex(/^[a-z0-9-]{1,32}$/), z.string().max(255)).refine((v) => Object.keys(v).length <= 8, 'Too many values').optional(),
+    })
+    .strict(),
 ]);
 
 const readBody = async (req: IncomingMessage, limit: number): Promise<Buffer> => {
@@ -396,6 +417,8 @@ export const createHttpServer = (deps: Deps) => {
     log.info('socket open', { who: who(principal.sub), connId });
     let tasks = 0;
     let requests = 0;
+    /** v2.11: when this socket last beat (presence.beat answers at most every BEAT_MIN_MS). */
+    let lastBeat = 0;
     let alive = true;
     const withinRate = rateLimiter(FRAME_BURST, FRAMES_PER_SECOND);
     let lastAccountCommand = 0;
@@ -517,6 +540,35 @@ export const createHttpServer = (deps: Deps) => {
             ? care.explain(cmd.findingId, emit)
             : stepUp().then((ok) => (ok ? care.fix(cmd.requestId, cmd.findingId, emit, approvals) : emit({ type: 'error', requestId: cmd.requestId, code: 'mfa_required', message: MFA_REQUIRED_MESSAGE })));
         void track(Promise.resolve(job).catch(failed)).finally(() => requests--);
+        return;
+      }
+      if (cmd.action === 'presence.beat' || cmd.action === 'score.submit' || cmd.action === 'leaderboard.get') {
+        // Cheap reads and writes of the player table; a beat more often than every 20 s is answered from the last one.
+        const now = Date.now();
+        if (cmd.action === 'presence.beat' && now - lastBeat < BEAT_MIN_MS) return;
+        if (cmd.action === 'presence.beat') lastBeat = now;
+        const job =
+          cmd.action === 'presence.beat'
+            ? tenant.social.beat(cmd.region, cmd.rank)
+            : cmd.action === 'score.submit'
+              ? tenant.social.submit(cmd.board, cmd.score)
+              : isBoard(cmd.board)
+                ? tenant.social.board(cmd.board)
+                : Promise.reject(new Error('unknown board'));
+        void track(job.then(emit).catch((err) => emit({ type: 'error', message: publicError('live city failed', err) })));
+        return;
+      }
+      if (cmd.action === 'workshop.verify') {
+        // A check is a fresh poll of the account: it counts as a request on this socket, and polls coalesce.
+        if (requests >= MAX_REQUESTS_PER_SOCKET) return emit({ type: 'error', message: 'Still checking your last step. Try again in a moment.' });
+        requests++;
+        const { workshopId, stepId, values } = cmd;
+        void track(
+          tenant
+            .fresh()
+            .then((snap) => emit({ type: 'workshop.verified', workshopId, stepId, ...verifyStep(snap, workshopId, stepId, values) }))
+            .catch((err) => emit({ type: 'workshop.verified', workshopId, stepId, ok: false, detail: publicError('workshop check failed', err) })),
+        ).finally(() => requests--);
         return;
       }
       if (cmd.action === 'flow.enable') {

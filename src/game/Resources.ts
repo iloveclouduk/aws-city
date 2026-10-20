@@ -6,7 +6,8 @@
 import Phaser from 'phaser';
 import type { InventoryItem } from '@/backend/contract';
 import type { Inventory } from '@/state/store';
-import { DISTRICT_PLOTS, GRID, isRoad, landmarkLayout, TOWN_SQUARE, type AzIsland, type Rect, type Tile } from '@/world/layout';
+import type { AzIsland, Rect, Tile } from '@/world/layout';
+import { legacyPlan, type CityPlan } from '@/world/plan';
 import { placeFor } from '@/world/places';
 import { placeResources, propLine, type Group, type Placement } from '@/world/resources';
 import type { Terrain } from '@/world/terrain';
@@ -54,6 +55,7 @@ export class Resources {
   constructor(
     private scene: Phaser.Scene,
     private world: ResourcesWorld,
+    private plan: CityPlan = legacyPlan(),
   ) {}
 
   /** Display objects this owns (the smoke budget). */
@@ -136,7 +138,7 @@ export class Resources {
   }
 
   private drawLandmark(id: string, g: Group) {
-    const l = landmarkLayout(id);
+    const l = this.plan.landmarkLayout(id);
     const tier = this.world.tier(id);
     if (!l || tier < 0) return;
     const f = l.footprint;
@@ -156,15 +158,25 @@ export class Resources {
   }
 
   private drawShed(where: string, items: InventoryItem[]) {
-    const rect: Rect = DISTRICT_PLOTS[where as DistrictId]?.rect ?? TOWN_SQUARE.rect;
+    const rect: Rect = this.plan.districts[where as DistrictId]?.bbox ?? this.plan.square;
     // The plot's west corner first (low x, high y), clear of the lots in the middle.
     let spot: Tile | undefined;
     for (let d = 0; d < rect.w + rect.h && !spot; d++)
       for (let dx = 0; dx <= d && !spot; dx++) {
         const x = rect.x + dx;
         const y = rect.y + rect.h - 1 - (d - dx);
-        if (x < rect.x + rect.w && y >= rect.y && x < GRID && !isRoad({ x, y }) && this.world.free(x, y)) spot = { x, y };
+        if (x < rect.x + rect.w && y >= rect.y && x < this.plan.size && !this.plan.isRoad({ x, y }) && this.plan.plotAt({ x, y }) === (rect === this.plan.square ? 'square' : where) && this.world.free(x, y)) spot = { x, y };
       }
+    // Dense infill can leave no free tile: then a corner of an open lot (pocket parks never use (x, y + 2), decor.ts),
+    // then a quiet sidewalk tile of the district, so real resources always show.
+    if (!spot && rect !== this.plan.square) {
+      const lot = this.plan.openLots(where)[0];
+      if (lot) spot = { x: lot.x, y: lot.y + lot.h - 1 };
+    }
+    if (!spot)
+      for (let y = rect.y; y < rect.y + rect.h && !spot; y++)
+        for (let x = rect.x; x < rect.x + rect.w && !spot; x++)
+          if (this.plan.plotAt({ x, y }) === where && !this.plan.isRoad({ x, y }) && !this.plan.isFootprint(x, y) && !this.plan.landmarks.some((l) => l.workSpot.x === x && l.workSpot.y === y)) spot = { x, y };
     if (!spot) return;
     const kinds = [...new Set(items.map((it) => it.type.replace(/^AWS::/, '').replace('::', ' ')))];
     const what = `${items.length} more thing${items.length === 1 ? '' : 's'} of yours: ${kinds.slice(0, 3).join(', ')}${kinds.length > 3 ? '…' : ''}`;

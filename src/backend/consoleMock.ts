@@ -1,12 +1,15 @@
 // The mock backend's Console Copilot brain: decides the next console step from the live page snapshot.
 // Scripted, snapshot-driven demo flows (reliable offline demos) for S3 "Create bucket", EC2 "Launch
-// instance", DynamoDB "Create table" and Lambda "Create function"; for anything else it points at the
-// most relevant control it can see and explains it. The server (server/) uses Claude on Bedrock for any page.
+// instance", DynamoDB "Create table", Lambda "Create function", RDS "Create database", CloudFront "Create
+// distribution", SQS "Create queue" and IAM "Create role" (each runs end to end on the practice console,
+// src/console/practicePage.ts); for anything else it points at a few relevant controls, explains them and ends as
+// practice only (`ok: false`), so the offline demo never claims it did a task it can't script. The server (server/)
+// uses Claude on Bedrock for any page.
 import type { ConsoleStepEvent, PageSnapshot, ServerEvent, SnapshotItem } from './contract';
 import { placeFor } from '@/world/places';
 
 type Step = Omit<ConsoleStepEvent, 'type' | 'taskId' | 'index' | 'agentId'>;
-type FlowId = 's3' | 'ec2' | 'dynamodb' | 'lambda';
+export type FlowId = 's3' | 'ec2' | 'dynamodb' | 'lambda' | 'rds' | 'cloudfront' | 'sqs' | 'iam';
 interface Task {
   goal: string;
   agentId: string;
@@ -103,24 +106,102 @@ const LAMBDA: Flow = {
   done: () => ({ action: 'done', say: 'Done! city-hello is live. Press “Test” to run it once.', why: 'Next: add a trigger (API Gateway, S3, EventBridge) so something calls your function.', risk: 'safe' }),
 };
 
-const FLOWS: Record<FlowId, Flow> = { s3: S3, ec2: EC2, dynamodb: DYNAMODB, lambda: LAMBDA };
+const RDS: Flow = {
+  onForm: (s) => !!find(s, /^db instance identifier/i, 'textbox'),
+  finalKey: 'create',
+  rules: [
+    { key: 'open', page: 'list', find: (s) => find(s, /^create database$/i), step: (i) => ({ action: 'click', target: target(i), say: 'Opening the “Create database” form.', why: 'Amazon RDS runs a relational database for you: AWS handles the hardware, patching and backups, and you keep using SQL.', risk: 'safe' }) },
+    {
+      key: 'easy',
+      find: (s) => find(s, /^easy create/i, 'radio'),
+      step: (i) =>
+        i.checked
+          ? { action: 'point', target: target(i), say: '“Easy create” is already picked.', why: 'Easy create uses recommended best-practice settings, and you can change most of them after the database exists.', risk: 'safe' }
+          : { action: 'click', target: target(i), say: 'Picking “Easy create”.', why: 'Easy create uses recommended best-practice settings, and you can change most of them after the database exists.', risk: 'safe' },
+    },
+    { key: 'engine', find: (s) => find(s, /^postgresql/i, 'radio'), step: (i) => ({ action: 'click', target: target(i), say: 'Choosing the PostgreSQL engine.', why: 'The engine is the database software. PostgreSQL is open source and popular; RDS also runs MySQL, MariaDB, Oracle, SQL Server and Db2.', risk: 'safe' }) },
+    { key: 'size', find: (s) => find(s, /^free tier/i, 'radio'), step: (i) => ({ action: 'click', target: target(i), say: 'Choosing the Free tier size.', why: 'A small burstable instance is enough to learn on. Production sizes cost more per hour, so pick them only for real traffic.', risk: 'safe' }) },
+    { key: 'name', find: (s) => find(s, /^db instance identifier/i, 'textbox'), step: (i, t) => ({ action: 'type', target: target(i), value: t.name, say: `Naming it ${t.name}.`, why: 'The identifier names the database instance in this account and Region. It becomes part of its endpoint address.', risk: 'safe' }) },
+    { key: 'creds', find: (s) => find(s, /^manage master credentials/i, 'checkbox'), step: (i) => ({ action: 'point', target: target(i), say: 'Leaving the sign-in to AWS Secrets Manager.', why: 'RDS creates the database password in Secrets Manager and can rotate it, so nobody types it or keeps it in a note. I never type passwords for you.', risk: 'safe' }) },
+    { key: 'create', find: (s) => find(s, /^create database$/i), step: () => ({ action: 'click', target: { name: 'Create database' }, say: 'Ready to create the database.', why: 'A database instance bills by the hour while it runs, even when nobody uses it. Delete it when you finish practising.', risk: 'confirm' }) },
+  ],
+  done: (t) => ({ action: 'done', say: `Done! ${t.name} is being created. It takes a few minutes to become available.`, why: 'Next: connect to it from an app in the same VPC, and keep it private: no public access.', risk: 'safe' }),
+};
 
-/** Goal keywords first, then the service in the console URL's path, then the page the player was on. */
-export function flowFor(goal: string, url = '', serviceId?: string): FlowId | undefined {
-  const g = goal.toLowerCase();
-  if (/\b(s3|buckets?)\b/.test(g)) return 's3';
-  if (/\b(ec2|instances?|virtual (machine|server)|vm|server)\b/.test(g)) return 'ec2';
-  if (/\b(dynamo(db)?|tables?|nosql)\b/.test(g)) return 'dynamodb';
-  if (/\b(lambda|functions?|serverless)\b/.test(g)) return 'lambda';
+const CLOUDFRONT: Flow = {
+  onForm: (s) => !!find(s, /^origin domain/i, 'combobox'),
+  finalKey: 'create',
+  rules: [
+    { key: 'open', page: 'list', find: (s) => find(s, /^create distribution$/i), step: (i) => ({ action: 'click', target: target(i), say: 'Opening the “Create distribution” form.', why: 'A CloudFront distribution serves your content from edge locations near your viewers, so pages load faster and your origin gets fewer requests.', risk: 'safe' }) },
+    { key: 'origin', find: (s) => find(s, /^origin domain/i, 'combobox'), step: (i) => ({ action: 'select', target: target(i), value: 'city-site.s3.us-west-2.amazonaws.com', say: 'Picking the city-site bucket as the origin.', why: 'The origin is where CloudFront fetches content it doesn’t have cached yet: here, an S3 bucket.', risk: 'safe' }) },
+    { key: 'oac', find: (s) => find(s, /^origin access control/i, 'radio'), step: (i) => ({ action: 'click', target: target(i), say: 'Choosing origin access control.', why: 'With origin access control the bucket stays private and only this distribution can read it. Viewers can’t go around CloudFront.', risk: 'safe' }) },
+    { key: 'https', find: (s) => find(s, /^redirect http to https/i, 'radio'), step: (i) => ({ action: 'click', target: target(i), say: 'Redirecting HTTP to HTTPS.', why: 'Viewers who type http:// are sent to the encrypted https:// address, so nothing travels in plain text.', risk: 'safe' }) },
+    { key: 'price', find: (s) => find(s, /^use all edge locations/i, 'radio'), step: (i) => ({ action: 'point', target: target(i), say: 'Keeping all edge locations.', why: 'The price class decides which edge locations serve your content. Fewer locations cost a little less per request but are slower for faraway viewers.', risk: 'safe' }) },
+    { key: 'create', find: (s) => find(s, /^create distribution$/i), step: () => ({ action: 'click', target: { name: 'Create distribution' }, say: 'Creating the distribution now.', why: 'You pay for data sent to viewers and for requests, so an unused distribution costs next to nothing.', risk: 'safe' }) },
+  ],
+  done: () => ({ action: 'done', say: 'Done! The distribution is deploying to the edge.', why: 'Next: update the bucket policy CloudFront suggests, so the distribution can read the bucket.', risk: 'safe' }),
+};
+
+const SQS: Flow = {
+  onForm: (s) => /^create queue$/i.test(s.heading ?? ''),
+  finalKey: 'create',
+  rules: [
+    { key: 'open', page: 'list', find: (s) => find(s, /^create queue$/i), step: (i) => ({ action: 'click', target: target(i), say: 'Opening the “Create queue” form.', why: 'An SQS queue holds messages between parts of an app, so a busy producer never has to wait for a slow consumer.', risk: 'safe' }) },
+    { key: 'type', find: (s) => find(s, /^standard/i, 'radio'), step: (i) => ({ action: 'point', target: target(i), say: 'Keeping a Standard queue.', why: 'Standard queues deliver each message at least once with nearly unlimited throughput. Choose FIFO when order and exactly-once processing matter.', risk: 'safe' }) },
+    { key: 'name', find: (s) => find(s, /^name$/i, 'textbox'), step: (i, t) => ({ action: 'type', target: target(i), value: t.name, say: `Naming it ${t.name}.`, why: 'Queue names are unique in your account and Region. A FIFO queue’s name has to end in .fifo.', risk: 'safe' }) },
+    { key: 'vt', find: (s) => find(s, /^visibility timeout/i, 'textbox'), step: (i) => ({ action: 'point', target: target(i), say: 'Leaving the visibility timeout at 30 seconds.', why: 'After a consumer takes a message, it stays hidden this long. Set it longer than your consumer needs to process one message, or it may be handled twice.', risk: 'safe' }) },
+    { key: 'enc', find: (s) => find(s, /^amazon sqs key/i, 'radio'), step: (i) => ({ action: 'point', target: target(i), say: 'Encryption stays on (SSE-SQS).', why: 'Messages are encrypted at rest with a key SQS manages. Pick SSE-KMS when you need your own key and an audit trail.', risk: 'safe' }) },
+    { key: 'create', find: (s) => find(s, /^create queue$/i), step: () => ({ action: 'click', target: { name: 'Create queue' }, say: 'Creating the queue now.', why: 'You pay per request, and the first million requests each month are free, so an idle queue costs nothing.', risk: 'safe' }) },
+  ],
+  done: (t) => ({ action: 'done', say: `Done! ${t.name} is ready. Try “Send and receive messages”.`, why: 'Next: add a dead-letter queue so messages that keep failing are set aside instead of retried forever.', risk: 'safe' }),
+};
+
+const IAM_PAGES = /^(select trusted entity|add permissions|name, review, and create)$/i;
+const onIamPage = (s: PageSnapshot, page: RegExp) => page.test(s.heading ?? '');
+const IAM: Flow = {
+  onForm: (s) => IAM_PAGES.test(s.heading ?? ''),
+  finalKey: 'create',
+  rules: [
+    { key: 'open', page: 'list', find: (s) => find(s, /^create role$/i), step: (i) => ({ action: 'click', target: target(i), say: 'Opening the “Create role” wizard.', why: 'An IAM role is an identity with permissions that a service can take on for a while, with short-term credentials instead of stored keys.', risk: 'safe' }) },
+    { key: 'entity', find: (s) => onIamPage(s, /^select trusted entity$/i) ? find(s, /^aws service/i, 'radio') : undefined, step: (i) => ({ action: 'point', target: target(i), say: 'Keeping “AWS service” as the trusted entity.', why: 'The trusted entity is who may take on the role. Here it’s an AWS service, so nobody outside your account can use it.', risk: 'safe' }) },
+    { key: 'usecase', find: (s) => onIamPage(s, /^select trusted entity$/i) ? find(s, /^service or use case/i, 'combobox') : undefined, step: (i) => ({ action: 'select', target: target(i), value: 'Lambda', say: 'Choosing Lambda as the use case.', why: 'This writes the trust policy: only the Lambda service may assume the role, for your functions.', risk: 'safe' }) },
+    { key: 'next1', find: (s) => onIamPage(s, /^select trusted entity$/i) ? find(s, /^next$/i, 'button') : undefined, step: (i) => ({ action: 'click', target: target(i), say: 'On to permissions.', why: 'Trust says who can use the role; permissions say what it can do once they have.', risk: 'safe' }) },
+    {
+      key: 'policy',
+      find: (s) => (onIamPage(s, /^add permissions$/i) ? find(s, /^awslambdabasicexecutionrole/i, 'checkbox') : undefined),
+      step: (i) =>
+        i.checked
+          ? { action: 'point', target: target(i), say: 'AWSLambdaBasicExecutionRole is already ticked.', why: 'It only lets the function write its logs to CloudWatch: least privilege, nothing more.', risk: 'safe' }
+          : { action: 'click', target: target(i), say: 'Ticking AWSLambdaBasicExecutionRole.', why: 'It only lets the function write its logs to CloudWatch: least privilege. Full-access policies like AdministratorAccess are never the place to start, so I leave them alone.', risk: 'safe' },
+    },
+    { key: 'next2', find: (s) => onIamPage(s, /^add permissions$/i) ? find(s, /^next$/i, 'button') : undefined, step: (i) => ({ action: 'click', target: target(i), say: 'On to naming the role.', why: 'You can add or remove policies later; start small and add what the function turns out to need.', risk: 'safe' }) },
+    { key: 'name', find: (s) => onIamPage(s, /^name, review, and create$/i) ? find(s, /^role name/i, 'textbox') : undefined, step: (i, t) => ({ action: 'type', target: target(i), value: t.name, say: `Naming it ${t.name}.`, why: 'Role names are unique in your account. A clear name says what uses it and why, which helps the next person who reviews access.', risk: 'safe' }) },
+    { key: 'create', find: (s) => onIamPage(s, /^name, review, and create$/i) ? find(s, /^create role$/i) : undefined, step: () => ({ action: 'click', target: { name: 'Create role' }, say: 'Ready to create the role.', why: 'A role changes who can do what in your account, so you press this one yourself after reading the trust policy above it.', risk: 'confirm' }) },
+  ],
+  done: (t) => ({ action: 'done', say: `Done! ${t.name} is ready for a Lambda function.`, why: 'Next: pick it as the execution role when you create a function, and check IAM Access Analyzer for unused permissions later.', risk: 'safe' }),
+};
+
+const FLOWS: Record<FlowId, Flow> = { s3: S3, ec2: EC2, dynamodb: DYNAMODB, lambda: LAMBDA, rds: RDS, cloudfront: CLOUDFRONT, sqs: SQS, iam: IAM };
+
+export const isFlow = (id: string): id is FlowId => id in FLOWS;
+const BY_PATH: Record<string, FlowId> = { s3: 's3', ec2: 'ec2', dynamodbv2: 'dynamodb', dynamodb: 'dynamodb', lambda: 'lambda', rds: 'rds', cloudfront: 'cloudfront', sqs: 'sqs', iam: 'iam', iamv2: 'iam' };
+
+/**
+ * The scripted flow for a task, by the task's service: the service it names (a workshop step's, or the console page's),
+ * else the service in the console URL's path, else a service named outright in the goal. Never by loose words: "an RDS
+ * instance" isn't EC2 and "CloudFront functions" aren't Lambda. A named service without a flow has none (practice only).
+ */
+export function flowFor(serviceId: string | undefined, url = '', goal = ''): FlowId | undefined {
+  if (serviceId) return isFlow(serviceId) ? serviceId : undefined;
   let path = '';
   try {
     path = new URL(url).pathname.split('/')[1]?.toLowerCase() ?? '';
   } catch {
     /* no url */
   }
-  const byPath: Record<string, FlowId> = { s3: 's3', ec2: 'ec2', dynamodbv2: 'dynamodb', dynamodb: 'dynamodb', lambda: 'lambda' };
-  if (byPath[path]) return byPath[path];
-  return serviceId && serviceId in FLOWS ? (serviceId as FlowId) : undefined;
+  if (path && path !== 'console') return BY_PATH[path];
+  const named = [...goal.toLowerCase().matchAll(/\b(s3|ec2|dynamo(?:db)?|lambda|rds|cloudfront|sqs|iam)\b/g)].map((m) => (m[1].startsWith('dynamo') ? 'dynamodb' : m[1]) as FlowId);
+  return new Set(named).size === 1 ? named[0] : undefined;
 }
 
 /** A scripted flow, as a function of what's on screen. */
@@ -141,6 +222,9 @@ function flowStep(flow: Flow, t: Task, s: PageSnapshot): Step | undefined {
   return undefined;
 }
 
+/** What the offline demo says when it can't script a task (the task ends `ok: false`: nothing was done for real). */
+export const PRACTICE_ONLY = 'The offline demo can’t click this one; try it in the practice terminal.';
+
 /** Any other page: point at the most relevant visible control and explain it (the server does real planning). */
 function genericStep(t: Task, s: PageSnapshot): Step {
   const words = t.goal.toLowerCase().split(/\W+/).filter((w) => w.length > 3);
@@ -150,7 +234,7 @@ function genericStep(t: Task, s: PageSnapshot): Step {
     .sort((a, b) => b.score - a.score);
   const best = scored[0]?.score ? scored[0].i : undefined;
   if (!best || t.index >= 3) {
-    return { action: 'done', say: 'That’s as far as the offline demo goes on this page.', why: 'Connect to the AWS City server and Claude on Bedrock will plan every step for any console page.', risk: 'safe' };
+    return { action: 'done', say: PRACTICE_ONLY, why: 'Connect to the AWS City server and Claude on Bedrock will plan every step for any console page.', risk: 'safe' };
   }
   t.did.add(best.id);
   return { action: 'point', target: { id: best.id, name: best.name }, say: `This is “${best.name}”${best.context ? ` in ${best.context}` : ''}.`, why: 'It’s the closest match to what you asked for. The full Copilot would take it from here.', risk: 'safe' };
@@ -161,6 +245,10 @@ const NAMES: Record<FlowId, () => string> = {
   ec2: () => `city-web-${suffix()}`,
   dynamodb: () => `city-demo-${suffix()}`,
   lambda: () => 'city-hello',
+  rds: () => `city-db-${suffix()}`,
+  cloudfront: () => 'city-site',
+  sqs: () => `city-orders-${suffix()}`,
+  iam: () => `city-lambda-role-${suffix()}`,
 };
 
 export class ConsoleMock {
@@ -168,11 +256,11 @@ export class ConsoleMock {
   constructor(private emit: (e: ServerEvent) => void) {}
 
   start(taskId: string, goal: string, snapshot: PageSnapshot, serviceId?: string) {
-    const flow = flowFor(goal, snapshot.url, serviceId);
+    const flow = flowFor(serviceId, snapshot.url, goal);
     const agentId = flow ?? serviceId ?? 'concierge';
     const t: Task = { goal, agentId, flow, index: 0, did: new Set(), misses: 0, name: flow ? NAMES[flow]() : '' };
     this.tasks.set(taskId, t);
-    const who = flow ? (placeFor(flow)?.agentName ?? 'the right agent') : 'the right agent';
+    const who = placeFor(agentId)?.agentName ?? 'the right agent';
     this.emit({ type: 'agent.message', from: 'concierge', to: 'user', text: `I’ll ask ${who} to do it in your console, step by step.` });
     this.emit({ type: 'task.plan', taskId, agentId, targetServiceId: flow ?? serviceId ?? 's3', steps: ['Working in your AWS console'] });
     this.next(taskId, snapshot);
@@ -203,7 +291,8 @@ export class ConsoleMock {
     const index = t.index++;
     this.emit({ type: 'agent.state', agentId: t.agentId, state: 'working', service: 'console', detail: `${step.action} ${step.target?.name ?? ''}`.trim() });
     this.emit({ type: 'console.step', taskId, index, agentId: t.agentId, ...step });
-    if (step.action === 'done') this.finish(taskId, true, step.say);
+    // Done for real only when the scripted flow reached its final click; the practice-only path never is.
+    if (step.action === 'done') this.finish(taskId, !!t.flow && t.did.has(FLOWS[t.flow].finalKey), step.say);
   }
 
   private finish(taskId: string, ok: boolean, text: string) {

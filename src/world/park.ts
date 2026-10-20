@@ -12,6 +12,8 @@ export const RIDE_TIER = 2;
 /** The park's footprint: three rides across, two deep, and the entrance row in front. */
 export const PARK_W = 6;
 export const PARK_H = 5;
+/** The annex behind it: one more row of three rides (terrain `parkAnnex`). */
+export const ANNEX_H = 2;
 
 export interface Ride {
   id: string;
@@ -29,6 +31,13 @@ export const RIDES: Ride[] = [
   { id: 'flume', name: 'S3 Log Flume', serviceId: 's3', frames: 3 },
   { id: 'teacups', name: 'SQS Teacups', serviceId: 'sqs', frames: 3 },
 ];
+/** The annex's rides (drawn on terrain `parkAnnex`, so the park's own six never move). */
+export const ANNEX_RIDES: Ride[] = [
+  { id: 'maze', name: 'API Gateway Route Maze', serviceId: 'apigateway', frames: 0 },
+  { id: 'rapids', name: 'Glue Data Rapids', serviceId: 'glue', frames: 3 },
+  { id: 'robots', name: 'AgentCore Robot Arena', serviceId: 'agentcore', frames: 3 },
+];
+export const ALL_RIDES: Ride[] = [...RIDES, ...ANNEX_RIDES];
 
 export interface ParkPiece {
   sprite: string;
@@ -53,13 +62,19 @@ export const RIDE_MS = 3000;
 
 export const rideHint = (ride: Ride) => `Reach ${TIER_NAMES[RIDE_TIER]} at ${placeFor(ride.serviceId)?.place ?? ride.serviceId} to open the ${ride.name}`;
 
-/** Everything on the site: six rides (open or under wraps), the entrance arch, a ticket booth and fences. */
-export function parkLayout(site: Rect, p: Progress, region?: string): ParkPiece[] {
-  const pieces: ParkPiece[] = RIDES.map((ride, i) => {
-    const open = rideOpen(p, ride, region);
-    const still = ride.frames ? `park:${ride.id}0` : `park:${ride.id}`;
-    return { sprite: open ? still : `park:${ride.id}:locked`, x: site.x + (i % 3) * 2, y: site.y + Math.floor(i / 3) * 2, w: 2, h: 2, ride, open };
-  });
+const ridePiece = (ride: Ride, x: number, y: number, p: Progress, region?: string): ParkPiece => {
+  const open = rideOpen(p, ride, region);
+  const still = ride.frames ? `park:${ride.id}0` : `park:${ride.id}`;
+  return { sprite: open ? still : `park:${ride.id}:locked`, x, y, w: 2, h: 2, ride, open };
+};
+
+/**
+ * Everything on the site: six rides (open or under wraps), the entrance arch, a ticket booth and fences; with an annex,
+ * three more rides in a row on it.
+ */
+export function parkLayout(site: Rect, p: Progress, region?: string, annex?: Rect): ParkPiece[] {
+  const pieces: ParkPiece[] = RIDES.map((ride, i) => ridePiece(ride, site.x + (i % 3) * 2, site.y + Math.floor(i / 3) * 2, p, region));
+  if (annex) ANNEX_RIDES.forEach((ride, i) => pieces.push(ridePiece(ride, annex.x + i * 2, annex.y, p, region)));
   const front = site.y + 4;
   pieces.push({ sprite: 'park:fenceX', x: site.x, y: front, w: 1, h: 1 }, { sprite: 'park:fenceX', x: site.x + 1, y: front, w: 1, h: 1 });
   pieces.push({ sprite: 'park:arch', x: site.x + 2, y: front, w: 2, h: 1 });
@@ -68,4 +83,4 @@ export function parkLayout(site: Rect, p: Progress, region?: string): ParkPiece[
 }
 
 /** How many rides are open (the park's sign counts them). */
-export const openRides = (p: Progress, region?: string) => RIDES.filter((r) => rideOpen(p, r, region)).length;
+export const openRides = (p: Progress, region?: string) => ALL_RIDES.filter((r) => rideOpen(p, r, region)).length;

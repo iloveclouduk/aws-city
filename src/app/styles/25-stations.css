@@ -1,0 +1,329 @@
+/* City Clients station panels (src/ui/clients/stations/). */
+/* Each station is a small panel inside a task card; it fits the 400 px side panel (one column, wrapping rows). */
+.station {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--fs-sm);
+}
+.st-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.st-rules {
+  flex: 1;
+  margin: 0;
+  color: var(--ink-soft);
+}
+.st-clock {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  color: var(--ink);
+}
+.st-clock.st-low {
+  border-color: var(--bad-line);
+  color: var(--bad-ink);
+}
+.st-count {
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+.st-count.st-bad,
+.st-say {
+  margin: 0;
+  min-height: 1.4em;
+  color: var(--ink);
+}
+.st-count.st-bad {
+  color: var(--bad-ink);
+}
+.st-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.st-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel-2);
+}
+.st-row-text {
+  flex: 1 1 160px;
+  display: flex;
+  flex-direction: column;
+}
+.st-choices {
+  display: flex;
+  gap: 4px;
+}
+.station .btn[aria-pressed='true'],
+.st-zone[aria-pressed='true'] {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+.st-right,
+.st-done {
+  border-color: var(--good) !important;
+  color: var(--good-ink) !important;
+}
+.st-wrong,
+.st-bad {
+  border-color: var(--bad-line) !important;
+}
+.st-wrong {
+  color: var(--bad-ink) !important;
+}
+
+/* Sort */
+.st-card {
+  padding: 10px 12px;
+  border: 1px solid var(--gold-deep);
+  border-radius: var(--r-lg);
+  background: var(--panel-hi);
+  color: var(--ink-hi);
+  text-align: center;
+}
+.st-bins {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 6px;
+}
+.st-bin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 52px;
+  white-space: normal;
+}
+.st-bin-n {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+/* Match */
+.st-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.st-cols > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.st-pick {
+  white-space: normal;
+  text-align: left;
+  justify-content: flex-start;
+}
+
+/* Route */
+.st-route > div[role='group']:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.st-flow {
+  white-space: normal;
+  justify-content: flex-start;
+  text-align: left;
+}
+.st-zones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 6px;
+}
+.st-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--panel-hi);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.st-zone:disabled {
+  cursor: default;
+}
+.st-zone.st-dark {
+  background: var(--bg-deep);
+  color: var(--muted);
+  border-style: dashed;
+}
+.st-meter {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.st-meter > span {
+  display: block;
+  height: 100%;
+  background: var(--good);
+}
+.st-zone.st-bad .st-meter > span {
+  background: var(--bad);
+}
+
+/* Scale: demand (outline) against capacity (filled) per slot. */
+.st-slot {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) 2fr auto;
+  align-items: center;
+  gap: 6px;
+}
+.st-bars {
+  position: relative;
+  height: 14px;
+}
+.st-bars > span,
+.st-key {
+  position: absolute;
+  left: 0;
+  height: 6px;
+  border-radius: 3px;
+}
+.st-bars .st-demand {
+  top: 0;
+  border: 1px solid var(--gold);
+  box-sizing: border-box;
+}
+.st-bars .st-cap {
+  bottom: 0;
+  background: var(--good);
+}
+.st-bars .st-cap.st-bad {
+  background: var(--bad);
+}
+.st-key {
+  position: static;
+  display: inline-block;
+  width: 14px;
+  vertical-align: middle;
+}
+.st-key.st-demand {
+  border: 1px solid var(--gold);
+}
+.st-key.st-cap {
+  background: var(--good);
+}
+.st-legend {
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+.st-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.st-units {
+  min-width: 1.6em;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
+/* Spot: a log of lines to tap. */
+.st-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-deep);
+}
+.st-line {
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.st-line:hover:not(:disabled) {
+  background: var(--panel-hi);
+}
+.st-line.st-marked {
+  border-color: var(--gold);
+  background: var(--accent-soft);
+}
+
+/* Order */
+.st-pos {
+  flex: none;
+  width: 1.6em;
+  text-align: center;
+  font-family: var(--font-pixel);
+  color: var(--gold);
+}
+.st-step {
+  flex-wrap: nowrap;
+}
+.st-step[draggable='true'] {
+  cursor: grab;
+}
+
+/* The result line under the panel. */
+.st-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line-strong);
+}
+.st-result.st-pass {
+  border-color: var(--good);
+  color: var(--good-ink);
+}
+.st-result.st-fail {
+  border-color: var(--bad-line);
+  background: var(--bad-soft);
+  color: var(--bad-ink);
+}
+.st-result-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* A wrong pick shakes once, unless the player asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .st-shake {
+    animation: st-shake 0.3s var(--ease-out, ease-out);
+  }
+}
+@keyframes st-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}

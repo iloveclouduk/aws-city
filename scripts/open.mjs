@@ -1,7 +1,9 @@
 // Opens a real (headed) Chromium window with AWS City loaded — branded Chrome ignores --load-extension.
 // Usage: npm run open [-- --console]   (keeps progress in .cache/chrome-profile between runs)
-// Opens the city and the S3 practice page. The real AWS console sign-in opens only with --console, or the stdin
-// command `console` (the `a` key in npm start).
+// `npm run open` passes --build: the extension is built first, quietly (one line; WXT's own output only if it fails).
+// Opens the city and the practice console (practice.html inside the extension: it looks like the AWS console, and
+// nothing there touches AWS). The real AWS console sign-in opens only with --console, or the stdin command `console`
+// (the `a` key in npm start).
 import './launcher/require-node.mjs';
 import { chromium } from 'playwright';
 import { spawnSync } from 'node:child_process';
@@ -17,6 +19,20 @@ if (!existsSync(chromium.executablePath())) {
     console.error('\n✗ The download failed. Run  npx playwright install chromium  to see why, then  npm run open  again.\n');
     process.exit(1);
   }
+}
+
+// The build prints a few hundred lines a newcomer doesn't need: a one-line summary, and everything only on failure.
+if (process.argv.includes('--build')) {
+  console.log('▶ Building AWS City (under a minute)…');
+  const started = Date.now();
+  const r = spawnSync('npx', ['wxt', 'build', '-b', 'chrome'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, shell: process.platform === 'win32' });
+  if (r.status !== 0) {
+    process.stdout.write(r.stdout ?? '');
+    process.stderr.write(r.stderr ?? '');
+    console.error(`\n✗ The build failed${r.error ? ` (${r.error.message})` : ''}: its output is above. Fix it, then run  npm run open  again.\n`);
+    process.exit(1);
+  }
+  console.log(`✓ Built in ${Math.round((Date.now() - started) / 1000)} s.`);
 }
 
 const ext = path.resolve('.output/chrome-mv3');
@@ -66,13 +82,11 @@ try {
 let [sw] = ctx.serviceWorkers();
 sw ??= await ctx.waitForEvent('serviceworker');
 const id = new URL(sw.url()).host;
-console.log(`AWS City loaded (extension id ${id}). Close the window to stop.`);
 
-// A safe practice page for the Console Copilot: this one console URL is served locally (a stand-in for the
-// S3 "Create bucket" page). Every other console URL is the real AWS console.
-const DEMO = 'https://us-west-2.console.aws.amazon.com/s3/aws-city-demo';
-const fs = await import('node:fs');
-await ctx.route(`${DEMO}*`, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: fs.readFileSync('tests/fixtures/s3-console.html', 'utf8') }));
+// The safe practice console for the Copilot and the Lookout: the extension's own page (src/entrypoints/practice/),
+// with S3, EC2, DynamoDB, Lambda, RDS, CloudFront, SQS and IAM. Every console.aws.amazon.com URL is the real console.
+const PRACTICE = `chrome-extension://${id}/practice.html`;
+const DEMO = `${PRACTICE}#/s3`;
 const CONSOLE = 'https://console.aws.amazon.com/s3/home';
 const cityUrl = `chrome-extension://${id}/city.html`;
 // A first install opens the city itself (runtime.onInstalled): give it a moment, then reuse that tab.
@@ -86,6 +100,17 @@ const city = cityTab ?? (await ctx.newPage());
 if (!city.url().startsWith(cityUrl)) await city.goto(cityUrl);
 await city.bringToFront();
 city.on('pageerror', (e) => console.log('page error:', e.message));
+// Say plainly what just opened: a new window with two tabs, and which one is which.
+console.log(
+  [
+    '',
+    '✓ AWS City is open in a new browser window (Chrome for Testing).',
+    '  • The tab in front is your city. It starts in Demo mode: a practice account, nothing real is created or charged.',
+    '  • The other tab is the practice console: it looks like the AWS console, and nothing there touches AWS.',
+    '  Close the window to stop.',
+    '',
+  ].join('\n'),
+);
 // `npm start` waits for this line, then drives the window with one-word commands on stdin.
 console.log(`READY ${id}`);
 
@@ -99,7 +124,7 @@ process.stdin.setEncoding('utf8');
 process.stdin.on('data', (chunk) => {
   for (const cmd of chunk.split('\n').map((c) => c.trim())) {
     if (cmd === 'city') void focus(cityUrl);
-    else if (cmd === 'practice') void focus(DEMO);
+    else if (cmd === 'practice') void focus(DEMO, PRACTICE);
     else if (cmd === 'console') void focus(CONSOLE, 'https://console.aws.amazon.com');
     else if (cmd === 'quit') void ctx.close();
   }

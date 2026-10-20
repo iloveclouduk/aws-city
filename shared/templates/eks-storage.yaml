@@ -1,0 +1,207 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - Kubernetes with disks and a shared folder. An EKS cluster runs Graviton worker nodes in two Availability Zones; the EBS CSI driver gives a pod its own volume and the EFS CSI driver mounts one shared, encrypted file system, each driver with its own IAM role through EKS Pod Identity.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC for the cluster
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Two private subnets in different Availability Zones (the first two get EFS mount targets)
+
+Resources:
+  ClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+              - sts:TagSession
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonEKSClusterPolicy'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  HarbourCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      RoleArn: !GetAtt ClusterRole.Arn
+      ResourcesVpcConfig:
+        SubnetIds: !Ref SubnetIds
+      AccessConfig:
+        AuthenticationMode: API
+        BootstrapClusterCreatorAdminPermissions: true
+      Logging:
+        ClusterLogging:
+          EnabledTypes:
+            - Type: api
+            - Type: audit
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  NodeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      # Only what a node needs; the storage drivers get their own roles below.
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonEKS_CNI_Policy'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  HarbourNodes:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      ClusterName: !Ref HarbourCluster
+      NodeRole: !GetAtt NodeRole.Arn
+      Subnets: !Ref SubnetIds
+      AmiType: AL2023_ARM_64_STANDARD
+      InstanceTypes:
+        - t4g.medium
+      ScalingConfig:
+        MinSize: 2
+        DesiredSize: 2
+        MaxSize: 4
+      Tags:
+        managed-by: aws-city
+
+  PodIdentityAgent:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref HarbourCluster
+      AddonName: eks-pod-identity-agent
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  EbsDriverRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: pods.eks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+              - sts:TagSession
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonEBSCSIDriverPolicyV2'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  EbsDriver:
+    Type: AWS::EKS::Addon
+    DependsOn:
+      - PodIdentityAgent
+      - HarbourNodes
+    Properties:
+      ClusterName: !Ref HarbourCluster
+      AddonName: aws-ebs-csi-driver
+      PodIdentityAssociations:
+        - ServiceAccount: ebs-csi-controller-sa
+          RoleArn: !GetAtt EbsDriverRole.Arn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  EfsDriverRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: pods.eks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+              - sts:TagSession
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  EfsDriver:
+    Type: AWS::EKS::Addon
+    DependsOn:
+      - PodIdentityAgent
+      - HarbourNodes
+    Properties:
+      ClusterName: !Ref HarbourCluster
+      AddonName: aws-efs-csi-driver
+      PodIdentityAssociations:
+        - ServiceAccount: efs-csi-controller-sa
+          RoleArn: !GetAtt EfsDriverRole.Arn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  FilesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EFS mount targets, reachable only from the cluster nodes
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !GetAtt HarbourCluster.ClusterSecurityGroupId
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  SharedFiles:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      PerformanceMode: generalPurpose
+      ThroughputMode: elastic
+      BackupPolicy:
+        Status: ENABLED
+      FileSystemTags:
+        - Key: managed-by
+          Value: aws-city
+
+  MountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref SharedFiles
+      SubnetId: !Select [0, !Ref SubnetIds]
+      SecurityGroups:
+        - !Ref FilesSecurityGroup
+
+  MountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref SharedFiles
+      SubnetId: !Select [1, !Ref SubnetIds]
+      SecurityGroups:
+        - !Ref FilesSecurityGroup
+
+Outputs:
+  ClusterName:
+    Description: Run aws eks update-kubeconfig --name with this, then kubectl get nodes
+    Value: !Ref HarbourCluster
+  FileSystemId:
+    Description: Use this in the EFS StorageClass or PersistentVolume
+    Value: !Ref SharedFiles

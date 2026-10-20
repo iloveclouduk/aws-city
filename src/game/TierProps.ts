@@ -4,7 +4,8 @@
 // under reduced motion). The props stand on the row in front of the lot, which decor always leaves clear, and never
 // block a tile (walkers pass them as they pass a bench).
 import Phaser from 'phaser';
-import { LANDMARKS, type LandmarkLayout, type Tile } from '@/world/layout';
+import { frontRowTiles, type LandmarkLayout } from '@/world/layout';
+import { legacyPlan, type CityPlan } from '@/world/plan';
 import { districtById, serviceById } from '@/world/taxonomy';
 import { addSprite, hasSprite } from './assets';
 import { CITY_ISO, cornerScreen, entityDepth, footprintDepth, toScreen } from './iso';
@@ -18,38 +19,46 @@ export const TIER_PLAZA = 3;
 export const TIER_SPARKLE = 4;
 const SPARKS = 5;
 
-/** The row in front of a service landmark's lot: the tiles a tier-3 plaza paves (the middle one is its work spot). */
-export const frontRowTiles = (l: LandmarkLayout): Tile[] => Array.from({ length: l.footprint.w }, (_, i) => ({ x: l.footprint.x + i, y: l.footprint.y + l.footprint.h }));
+/** The row in front of a service landmark's lot (src/world/layout.ts). */
+export { frontRowTiles };
 
 export class TierProps {
   private items = new Map<string, { tier: number; imgs: Phaser.GameObjects.Image[] }>();
-  private works = new Map<string, { stage: number; imgs: Phaser.GameObjects.Image[] }>();
+  private works = new Map<string, { stage: number; site: boolean; imgs: Phaser.GameObjects.Image[] }>();
   private sparks: Phaser.GameObjects.Image[] = [];
+  /** v2.10: a gold "established" plaque in front of each building whose workshop is finished. */
+  private plaques = new Map<string, Phaser.GameObjects.Image[]>();
 
-  constructor(private scene: Phaser.Scene) {}
+  constructor(
+    private scene: Phaser.Scene,
+    private plan: CityPlan = legacyPlan(),
+  ) {}
 
   get count() {
     let n = this.sparks.length;
     for (const v of this.items.values()) n += v.imgs.length;
     for (const v of this.works.values()) n += v.imgs.length;
+    for (const v of this.plaques.values()) n += v.length;
     return n;
   }
 
   /** Construction stages for each built landmark from how far it is to its next level (0..1, `top` when fully grown). */
   syncWorks(growth: (id: string) => { tier: number; pct: number; top: boolean } | undefined) {
-    for (const l of LANDMARKS) {
+    for (const l of this.plan.landmarks) {
       if (!serviceById(l.id)) continue;
       const g = growth(l.id);
       const stage = g && g.tier >= 0 ? constructionStage(g.pct, g.top) : 0;
+      // A construction site (tier 0) draws its own crane (construction3x3): it gets no second one.
+      const site = g?.tier === 0;
       const cur = this.works.get(l.id);
-      if ((cur?.stage ?? 0) === stage) continue;
+      if ((cur?.stage ?? 0) === stage && (cur?.site ?? false) === site) continue;
       cur?.imgs.forEach((i) => i.destroy());
       this.works.delete(l.id);
-      if (stage) this.works.set(l.id, { stage, imgs: this.buildWorks(l, stage) });
+      if (stage) this.works.set(l.id, { stage, site, imgs: this.buildWorks(l, stage, site) });
     }
   }
 
-  private buildWorks(l: LandmarkLayout, stage: number) {
+  private buildWorks(l: LandmarkLayout, stage: number, site = false) {
     const f = l.footprint;
     const imgs: Phaser.GameObjects.Image[] = [];
     const over = footprintDepth(CITY_ISO, f) + 1;
@@ -59,7 +68,7 @@ export class TierProps {
       imgs.push(addSprite(this.scene, 'scaffold1x1', n.x, n.y).setDepth(over));
     }
     // The crane stands at the back corner, behind the building, its jib over the roof.
-    if (stage >= 2 && hasSprite('crane1x1')) {
+    if (stage >= 2 && !site && hasSprite('crane1x1')) {
       const n = cornerScreen(CITY_ISO, f.x + f.w - 1, f.y);
       imgs.push(addSprite(this.scene, 'crane1x1', n.x, n.y).setDepth(footprintDepth(CITY_ISO, f) - 1));
       if (hasSprite('crane1x1@lights')) imgs.push(addSprite(this.scene, 'crane1x1@lights', n.x, n.y).setDepth(70_001).setBlendMode(Phaser.BlendModes.ADD).setAlpha(this.night));
@@ -67,16 +76,53 @@ export class TierProps {
     return imgs;
   }
 
+  /** Plaques for the buildings whose workshop is finished (beside the flag, on the row in front of the lot). */
+  syncEstablished(established: (id: string) => boolean) {
+    for (const l of this.plan.landmarks) {
+      if (!serviceById(l.id)) continue;
+      const on = established(l.id);
+      if (on === this.plaques.has(l.id)) continue;
+      this.plaques.get(l.id)?.forEach((i) => i.destroy());
+      this.plaques.delete(l.id);
+      if (!on || !hasSprite('established')) continue;
+      const t = frontRowTiles(l)[0];
+      const n = cornerScreen(CITY_ISO, t.x, t.y);
+      const y = toScreen(CITY_ISO, t.x, t.y).y;
+      const imgs = [addSprite(this.scene, 'established', n.x + 8, n.y).setDepth(entityDepth(y + 1))];
+      if (hasSprite('established@lights')) imgs.push(addSprite(this.scene, 'established@lights', n.x + 8, n.y).setDepth(70_001).setBlendMode(Phaser.BlendModes.ADD).setAlpha(this.night));
+      this.plaques.set(l.id, imgs);
+    }
+  }
+
+  /**
+   * A workshop just finished: the building's plaque drops in from above, lands with a bounce and a glint. `landed` runs
+   * as it touches down (the city's sound). Reduced motion shows it in place at once.
+   */
+  dropPlaque(id: string, landed?: () => void) {
+    const imgs = this.plaques.get(id);
+    if (!imgs?.length || reducedMotion()) return void landed?.();
+    const lift = 48;
+    for (const img of imgs) {
+      const y = img.y;
+      const alpha = img.alpha;
+      img.setY(y - lift).setAlpha(0);
+      this.scene.tweens.add({ targets: img, alpha, duration: 160 });
+      this.scene.tweens.add({ targets: img, y, duration: 520, ease: 'Bounce.easeOut' });
+    }
+    this.scene.time.delayedCall(260, () => landed?.());
+  }
+
   private night = 0;
-  /** The crane's beacon at night. */
+  /** The crane's beacon and the plaques' glow at night. */
   setNight(n: number) {
     this.night = n;
     for (const v of this.works.values()) for (const i of v.imgs) if (i.blendMode === Phaser.BlendModes.ADD) i.setAlpha(n);
+    for (const v of this.plaques.values()) for (const i of v) if (i.blendMode === Phaser.BlendModes.ADD) i.setAlpha(n);
   }
 
   /** Each built service landmark's tier (-1 or 0: nothing extra). Diffed: only a landmark whose tier changed is redrawn. */
   sync(tierOf: (id: string) => number) {
-    for (const l of LANDMARKS) {
+    for (const l of this.plan.landmarks) {
       if (!serviceById(l.id)) continue;
       const tier = Math.max(0, tierOf(l.id));
       const cur = this.items.get(l.id);
@@ -105,10 +151,17 @@ export class TierProps {
   /** A Master landmark visited: a few soft twinkles over it, once. Nothing under reduced motion. */
   sparkle(id: string, tier: number) {
     if (tier < TIER_SPARKLE || reducedMotion() || this.sparks.length) return;
-    const l = LANDMARKS.find((x) => x.id === id);
+    const l = this.plan.landmarkLayout(id);
     if (!l) return;
     const f = l.footprint;
     const c = toScreen(CITY_ISO, f.x + (f.w - 1) / 2, f.y + (f.h - 1) / 2);
+    this.sparkleAt(c.x, c.y - 40);
+  }
+
+  /** A few soft twinkles round a point (world px): a Master's visit, a combo found. Nothing under reduced motion. */
+  sparkleAt(x: number, y: number) {
+    if (reducedMotion() || this.sparks.length) return;
+    const c = { x, y: y + 40 };
     const key = ensureSparkleTexture(this.scene);
     for (let i = 0; i < SPARKS; i++) {
       const s = this.scene.add
@@ -136,6 +189,8 @@ export class TierProps {
     for (const v of this.items.values()) v.imgs.forEach((i) => i.destroy());
     this.items.clear();
     for (const v of this.works.values()) v.imgs.forEach((i) => i.destroy());
+    for (const v of this.plaques.values()) v.forEach((i) => i.destroy());
+    this.plaques.clear();
     this.works.clear();
     for (const s of this.sparks) s.destroy();
     this.sparks = [];

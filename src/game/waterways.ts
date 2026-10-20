@@ -1,13 +1,13 @@
 // Where the boats sail (pure, no Phaser; src/game/Boats.ts moves them): round the river that rings downtown, and along
 // the longest straight run of open sea the coast has.
 import { GRID } from '@/world/layout';
-import { RING_MAX, RING_MIN, type Terrain } from '@/world/terrain';
+import { ringOf, type Terrain } from '@/world/terrain';
 import type { Pt } from './RoadGraph';
 
 /** The river's centre line, all round (closed): a boat going round passes under every bridge. */
-export function riverLoop(lane: number): Pt[] {
+export function riverLoop(lane: number, size = GRID): Pt[] {
   const lo = -lane;
-  const hi = GRID - 1 + lane;
+  const hi = size - 1 + lane;
   return [{ x: lo, y: lo }, { x: hi, y: lo }, { x: hi, y: hi }, { x: lo, y: hi }, { x: lo, y: lo }];
 }
 
@@ -15,11 +15,12 @@ export function riverLoop(lane: number): Pt[] {
  * The longest straight run of open sea (with sea on both sides, so a ferry fits) at least 6 tiles from the core, along
  * a row or a column of the map; undefined when the coast has none worth sailing (an inland Region).
  */
-export function seaLane(t: Pick<Terrain, 'kind'>): Pt[] | undefined {
+export function seaLane(t: Pick<Terrain, 'kind'>, size = GRID): Pt[] | undefined {
+  const { min: RING_MIN, max: RING_MAX } = ringOf(size);
   let best: { a: Pt; b: Pt; n: number } | undefined;
   const open = (x: number, y: number, horizontal: boolean) =>
     t.kind(x, y) === 'sea' && (horizontal ? t.kind(x, y - 1) === 'sea' && t.kind(x, y + 1) === 'sea' : t.kind(x - 1, y) === 'sea' && t.kind(x + 1, y) === 'sea');
-  const far = (x: number, y: number) => Math.max(-x, x - (GRID - 1), -y, y - (GRID - 1)) >= 6;
+  const far = (x: number, y: number) => Math.max(-x, x - (size - 1), -y, y - (size - 1)) >= 6;
   for (const horizontal of [true, false])
     for (let j = RING_MIN + 1; j < RING_MAX; j++) {
       let start = -1;

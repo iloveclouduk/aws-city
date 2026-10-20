@@ -1,0 +1,32 @@
+{
+  "asOf": "2026-10-17",
+  "note": "Launch Day (src/learning/launch.ts, src/ui/launch/LaunchDay.tsx): build a stack, then survive a launch's traffic. The numbers are game-sized, but every behaviour is a real one, from the page in `source` (wording ours).",
+  "slots": [
+    { "id": "edge", "label": "Edge", "options": ["none", "cloudfront"] },
+    { "id": "guard", "label": "Firewall", "options": ["none", "shield"] },
+    { "id": "door", "label": "Front door", "options": ["none", "apigateway"] },
+    { "id": "compute", "label": "Compute", "options": ["ec2-1az", "ec2-2az", "lambda"] },
+    { "id": "buffer", "label": "Buffer", "options": ["none", "sqs"] },
+    { "id": "cache", "label": "Cache", "options": ["none", "elasticache"] },
+    { "id": "data", "label": "Database", "options": ["rds-1az", "rds-multiaz", "dynamodb"] }
+  ],
+  "parts": {
+    "none": { "serviceId": null, "name": "Nothing", "cost": 0, "rule": "Leave the slot empty.", "source": "https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html" },
+    "cloudfront": { "serviceId": "cloudfront", "name": "CloudFront", "cost": 2, "rule": "Copies of your pages wait at edge locations near people, so most reads never reach your servers.", "source": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/HowCloudFrontWorks.html" },
+    "shield": { "serviceId": "shield", "name": "Shield & WAF", "cost": 2, "rule": "A rate-based rule blocks clients that send too many requests, so a bot flood doesn't use up your servers.", "source": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-rate-based.html" },
+    "apigateway": { "serviceId": "apigateway", "name": "API Gateway", "cost": 2, "rule": "Throttling turns away requests above a steady rate, protecting what's behind it from being overwhelmed.", "source": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-request-throttling.html" },
+    "ec2-1az": { "serviceId": "ec2", "name": "EC2, one AZ", "cost": 3, "rule": "Two servers in one Availability Zone: a fixed amount of work at a time, and nothing left if that zone goes dark.", "source": "https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_fault_isolation_multiaz_region_system.html" },
+    "ec2-2az": { "serviceId": "ec2", "name": "EC2, two AZs", "cost": 4, "rule": "One server in each of two Availability Zones: if a zone goes dark, the other keeps serving.", "source": "https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_fault_isolation_multiaz_region_system.html" },
+    "lambda": { "serviceId": "lambda", "name": "Lambda", "cost": 3, "rule": "Scales out on its own, adding up to 1,000 execution environments every 10 seconds, and runs across zones for you.", "source": "https://docs.aws.amazon.com/lambda/latest/dg/scaling-behavior.html" },
+    "sqs": { "serviceId": "sqs", "name": "SQS queue", "cost": 1, "rule": "Writes wait in the queue when workers are busy, instead of failing, and are worked through when there's room.", "source": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html" },
+    "elasticache": { "serviceId": "elasticache", "name": "ElastiCache", "cost": 2, "rule": "Repeat reads come from memory in microseconds, taking load off the database.", "source": "https://aws.amazon.com/elasticache/faqs/" },
+    "rds-1az": { "serviceId": "rds", "name": "RDS, one AZ", "cost": 2, "rule": "A fixed amount of work at a time, and it stops if its zone goes dark.", "source": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZ.Failover.html" },
+    "rds-multiaz": { "serviceId": "rds", "name": "RDS Multi-AZ", "cost": 3, "rule": "A standby in another zone takes over if the first fails; failover typically takes 60 to 120 seconds.", "source": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZ.Failover.html" },
+    "dynamodb": { "serviceId": "dynamodb", "name": "DynamoDB on-demand", "cost": 3, "rule": "On-demand instantly accommodates up to double the previous peak, with no capacity to plan.", "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/on-demand-capacity-mode.html" }
+  },
+  "days": [
+    { "id": "launch", "name": "Launch day", "budget": 13, "simple": "Your app goes live. Expect a rush when the news drops.", "events": ["spike"], "unlock": 0 },
+    { "id": "viral", "name": "Going viral", "budget": 15, "simple": "Someone famous shares it, and halfway through, one Availability Zone goes dark.", "events": ["spike", "viral", "blip"], "unlock": 3 },
+    { "id": "attack", "name": "Under attack", "budget": 17, "simple": "A bot flood hits your front door while real customers keep coming.", "events": ["spike", "blip", "bots", "viral"], "unlock": 6 }
+  ]
+}

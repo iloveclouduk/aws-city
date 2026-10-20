@@ -1,6 +1,7 @@
 {
-  "source": "Hand-written to AWS's own docs: S3 storage classes and their minimums (S3 pricing and user guide), Route 53 record types and routing policies (Route 53 developer guide), AWS WAF managed rule groups and rate-based rules (AWS WAF developer guide). Tiers: 1 first plays, 2 after a couple of plays, 3 for regulars.",
-  "asOf": "2026-10-11",
+  "source": "Hand-written to AWS's own docs: S3 storage classes and their minimums (S3 pricing and user guide), Route 53 record types and routing policies (Route 53 developer guide), AWS WAF managed rule groups and rate-based rules (AWS WAF developer guide), red team requests (fictional log lines; each flaw type cites its AWS docs page). Tiers: 1 first plays, 2 after a couple of plays, 3 for regulars.",
+  "asOf": "2026-10-17",
+  "minAccuracy": { "iamgate": 75, "redteam": 75, "queue": 85, "edge": 25, "shield": 60, "lambda": 60, "dynamodb": 70 },
   "fishing": [
     {
       "name": "profile-pic.jpg",
@@ -709,5 +710,288 @@
         "group": "a rate-based rule (requests per IP address over a time window)"
       }
     }
+  },
+  "redteam": {
+    "lesson": "Every request must prove who is asking, and reach only what that caller owns. Check identity, check ownership, and never trust the input.",
+    "flaws": {
+      "idor": {
+        "name": "Insecure direct object reference",
+        "simple": "Change a number in the address and you see someone else's record, because the app never checks the owner.",
+        "fix": "On every request, check that the signed-in caller owns the record, not just that they are signed in.",
+        "source": "https://docs.aws.amazon.com/securityagent/latest/userguide/security-guidance.html"
+      },
+      "sqli": {
+        "name": "SQL injection",
+        "simple": "Text typed into a box gets run as part of a database command.",
+        "fix": "Use parameterised queries so input is only ever data, and add an AWS WAF SQL injection rule in front.",
+        "source": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-sqli-match.html"
+      },
+      "xss": {
+        "name": "Cross-site scripting",
+        "simple": "A script hidden in a comment or name runs in other people's browsers.",
+        "fix": "Encode user text before showing it, and add an AWS WAF cross-site scripting rule in front.",
+        "source": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-xss-match.html"
+      },
+      "cross-tenant": {
+        "name": "Cross-tenant access",
+        "simple": "One customer company reaches another company's data in a shared app.",
+        "fix": "Scope each request's credentials to its own tenant, for example with a session policy on dynamodb:LeadingKeys.",
+        "source": "https://aws.amazon.com/blogs/apn/isolating-saas-tenants-with-dynamically-generated-iam-policies/"
+      },
+      "no-auth": {
+        "name": "Missing authentication",
+        "simple": "Anyone can call it: the app never asks who you are.",
+        "fix": "Put an authorizer on every route that isn't meant to be public, and default to deny.",
+        "source": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html"
+      },
+      "secret-in-url": {
+        "name": "Secret in the address",
+        "simple": "A password or key sits in the web address, where logs and browser history keep it.",
+        "fix": "Send secrets in a header or the request body, keep keys in Secrets Manager, and rotate any that leaked.",
+        "source": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html"
+      }
+    },
+    "requests": [
+      {
+        "id": "r01",
+        "line": "GET /api/invoices/9142  as: tenant 3 (its own invoice)",
+        "flaw": null,
+        "tier": 1
+      },
+      {
+        "id": "r02",
+        "line": "GET /products?search=blue+mug",
+        "flaw": null,
+        "tier": 1
+      },
+      {
+        "id": "r03",
+        "line": "GET /api/orders  as: tenant 7 (lists its own orders)",
+        "flaw": null,
+        "tier": 1
+      },
+      {
+        "id": "r04",
+        "line": "GET /health  (public status page)",
+        "flaw": null,
+        "tier": 1
+      },
+      {
+        "id": "r05",
+        "line": "POST /api/comments  body: \"Great service!\"",
+        "flaw": null,
+        "tier": 1
+      },
+      {
+        "id": "r06",
+        "line": "POST /login  user=ana@shop.example (password in the body)",
+        "flaw": null,
+        "tier": 2
+      },
+      {
+        "id": "r07",
+        "line": "PUT /api/profile  as: user 55 (edits own profile)",
+        "flaw": null,
+        "tier": 2
+      },
+      {
+        "id": "r08",
+        "line": "GET /search?q=red%20shoes",
+        "flaw": null,
+        "tier": 2
+      },
+      {
+        "id": "r09",
+        "line": "DELETE /api/cart/items/12  as: user 9 (own cart)",
+        "flaw": null,
+        "tier": 2
+      },
+      {
+        "id": "r10",
+        "line": "GET /api/tenants/7/reports  as: tenant 7",
+        "flaw": null,
+        "tier": 3
+      },
+      {
+        "id": "r11",
+        "line": "GET /download/report.pdf  token in Authorization header",
+        "flaw": null,
+        "tier": 3
+      },
+      {
+        "id": "r12",
+        "line": "GET /api/users/me  as: user 31",
+        "flaw": null,
+        "tier": 3
+      },
+      {
+        "id": "r13",
+        "line": "GET /api/users/32/address  as: user 31",
+        "flaw": "idor",
+        "tier": 1
+      },
+      {
+        "id": "r14",
+        "line": "GET /api/orders/5001  as: user 9 (order of user 14)",
+        "flaw": "idor",
+        "tier": 2
+      },
+      {
+        "id": "r15",
+        "line": "PUT /api/profile/77  as: user 55 (edits user 77)",
+        "flaw": "idor",
+        "tier": 3
+      },
+      {
+        "id": "r16",
+        "line": "GET /api/invoices/9142  as: tenant 7 (invoice of tenant 3)",
+        "flaw": "cross-tenant",
+        "tier": 1
+      },
+      {
+        "id": "r17",
+        "line": "GET /api/tenants/3/reports  as: tenant 7",
+        "flaw": "cross-tenant",
+        "tier": 2
+      },
+      {
+        "id": "r18",
+        "line": "SCAN invoices table  as: tenant 7 (no tenant filter)",
+        "flaw": "cross-tenant",
+        "tier": 3
+      },
+      {
+        "id": "r19",
+        "line": "GET /products?search=' OR 1=1--",
+        "flaw": "sqli",
+        "tier": 1
+      },
+      {
+        "id": "r20",
+        "line": "POST /login  user=admin'--",
+        "flaw": "sqli",
+        "tier": 2
+      },
+      {
+        "id": "r21",
+        "line": "GET /api/orders?sort=date;DROP TABLE orders",
+        "flaw": "sqli",
+        "tier": 3
+      },
+      {
+        "id": "r22",
+        "line": "POST /api/comments  body: <script>alert(1)</script>",
+        "flaw": "xss",
+        "tier": 1
+      },
+      {
+        "id": "r23",
+        "line": "GET /search?q=<img src=x onerror=alert(1)>",
+        "flaw": "xss",
+        "tier": 2
+      },
+      {
+        "id": "r24",
+        "line": "PUT /api/profile  name: <script>alert('hi')</script>",
+        "flaw": "xss",
+        "tier": 3
+      },
+      {
+        "id": "r25",
+        "line": "GET /api/admin/users  (no token)",
+        "flaw": "no-auth",
+        "tier": 1
+      },
+      {
+        "id": "r26",
+        "line": "DELETE /api/invoices/9142  (no token)",
+        "flaw": "no-auth",
+        "tier": 2
+      },
+      {
+        "id": "r27",
+        "line": "GET /api/exports/all  (no sign-in check)",
+        "flaw": "no-auth",
+        "tier": 3
+      },
+      {
+        "id": "r28",
+        "line": "GET /api/data?api_key=demo-secret-123",
+        "flaw": "secret-in-url",
+        "tier": 1
+      },
+      {
+        "id": "r29",
+        "line": "GET /reset?new_password=hunter2",
+        "flaw": "secret-in-url",
+        "tier": 2
+      },
+      {
+        "id": "r30",
+        "line": "GET /export?session=eyJhbGciOi...  (token in the address)",
+        "flaw": "secret-in-url",
+        "tier": 3
+      }
+    ]
+  },
+  "queue": {
+    "lesson": "A queue lets producers and workers run at their own pace: bursts wait instead of being lost. A message that keeps failing goes to a dead-letter queue, so it can't block the line.",
+    "source": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html",
+    "messages": ["order #1042", "resize photo", "send receipt", "update stock", "new signup", "refund #77", "ship parcel", "thumbnail", "invoice", "welcome email"],
+    "poison": ["malformed JSON", "missing order id", "corrupt image", "unknown type"]
+  },
+  "iamgate": {
+    "lesson": "IAM denies anything a policy doesn't allow, and an explicit Deny beats any Allow. Grant only what a role needs.",
+    "source": "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic.html",
+    "waves": [
+      {
+        "role": "Photos app (Lambda)",
+        "policy": ["Allow s3:GetObject on photos/*", "Allow s3:PutObject on photos/*"],
+        "requests": [
+          { "text": "s3:GetObject photos/cat.jpg", "allow": true, "why": "Allowed: GetObject on photos/*." },
+          { "text": "s3:PutObject photos/new.png", "allow": true, "why": "Allowed: PutObject on photos/*." },
+          { "text": "s3:DeleteObject photos/cat.jpg", "allow": false, "why": "No statement allows DeleteObject, so it's denied by default." },
+          { "text": "s3:GetObject payroll/2026.csv", "allow": false, "why": "The Allow covers photos/* only." },
+          { "text": "dynamodb:Scan orders", "allow": false, "why": "Nothing allows DynamoDB at all: denied by default." }
+        ]
+      },
+      {
+        "role": "Orders service (ECS task)",
+        "policy": ["Allow dynamodb:GetItem, PutItem on table orders", "Deny dynamodb:DeleteTable on *"],
+        "requests": [
+          { "text": "dynamodb:PutItem orders", "allow": true, "why": "Allowed on the orders table." },
+          { "text": "dynamodb:GetItem orders", "allow": true, "why": "Allowed on the orders table." },
+          { "text": "dynamodb:DeleteTable orders", "allow": false, "why": "An explicit Deny beats everything." },
+          { "text": "dynamodb:PutItem customers", "allow": false, "why": "The Allow names the orders table only." },
+          { "text": "s3:ListBucket logs", "allow": false, "why": "No S3 statement: denied by default." }
+        ]
+      },
+      {
+        "role": "Report job (EC2)",
+        "policy": ["Allow athena:StartQueryExecution on workgroup reports", "Allow s3:GetObject on datalake/*", "Deny s3:* on datalake/private/*"],
+        "requests": [
+          { "text": "athena:StartQueryExecution reports", "allow": true, "why": "Allowed on the reports workgroup." },
+          { "text": "s3:GetObject datalake/sales.parquet", "allow": true, "why": "Allowed on datalake/*." },
+          { "text": "s3:GetObject datalake/private/hr.csv", "allow": false, "why": "The explicit Deny on datalake/private/* wins over the Allow." },
+          { "text": "s3:PutObject datalake/sales.parquet", "allow": false, "why": "Only GetObject is allowed." },
+          { "text": "iam:CreateUser intern", "allow": false, "why": "Nothing allows IAM changes: denied by default." }
+        ]
+      }
+    ]
+  },
+  "edge": {
+    "lesson": "An edge cache answers repeat requests close to viewers; the origin only sees misses. When a file changes, invalidate it, or viewers keep the old copy until its TTL runs out.",
+    "source": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Invalidation.html",
+    "files": [
+      { "name": "index.html", "weight": 6 },
+      { "name": "logo.png", "weight": 5 },
+      { "name": "app.js", "weight": 4 },
+      { "name": "style.css", "weight": 3 },
+      { "name": "hero.jpg", "weight": 2 },
+      { "name": "font.woff2", "weight": 1 },
+      { "name": "terms.pdf", "weight": 1 },
+      { "name": "careers.html", "weight": 1 }
+    ],
+    "cities": ["London", "Tokyo", "São Paulo", "Mumbai", "Sydney", "Toronto", "Paris", "Cape Town"]
   }
 }

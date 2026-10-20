@@ -1,0 +1,166 @@
+{
+  "asOf": "2026-10-17",
+  "event": "AWS North",
+  "note": "Talks from the AWS North conference, summarised in our own words (no quotes, no speaker names). Every fact is checked against the AWS docs in `sources`; claims we couldn't verify were left out. `check` is a three-question quiz, `workshopIds` the hands-on workshops in shared/workshops.json that follow each talk.",
+  "talks": [
+    {
+      "id": "agentic-microservices",
+      "title": "Agents as microservices",
+      "theme": "agents",
+      "simple": "AI agents can be built like small services: each does one job well, and they talk to each other.",
+      "summary": "Services grew from SOA to REST, GraphQL and gRPC, and agents are the next step. An agent reaches tools and other agents over REST, MCP or A2A. A model decides which tools to call, in what order and how often, so treat every tool, even a local one, like a call across the network: slow, repeated or half done. Too many tools blur an agent's choices, so split work across small specialised agents, cap the turns they take with each other, watch token cost and add tracing from day one. AgentCore Runtime hosts them and bills for active processing.",
+      "keyIdeas": [
+        "Agents reach tools and other agents over REST, MCP or A2A, much as services call each other.",
+        "A model picks tools unpredictably: expect odd call orders, bursts of calls and half-finished work.",
+        "Treat even a local tool like a network call: give it a timeout, make it safe to retry, log it.",
+        "Too many tools dilute an agent's choices; small specialised agents that collaborate do better.",
+        "Cap how many turns agents take with each other, and count the tokens each turn costs."
+      ],
+      "serviceIds": ["agentcore", "bedrock", "apigateway", "lambda"],
+      "check": [
+        {"q": "Which protocol lets one agent call another agent hosted on AgentCore Runtime?", "options": ["A2A (Agent2Agent)", "Email", "A shared spreadsheet"], "answer": 0, "why": "AgentCore Runtime can host A2A servers, so agents call each other over the Agent2Agent protocol."},
+        {"q": "What does AgentCore Gateway do?", "options": ["Turns APIs and Lambda functions into MCP tools agents can call", "Trains new foundation models", "Hosts static websites"], "answer": 0, "why": "Gateway turns Lambda functions, OpenAPI or Smithy APIs and API Gateway REST stages into MCP tools."},
+        {"q": "Why split one agent with dozens of tools into several smaller agents?", "options": ["With fewer tools, each agent picks the right one more reliably", "It removes the need for a model", "An agent can only hold three tools"], "answer": 0, "why": "A long tool list dilutes the model's choices. Specialised agents that hand work to each other stay focused."}
+      ],
+      "workshopIds": [],
+      "sources": [
+        "https://aws.amazon.com/bedrock/agentcore/faqs/",
+        "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-a2a.html",
+        "https://docs.aws.amazon.com/help-panel/bedrock-agentcore/latest/console/hp-gateway-target-set-up.html",
+        "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html"
+      ]
+    },
+    {
+      "id": "agent-engineer",
+      "title": "Engineering in the age of agents",
+      "theme": "careers",
+      "simple": "Learn to think about systems, data, models and people, so you steer the AI instead of riding along.",
+      "summary": "As agents write more of the code, an engineer's value moves to judgement. Systems thinking: domain-driven design splits a business into core, supporting and generic parts with bounded contexts, which also keeps an AI's changes inside clear walls. Data thinking: know where data starts, how it flows (ETL or ELT) and where it lives, and delete what you don't need. Model thinking: pick the model that fits the task, not the newest. Human thinking: sustainability, ethics and guardrails. Grow broad skills with a few deep ones, and stay the driver.",
+      "keyIdeas": [
+        "Bounded contexts from domain-driven design give services, and the AI working on them, clear walls.",
+        "Know your data's life: where it starts, how it moves (ETL or ELT), where it rests and when to delete it.",
+        "Pick the model that fits the job and the budget; the newest one isn't always the right one.",
+        "Guardrails, ethics and sustainability are part of the engineering, not an afterthought.",
+        "Grow broad skills with a few deep ones, and drive the AI rather than ride along."
+      ],
+      "serviceIds": ["bedrock"],
+      "check": [
+        {"q": "In domain-driven design, what does a bounded context do?", "options": ["Draws a boundary around one business area and its language", "Limits how much a service may cost", "Sets an AI model's longest answer"], "answer": 0, "why": "Microservices use bounded contexts to draw service boundaries along business boundaries, so each part can change on its own."},
+        {"q": "Why delete data you no longer need?", "options": ["Less to store, protect and process, which also helps sustainability", "Old data makes every query return wrong answers", "Deleting data makes a database faster to create"], "answer": 0, "why": "The Well-Architected sustainability pillar advises removing unneeded data: less storage, less risk, less energy."},
+        {"q": "How should a team pick a foundation model?", "options": ["Compare models on its own task for quality, speed and cost", "Always use the newest model", "Use the largest model for everything"], "answer": 0, "why": "Bedrock offers many models. Testing them on your own examples shows which one fits the task and the budget."}
+      ],
+      "workshopIds": [],
+      "sources": [
+        "https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_service_architecture_business_domains.html",
+        "https://docs.aws.amazon.com/wellarchitected/2022-03-31/framework/sus-04.html",
+        "https://aws.amazon.com/blogs/machine-learning/beyond-the-basics-a-comprehensive-foundation-model-selection-framework-for-generative-ai/"
+      ]
+    },
+    {
+      "id": "multi-tenant-saas",
+      "title": "Serverless SaaS for many tenants",
+      "theme": "saas",
+      "simple": "One app serves many customer companies, and each one must only ever see its own data.",
+      "summary": "A SaaS app serves many tenants, and each tenant's data must stay its own. Resources can be siloed (a set per tenant), pooled (shared) or bridged (a mix). Pooled tables lead every key with the tenant id. Requests find their tenant by path, subdomain or custom domain, and Cognito can carry the tenant in a read-only custom attribute. A Lambda authorizer on an API Gateway REST API returns a policy plus the tenant as context. The function then gets credentials scoped by a session policy on dynamodb:LeadingKeys, so even a bug can't read another tenant's rows.",
+      "keyIdeas": [
+        "Silo gives each tenant its own resources, pool shares them, and bridge mixes the two layer by layer.",
+        "In a pooled table the tenant id leads every key, so each tenant's rows sit together.",
+        "A Lambda authorizer returns an allow or deny policy plus context, such as the caller's tenant.",
+        "A session policy on dynamodb:LeadingKeys scopes credentials to one tenant, so a bug can't cross over.",
+        "Usage plans throttle each tenant's API key (best effort), so a noisy neighbour can't slow the rest."
+      ],
+      "serviceIds": ["cognito", "apigateway", "iam", "dynamodb"],
+      "check": [
+        {"q": "In the pool model, how do tenants share one DynamoDB table safely?", "options": ["Keys start with the tenant id, and credentials only reach that tenant's keys", "Each tenant uses a different AWS Region", "Tenants take turns using the table"], "answer": 0, "why": "Pooled rows are keyed by tenant. A session policy on dynamodb:LeadingKeys limits each request to its own tenant's items."},
+        {"q": "What can an API Gateway Lambda authorizer return besides allow or deny?", "options": ["A context map, such as the tenant id, passed on to the backend", "A new database table", "A copy of the user's password"], "answer": 0, "why": "The authorizer returns a principal, a policy document and an optional context of strings, numbers or booleans."},
+        {"q": "Are API Gateway usage plan throttles and quotas hard limits?", "options": ["No, they're applied on a best-effort basis", "Yes, never exceeded by a single request", "Only on weekends"], "answer": 0, "why": "AWS says usage plan limits are best effort. Don't use API keys for authorization or to control cost."}
+      ],
+      "workshopIds": ["saas-tenant-isolation"],
+      "sources": [
+        "https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/silo-pool-and-bridge-models.html",
+        "https://aws.amazon.com/blogs/apn/isolating-saas-tenants-with-dynamically-generated-iam-policies/",
+        "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-lambda-authorizer-output.html",
+        "https://docs.aws.amazon.com/cognito/latest/developerguide/custom-attribute-based-multi-tenancy.html"
+      ]
+    },
+    {
+      "id": "ai-dlc",
+      "title": "The AI-driven development life cycle",
+      "theme": "delivery",
+      "simple": "AI does its best work when the team writes down what it knows first, then checks each step together.",
+      "summary": "AI is only as good as the context it gets. Much of a team's know-how is tacit, held in people's heads, so write it down as skills, rules, prompts, tools reached through MCP and memories that fit the context window. In one two-week greenfield project the team spent about 40% of the time on that first: a style guide, a data model drawn from wireframes and reviews that threw rocks at the plan. Then delivery sped up. AWS's AI-DLC frames this as Inception, Construction and Operations: AI proposes, the team validates, and short bolts replace sprints. Start small.",
+      "keyIdeas": [
+        "Write the team's tacit know-how down as skills, rules and prompts the AI can read.",
+        "Context windows are limited: give the AI the right few things, not everything.",
+        "AI-DLC runs through Inception, Construction and Operations, with the team validating each step.",
+        "In Mob Elaboration the whole team checks the AI's questions and proposals together.",
+        "Bolts, cycles of hours or days, replace sprints; start with something small, like a commit skill."
+      ],
+      "serviceIds": ["q", "bedrock"],
+      "check": [
+        {"q": "What are the three phases of AWS's AI-DLC?", "options": ["Inception, Construction and Operations", "Plan, Code and Forget", "Design, Test and Launch"], "answer": 0, "why": "AI-DLC runs through Inception, Construction and Operations, with the team validating the AI's work at each step."},
+        {"q": "In AI-DLC, what replaces sprints?", "options": ["Bolts: short cycles of hours or days", "Quarterly releases", "Hackathons"], "answer": 0, "why": "Bolts are shorter, more intense cycles than sprints, and units of work replace epics."},
+        {"q": "Why write skills and rules before asking AI to build?", "options": ["AI only knows what's in its context, so the team's know-how must be written down", "It makes the model bigger", "Rules make AI answers free"], "answer": 0, "why": "Tacit knowledge lives in people's heads. Written skills, rules and specs give the AI the context it lacks."}
+      ],
+      "workshopIds": [],
+      "sources": [
+        "https://aws.amazon.com/blogs/devops/ai-driven-development-life-cycle/",
+        "https://aws.amazon.com/blogs/devops/open-sourcing-adaptive-workflows-for-ai-driven-development-life-cycle-ai-dlc/"
+      ]
+    },
+    {
+      "id": "lambda-managed-instances",
+      "title": "Lambda Managed Instances",
+      "theme": "serverless",
+      "simple": "Run Lambda functions on bigger, always-on EC2 servers that Lambda looks after for you.",
+      "summary": "Lambda Managed Instances runs your functions on current-generation EC2 instances in your own account and VPC, while Lambda patches, routes and scales them. A capacity provider sets the subnets, an operator role and the instance types (C, M or R families). Each environment serves many requests at once, sized by a memory to vCPU ratio of 2:1, 4:1 or 8:1. There are no cold starts: it scales on CPU use, not per request, and keeps a minimum running. You pay the EC2 price plus a 15% fee. It suits steady, heavy or CPU-bound traffic; spiky work stays on standard Lambda.",
+      "keyIdeas": [
+        "A capacity provider picks the subnets, operator role, instance types and scaling, and is the security boundary.",
+        "One execution environment handles many invocations at once (multi-concurrency).",
+        "No cold starts: it scales on CPU use, ahead of demand, and never down to zero.",
+        "You pay the EC2 instance price plus a 15% management fee; EC2 discounts cover the instance part.",
+        "Asynchronous invokes can run for up to 90 minutes; synchronous calls still stop at 15."
+      ],
+      "serviceIds": ["lambda", "ec2", "vpc"],
+      "check": [
+        {"q": "What does Lambda Managed Instances cost?", "options": ["The EC2 instance price plus a 15% management fee", "Per request only, like standard Lambda", "Nothing until the first cold start"], "answer": 0, "why": "You pay for the EC2 instances plus a 15% fee. EC2 discounts apply to the compute, not to the fee."},
+        {"q": "How does Lambda Managed Instances scale?", "options": ["On CPU use, in the background, with no cold starts", "By starting a new environment for every request", "It never scales"], "answer": 0, "why": "It scales on CPU use and concurrency, not when a request arrives, so requests never wait for a cold start."},
+        {"q": "Which workload suits Managed Instances better than standard Lambda?", "options": ["Steady, high, CPU-heavy traffic", "A function called twice a day", "A job that must scale to zero overnight"], "answer": 0, "why": "Steady load keeps the instances busy. Rare calls are cheaper on standard Lambda, which scales to zero."}
+      ],
+      "workshopIds": ["lmi-capacity-provider"],
+      "sources": [
+        "https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances.html",
+        "https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances-scaling.html",
+        "https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances-capacity-providers.html",
+        "https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html"
+      ]
+    },
+    {
+      "id": "durable-functions",
+      "title": "Durable functions for conversational agents",
+      "theme": "serverless",
+      "simple": "A Lambda function that can pause for days, remember where it was, and carry on.",
+      "summary": "A reminder agent texts a customer, waits for a reply and reschedules if needed, by text or voice. Lambda durable functions fit: each step checkpoints its result, waitForCallback suspends until the reply arrives, and after a pause the code replays from the start, skipping finished steps. Code outside steps runs again, so keep it deterministic. Steps are at-least-once by default, so use idempotency keys. Pin executions to versions, add a DLQ and know the limits (30,000 operations, 100 MB). Give each agent its own function, check a model's answer before sending it and key memory by customer.",
+      "keyIdeas": [
+        "A step checkpoints its result; waitForCallback suspends the run until another system replies.",
+        "On replay, code outside steps runs again: keep it deterministic and put randomness and time inside steps.",
+        "Steps are at-least-once by default, and execution names act as idempotency keys.",
+        "Invoke a version or an alias: an execution stays pinned to the version that started it.",
+        "Check a model's answer before it reaches a customer: models can be confidently wrong."
+      ],
+      "serviceIds": ["lambda", "bedrock"],
+      "check": [
+        {"q": "When a durable function resumes, what happens to steps that already finished?", "options": ["They're skipped, and their saved results are reused", "They all run again from scratch", "The execution fails"], "answer": 0, "why": "Replay starts from the top but skips completed checkpoints, reusing their stored results."},
+        {"q": "What happens if you reuse an execution name with a different payload?", "options": ["Lambda refuses it with DurableExecutionAlreadyStartedException", "A second execution starts", "The old execution is overwritten"], "answer": 0, "why": "Execution names are idempotency keys. The same payload returns the existing execution; a different one is refused."},
+        {"q": "When does Step Functions fit better than durable functions?", "options": ["Orchestrating a visual workflow across many AWS services", "Writing app logic in your own language inside Lambda", "Making one function run faster"], "answer": 0, "why": "AWS's guidance: durable functions for app logic in code, Step Functions for visual orchestration across 220+ services."}
+      ],
+      "workshopIds": ["durable-first-function"],
+      "sources": [
+        "https://docs.aws.amazon.com/lambda/latest/dg/durable-functions.html",
+        "https://docs.aws.amazon.com/lambda/latest/dg/durable-execution-idempotency.html",
+        "https://docs.aws.amazon.com/lambda/latest/dg/durable-step-functions.html",
+        "https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html"
+      ]
+    }
+  ]
+}

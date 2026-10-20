@@ -1,5 +1,6 @@
 // The citizens who look after the city: one per Well-Architected pillar (shared/citizens.json), and the player
 // text of the rules they check (shared/wa-rules.json). Both files are shared with the server.
+import type { WaBestPractice } from './content';
 import citizensJson from '../../shared/citizens.json' with { type: 'json' };
 import rulesJson from '../../shared/wa-rules.json' with { type: 'json' };
 import type { PillarKey } from '@/backend/contract';
@@ -33,6 +34,8 @@ export interface WaRule {
   /** Why it matters, in plain words. */
   why?: string;
   url: string;
+  /** The Well-Architected best practice it checks (tests/wa-bp.test.ts). */
+  bp?: WaBestPractice;
   fix?: { fixId: string; title: string; preview: string; rollback: string; costNote?: string };
 }
 

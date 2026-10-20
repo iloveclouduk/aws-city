@@ -4,6 +4,13 @@ import puzzlesJson from '../../shared/puzzles.json' with { type: 'json' };
 import questsJson from '../../shared/quests.json' with { type: 'json' };
 import templatesJson from '../../shared/templates.json' with { type: 'json' };
 
+/** A Well-Architected Framework best practice (id like SEC08-BP02, its title and its page on docs.aws.amazon.com). */
+export interface WaBestPractice {
+  id: string;
+  title: string;
+  url: string;
+}
+
 export interface Flashcard {
   id: string;
   q: string;
@@ -12,6 +19,8 @@ export interface Flashcard {
   simple?: string;
   tier: number;
   source: string;
+  /** The AWS North talk the card comes from (shared/conference.json), when it does. */
+  talk?: string;
 }
 
 export type PillarId = 'operational' | 'security' | 'reliability' | 'performance' | 'cost' | 'sustainability';
@@ -35,7 +44,11 @@ export interface Puzzle {
   why: string;
   /** Why the design works in a sentence a kid can read; `why` stays the full explanation, one tap away. */
   simpleWhy?: string;
-  pillarBonus: Record<PillarId, { services: string[]; tip: string }>;
+  pillarBonus: Record<PillarId, { services: string[]; tip: string; bp?: WaBestPractice }>;
+  /** The AWS reference architecture, whitepaper or lens this design follows. */
+  reference?: { title: string; url: string };
+  /** The CloudFormation this design becomes, for a drawing no quest deploys (shared/templates/<id>.yaml). */
+  templateId?: string;
   /** Bonus services the brief doesn't ask for: placing one costs points (over-building isn't free). */
   unneeded?: string[];
   /** The architecture drawn as an AWS diagram: slots to drop services on, arrows the data flows along. */
@@ -111,7 +124,13 @@ export type QuestStep =
   | { kind: 'ask'; prompt: string; text: string }
   | { kind: 'deploy'; templateId: string; text: string }
   /** A scenario question: which service fits, which is cheaper, what's wrong here. One option is right; each says why. */
-  | { kind: 'choose'; id: string; text: string; question: string; options: ChoiceOption[] };
+  | { kind: 'choose'; id: string; text: string; question: string; options: ChoiceOption[] }
+  /** Do a step of a hands-on workshop (shared/workshops.json), in practice or for real (store.workshopStep). */
+  | { kind: 'workshop'; workshopId: string; text: string }
+  /** Do something in the real AWS console with the Console Copilot, on this service's console page. */
+  | { kind: 'console'; serviceId: string; goal: string; text: string }
+  /** Draw any design on the Drawing board (Learn) that passes its review (src/ui/diagram/Sandbox.tsx). */
+  | { kind: 'design'; text: string };
 
 export interface ChoiceOption {
   text: string;
@@ -188,3 +207,15 @@ export function tipFor(serviceId: string, tier: number, turn: number): string | 
   }
   return out.trim();
 }
+
+/** The deploy template a quest builds right after this drawing (its CloudFormation is what the drawing becomes). */
+export const templateForPuzzle = (puzzleId: string): DeployTemplate | undefined => {
+  for (const q of QUESTS) {
+    const i = q.steps.findIndex((st) => st.kind === 'puzzle' && st.puzzleId === puzzleId);
+    const next = i >= 0 ? q.steps.slice(i + 1).find((st) => st.kind === 'deploy') : undefined;
+    if (next && next.kind === 'deploy') return TEMPLATES.find((t) => t.id === next.templateId);
+  }
+  // A drawing no quest deploys names its own template.
+  const own = PUZZLES.find((z) => z.id === puzzleId)?.templateId;
+  return own ? TEMPLATES.find((t) => t.id === own) : undefined;
+};

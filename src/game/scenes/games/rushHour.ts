@@ -17,6 +17,11 @@ export const RUSH = {
   okLongQueueS: 6,
   /** …and at most this many server-seconds spent idle. */
   okIdleS: 30,
+  /** Points: each customer served earns these; each idle server-second, each second of long line and each lost customer costs. */
+  servedPts: 2,
+  idleCost: 1,
+  longCost: 3,
+  lostCost: 2,
 } as const;
 
 export type Phase = 'morning' | 'lunch' | 'evening';
@@ -103,8 +108,9 @@ export function tick(s: RushState, arrived: number): Tick {
   s.stats.lost += lost;
   s.stats.idleS += idle;
   if (long) s.stats.longQueueS++;
-  // Every customer served earns a point; idle servers cost money; a long line upsets people.
-  const points = served - idle - (long ? 3 : 0) - lost * 2;
+  // Every customer served earns points; idle servers cost money; a long line upsets people. Served pays more than an
+  // idle server costs, so sensible scaling (a step behind the crowd, as a person plays) scores clearly above zero.
+  const points = served * RUSH.servedPts - idle * RUSH.idleCost - (long ? RUSH.longCost : 0) - lost * RUSH.lostCost;
   return { arrived, served, idle, long, lost, points };
 }
 

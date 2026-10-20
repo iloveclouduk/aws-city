@@ -1,0 +1,76 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the morning briefing. Turns on Security Hub, GuardDuty and Macie in this Region, and sends every critical finding to an SQS queue for the on-call team. Turn on Amazon Inspector in its console (CloudFormation has no switch for it); its findings then join the same board.
+
+Resources:
+  SecurityBoard:
+    Type: AWS::SecurityHub::HubV2
+    Properties:
+      Tags:
+        managed-by: aws-city
+
+  Watchtower:
+    Type: AWS::GuardDuty::Detector
+    Properties:
+      Enable: true
+      FindingPublishingFrequency: FIFTEEN_MINUTES
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  DataDetective:
+    Type: AWS::Macie::Session
+    Properties:
+      Status: ENABLED
+      FindingPublishingFrequency: FIFTEEN_MINUTES
+
+  OnCallQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  OnCallQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref OnCallQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt OnCallQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt CriticalFinding.Arn
+
+  # Security Hub sends each new or updated finding as one "Findings Imported V2" event (OCSF format).
+  CriticalFinding:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: A critical finding on the Security Hub board
+      EventPattern:
+        source:
+          - aws.securityhub
+        detail-type:
+          - Findings Imported V2
+        detail:
+          findings:
+            severity:
+              - Critical
+      Targets:
+        - Id: on-call
+          Arn: !GetAtt OnCallQueue.Arn
+
+Outputs:
+  QueueUrl:
+    Description: Critical findings for the on-call team
+    Value: !Ref OnCallQueue
+  DetectorId:
+    Description: The GuardDuty detector
+    Value: !Ref Watchtower

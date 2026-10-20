@@ -51,12 +51,14 @@ export const FONT_SIZE = { sm: '11px', md: '13px', lg: '16px' } as const;
 /** Every sign and tag on the map: ink on a translucent graphite chip. */
 export const LABEL_BG = withAlpha('bg', 0.85);
 
-/** Speech bubble tones: paper-white for speech, parchment for steps, the semantic colours for done and alert. */
+/** Speech bubble tones: paper-white for speech, parchment for steps, the semantic colours for done and alert, gold for a find. */
 export const BUBBLE_TONES = {
   speech: { fill: COLOR.bubble, stroke: COLOR.bg, text: CSS.bubbleInk, name: CSS.paperMeta },
   step: { fill: COLOR.highlight, stroke: COLOR.bg, text: CSS.quoteInk, name: CSS.paperMeta },
   done: { fill: COLOR.goodInk, stroke: COLOR.roleOk, text: CSS.bubbleInk, name: CSS.roleOk },
   alert: { fill: COLOR.badInk, stroke: 0x8f2a2e, text: CSS.bubbleInk, name: '#a32d31' },
+  /** A golden token found: the city's gold, short and bright. */
+  gold: { fill: COLOR.goldHi, stroke: COLOR.gold, text: CSS.paperInk, name: CSS.paperMeta },
 } as const;
 
 /** The common label style: 11 px, heavy, on the label chip. */

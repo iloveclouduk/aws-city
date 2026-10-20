@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
-import { BENCHES, GRID, type Tile } from '@/world/layout';
+import { BENCHES, type Tile } from '@/world/layout';
 import { Agent, type AgentWorld } from './Agent';
 import { roleForSheet } from '@/world/culture';
 import { citizenIds, crowdSheet } from './assets';
 import { click } from './audio';
 
 import { citizenLines, REPLIES, type ChatContext } from '@/world/dialogue';
+import { leavers } from '@/world/traffic';
 
 /** Pedestrians that make the city feel alive. They never block agents or the player. */
 export class Citizens {
@@ -20,6 +21,8 @@ export class Citizens {
     private world: AgentWorld,
     private spawnTiles: () => Tile[],
     private extras: { lakeShore: () => Tile | undefined; player: () => Agent | undefined; context?: () => ChatContext },
+    /** The Town Square's benches (CityPlan.benches). */
+    private benches: Tile[] = BENCHES,
   ) {}
 
   /** Keep roughly `target` citizens in town (grows as the city grows). */
@@ -37,7 +40,7 @@ export class Citizens {
         sheet: crowdSheet(sheet),
         name: role ? `${role.names[Math.floor(n / ids.length) % role.names.length]} · ${role.short}` : 'Citizen',
         tile: t,
-        home: { x: 0, y: 0, w: GRID, h: GRID },
+        home: { x: 0, y: 0, w: this.world.gridW, h: this.world.gridH },
         speed: 1.3 + Math.random() * 0.6,
       });
       if (role) {
@@ -54,13 +57,18 @@ export class Citizens {
     }
   }
 
-  /** Down to `cap` citizens (the window narrowed to a panel's width): idle ones leave; busy ones finish first. */
+  /**
+   * Down to `cap` citizens (a narrower window, or workers and visiting Mayors taking their places): idle ones leave
+   * first, then busy ones, so the crowd cap always holds (`leavers`). A leaver's bench is freed; a chat partner or a
+   * citizen's question notices they've gone (`list.includes`).
+   */
   trim(cap: number) {
-    for (let i = this.list.length - 1; i >= 0 && this.list.length > cap; i--) {
-      const c = this.list[i];
-      if (c.isBusy) continue;
-      this.list.splice(i, 1);
+    const gone = new Set(leavers(this.list.map((c) => c.isBusy), cap).map((i) => this.list[i]));
+    if (!gone.size) return;
+    for (const c of gone) {
+      this.list.splice(this.list.indexOf(c), 1);
       this.roles.delete(c);
+      for (const [k, who] of this.benchTaken) if (who === c) this.benchTaken.delete(k);
       c.destroy();
     }
   }
@@ -93,7 +101,7 @@ export class Citizens {
   }
 
   private sitOnBench(c: Agent) {
-    const free = BENCHES.filter((b) => !this.benchTaken.has(`${b.x},${b.y}`));
+    const free = this.benches.filter((b) => !this.benchTaken.has(`${b.x},${b.y}`));
     const b = free[Math.floor(Math.random() * free.length)];
     if (!b) return;
     const k = `${b.x},${b.y}`;
@@ -104,7 +112,7 @@ export class Citizens {
       this.scene.time.delayedCall(6000 + Math.random() * 8000, () => {
         c.release();
         c.pin(false);
-        this.benchTaken.delete(k);
+        if (this.benchTaken.get(k) === c) this.benchTaken.delete(k);
       });
     });
   }

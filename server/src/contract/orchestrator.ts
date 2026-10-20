@@ -195,7 +195,10 @@ export const createOrchestrator = (deps: {
     const district = districtById(districtId);
     if (!district) return emit({ type: 'error', message: `Unknown district "${districtId}"`, requestId });
     const inDistrict = servicesIn(districtId as DistrictId);
-    const matched = matchText(cmd.question);
+    // An "Explain it back" for a side job names its own service (src/state/explain.ts framedJobExplain): that building's
+    // agent answers, not whichever service the player's answer happens to mention.
+    const tagged = /^Explain it back\b[^]*?\(service: ([a-z0-9-]{1,40})\)/.exec(cmd.question)?.[1];
+    const matched = (tagged && inDistrict.some((s) => s.id === tagged) ? tagged : undefined) ?? matchText(cmd.question);
     const svc = inDistrict.find((s) => s.id === matched) ?? inDistrict[0] ?? SERVICES[0]!;
     const agentId = svc.id;
 

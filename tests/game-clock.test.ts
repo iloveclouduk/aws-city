@@ -33,8 +33,9 @@ describe('mini-game combo', async () => {
 
 describe('mini-game stars', async () => {
   const { countRound, roundStars, FULL_ROUNDS_A_DAY } = await import('@/learning/gameStars');
+  const { memoryLedger } = await import('@/learning/dailyLedger');
   it('full stars for the first rounds of the day and any new best, half after that', () => {
-    const seen = new Map();
+    const seen = memoryLedger();
     const rounds = Array.from({ length: 5 }, () => countRound('shield', '2026-10-13', seen));
     expect(rounds).toEqual([0, 1, 2, 3, 4]);
     expect(rounds.map((n) => roundStars(20, n, false))).toEqual([20, 20, 20, 10, 10]);

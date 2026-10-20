@@ -1,5 +1,5 @@
 """
-Crowd-size characters: a 3/4-scale copy of every citizen and agent sheet, so people stand at a believable size next
+Crowd-size characters: a 3/4-scale copy of every citizen and agent sheet (and of Kai's gold jacket, for visiting Mayors), so people stand at a believable size next
 to the buildings (a full 48x72 character is as tall as a house). Kai and the landmark agents keep the full size; the
 agent copies dress each service's workers on the street (src/game/Workers.ts).
 
@@ -53,7 +53,8 @@ def main():
     index = {k: v for k, v in index.items() if v.get("role") != "crowd"}
     made = 0
     for cid, entry in list(index.items()):
-        if entry.get("role") not in ("citizen", "agent"):
+        # Kai's gold jacket gets a crowd copy too: other players' Mayors visiting the live city wear it.
+        if entry.get("role") not in ("citizen", "agent") and cid != "player-gold":
             continue
         src_dir = os.path.join(OUT, cid)
         dst_dir = os.path.join(OUT, f"{cid}-crowd")

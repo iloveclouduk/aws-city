@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - a lake of receipts. Files stay in a private S3 bucket, a Glue crawler records their tables, Athena queries them in place, and Lake Formation manages access to the bucket.
+
+Resources:
+  ReceiptsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ResultsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      # Query results are copies: tidy them away after a week.
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-results
+            Status: Enabled
+            ExpirationInDays: 7
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ReceiptsDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: receipts
+        Description: Tables the crawler finds in the receipts bucket
+
+  CrawlerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSGlueServiceRole'
+      Policies:
+        - PolicyName: read-receipts-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt ReceiptsBucket.Arn
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub '${ReceiptsBucket.Arn}/*'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ReceiptsCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Role: !GetAtt CrawlerRole.Arn
+      DatabaseName: !Ref ReceiptsDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://${ReceiptsBucket}/receipts/'
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: LOG
+      Tags:
+        managed-by: aws-city
+
+  AnalystWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Sub '${AWS::StackName}-analysts'
+      RecursiveDeleteOption: true
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
+        # Stop any one query that would scan more than 1 GB.
+        BytesScannedCutoffPerQuery: 1073741824
+        ResultConfiguration:
+          OutputLocation: !Sub 's3://${ResultsBucket}/results/'
+          EncryptionConfiguration:
+            EncryptionOption: SSE_S3
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  # Registers the bucket with Lake Formation, so table and column grants can govern it.
+  ReceiptsLocation:
+    Type: AWS::LakeFormation::Resource
+    Properties:
+      ResourceArn: !GetAtt ReceiptsBucket.Arn
+      UseServiceLinkedRole: true
+
+Outputs:
+  ReceiptsBucketName:
+    Description: Upload CSV receipts under receipts/ here, then run the crawler
+    Value: !Ref ReceiptsBucket
+  WorkGroupName:
+    Description: Pick this workgroup in the Athena query editor
+    Value: !Ref AnalystWorkGroup

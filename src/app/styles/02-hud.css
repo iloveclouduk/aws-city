@@ -110,6 +110,38 @@
     opacity: 0.35;
   }
 }
+/* The side panel (~400 px) has no room for the word: keep the dot, hide the word visually (still announced, and
+   the dot's title names it on hover). */
+@media (max-width: 480px) {
+  .dot {
+    padding-left: 6px;
+    min-height: 12px;
+  }
+  .dot .dot-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  /* …except the demo, which keeps one short word ("Demo") so it never reads as a stray grey dot. */
+  .dot.mock {
+    padding-left: 10px;
+  }
+  .dot .dot-short {
+    display: inline;
+    flex: none;
+  }
+  /* A game's name needs the room: the rank and online chips step aside while one is open. */
+  .view-game .hud .rank-chip {
+    display: none;
+  }
+}
+.dot-short {
+  display: none;
+}
 
 /* the ⋯ menu */
 .more {
@@ -195,4 +227,64 @@
 .switch.on::after {
   transform: translateX(12px);
   background: var(--accent-ink);
+}
+
+/* The HUD's three numbers: ⭐ knowledge, City Coins (the coin icon), 💡 City Lights (one meaning each). */
+.progress-readout .hud-coins b {
+  color: var(--accent);
+}
+@media (max-width: 420px) {
+  .progress-readout .hud-streak {
+    display: none;
+  }
+}
+
+/* The one-time note under the coin counter (CoinsTip in src/ui/Hud.tsx). */
+.progress-readout .hud-coins {
+  position: relative;
+}
+.hud-tip {
+  /* Placed by CoinsTip (fixed, under the counter, inside the map: never over the tabs). Taps on the note itself pass
+     through to the map; only "Got it" is a button. */
+  pointer-events: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  /* Over the map's own chips (5–8), under toasts and every modal's scrim (--z-toast): a card or celebration covers it. */
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: max-content;
+  max-width: min(260px, 80vw);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-sm);
+  background: var(--panel, var(--bg));
+  color: var(--ink);
+  white-space: normal;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+/* "🚦 Rush hour" (RushChip in src/ui/Hud.tsx): a quiet amber chip while the city's rush hour runs. */
+.hud-rush {
+  padding: 1px var(--s-2);
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  color: var(--warn);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+/* In the narrow panel only the light shows; its words stay for screen readers. */
+@media (max-width: 420px) {
+  .hud-rush-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+.hud-tip .btn {
+  pointer-events: auto;
 }

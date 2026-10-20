@@ -374,12 +374,15 @@ export function click() {
   voice('click', 'click', (gain) => [{ freq: 1400, dur: 0.028, type: 'sine', vol: gain, slide: 0.55 }], true);
 }
 
-/** Two gentle notes: up for good news (correct answer, XP), down for a miss. */
-export function chime(up = true) {
+/**
+ * Two gentle notes: up for good news (correct answer, XP), down for a miss. `pitch` (round 3 juice, src/game/juice.ts
+ * pitchOf): right answers in a row rise, 1 = the plain chime.
+ */
+export function chime(up = true, pitch = 1) {
   if (up) voice('chime', 'chime', (g) => [
-    { freq: 659.25, dur: 0.14, type: 'sine', vol: g },
-    { freq: 987.77, dur: 0.22, type: 'sine', vol: g, delay: 0.085 },
-    { freq: 1975.5, dur: 0.12, type: 'triangle', vol: g * 0.12, delay: 0.085 },
+    { freq: 659.25 * pitch, dur: 0.14, type: 'sine', vol: g },
+    { freq: 987.77 * pitch, dur: 0.22, type: 'sine', vol: g, delay: 0.085 },
+    { freq: 1975.5 * pitch, dur: 0.12, type: 'triangle', vol: g * 0.12, delay: 0.085 },
   ], false);
   else voice('chimeDown', 'chimeDown', (g) => [
     { freq: 392, dur: 0.14, type: 'triangle', vol: g },

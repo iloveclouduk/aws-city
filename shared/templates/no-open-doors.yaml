@@ -1,0 +1,166 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - servers with no open doors. A server in a private subnet with no inbound rules and no SSH key; Session Manager reaches it through VPC endpoints, Patch Manager patches it every Sunday, and a log group is ready to keep each session (point Session Manager's preferences at it).
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The ticket office's VPC (DNS hostnames and DNS resolution turned on)
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: A private subnet in that VPC
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: Amazon Linux 2023, which comes with the SSM Agent
+
+Resources:
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: No inbound rules at all; the SSM Agent dials out to the endpoints
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS out to the Systems Manager endpoints
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  EndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTPS in from the ticket office servers only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref ServerSecurityGroup
+          Description: The servers' SSM Agent
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  SsmEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ssm'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref EndpointSecurityGroup
+
+  SsmMessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ssmmessages'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref EndpointSecurityGroup
+
+  Ec2MessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ec2messages'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref EndpointSecurityGroup
+
+  ServerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      # Just what the SSM Agent needs to be managed: sessions, Run Command, patching.
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ServerProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref ServerRole
+
+  TicketServer:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - SsmEndpoint
+      - SsmMessagesEndpoint
+      - Ec2MessagesEndpoint
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: t3.micro
+      SubnetId: !Ref SubnetId
+      IamInstanceProfile: !Ref ServerProfile
+      SecurityGroupIds:
+        - !Ref ServerSecurityGroup
+      MetadataOptions:
+        HttpTokens: required
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 8
+            VolumeType: gp3
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: ticket-office
+        - Key: Patch Group
+          Value: ticket-office
+        - Key: managed-by
+          Value: aws-city
+
+  WeeklyPatch:
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: !Sub '${AWS::StackName}-weekly-patch'
+      Name: AWS-RunPatchBaseline
+      ScheduleExpression: cron(0 3 ? * SUN *)
+      Parameters:
+        Operation:
+          - Install
+        RebootOption:
+          - RebootIfNeeded
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - !Ref TicketServer
+
+  SessionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws-city/${AWS::StackName}/sessions'
+      RetentionInDays: 365
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+Outputs:
+  InstanceId:
+    Description: Start a session from the Systems Manager console (Session Manager), no key needed
+    Value: !Ref TicketServer
+  SessionLogGroup:
+    Description: Choose this log group in Session Manager's preferences to keep every session
+    Value: !Ref SessionLogs

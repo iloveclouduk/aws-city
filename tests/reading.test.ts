@@ -7,15 +7,15 @@ import { SERVICES } from '@/world/taxonomy';
 const ids = new Set(SERVICES.map((s) => s.id));
 
 describe('reading shelf', () => {
-  it('every service has a free cheat sheet, and nothing points at an unknown service', () => {
-    for (const s of SERVICES) expect(READING[s.id]?.cheatSheet, s.id).toMatch(/^https:\/\/tutorialsdojo\.com\/[a-z0-9-]+\/$/);
+  it('every service has a free cheat sheet (or, too new for one, a guide), and nothing points at an unknown service', () => {
+    for (const s of SERVICES) expect(READING[s.id]?.cheatSheet ?? READING[s.id]?.guide, s.id).toMatch(/^https:\/\/tutorialsdojo\.com\/[a-z0-9-]+\/$/);
     for (const id of Object.keys(READING)) expect(ids.has(id), id).toBe(true);
     for (const b of BOOKS) for (const s of b.services) expect(ids.has(s), `${b.id} ${s}`).toBe(true);
   });
 
   it('every link opens only on a partner host', () => {
     const urls = [
-      ...Object.values(READING).flatMap((r) => [r.cheatSheet, r.articles].filter(Boolean) as string[]),
+      ...Object.values(READING).flatMap((r) => [r.cheatSheet, r.guide, r.articles].filter(Boolean) as string[]),
       ...BOOKS.map((b) => b.url),
       ...Object.values(PARTNERS).map((p) => p.home),
     ];

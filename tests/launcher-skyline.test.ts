@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { frame, ROOF_TIPS } from '../scripts/launcher/banner.mjs';
-import { growthCaption, renderDashboard, stepsGrowth, type Step } from '../scripts/launcher/dashboard.mjs';
+import { miniSkyline, renderPanel, stepsGrowth, type Step } from '../scripts/launcher/panel.mjs';
 
-// The terminal city grows with the run: lots fill in, floors rise and lights come on as the steps finish.
+// The terminal city grows: the first run's intro raises the skyline lot by lot, and the panel's one-line skyline
+// rises as the steps finish.
 const width = (l: string) => [...l].length;
 const lit = (lines: string[]) => lines.join('\n').split('').filter((c) => c === '▪').length;
 const roofs = (lines: string[]) => lines.join('\n').split('').filter((c) => ROOF_TIPS.includes(c)).length;
@@ -30,33 +31,36 @@ describe('a growing skyline', () => {
   });
 });
 
-describe('stepsGrowth', () => {
+describe('the panel header skyline', () => {
   const step = (id: string, status: Step['status'], extra: Partial<Step> = {}): Step => ({ id, title: id, status, ...extra });
 
   it('is 0 before anything runs and 1 when everything is done or skipped', () => {
     expect(stepsGrowth([step('prepare', 'pending'), step('build', 'pending')])).toBe(0);
     expect(stepsGrowth([step('prepare', 'done'), step('build', 'skipped')])).toBe(1);
-  });
-
-  it('uses a running step’s own progress, else eases with time (never past 90 % of the step)', () => {
     expect(stepsGrowth([step('prepare', 'done'), step('build', 'running', { progress: 0.5 })])).toBeCloseTo(0.75);
-    const t0 = 1_000_000;
-    const at = (s: number) => stepsGrowth([step('open', 'running', { started: t0 })], t0 + s * 1000);
-    expect(at(1)).toBeLessThan(at(3));
-    expect(at(600)).toBeLessThanOrEqual(0.9);
+    expect(stepsGrowth([step('prepare', 'done'), step('build', 'running')])).toBeCloseTo(0.75);
   });
 
-  it('captions what the city is doing', () => {
-    expect(growthCaption([step('prepare', 'done'), step('build', 'running', { progress: 0.5 })])).toBe('City 75% built · raising the towers');
-    expect(growthCaption([step('build', 'done')])).toBe('City built ✶');
+  it('rises building by building and is always eight columns', () => {
+    const height = (s: string) => [...s].reduce((n, ch) => n + '▁▂▃▄▅▆▇█'.indexOf(ch) + 1, 0);
+    expect(miniSkyline(0)).toBe('▁▁▁▁▁▁▁▁');
+    let last = 0;
+    for (const g of [0, 0.2, 0.4, 0.6, 0.8, 1]) {
+      const line = miniSkyline(g);
+      expect([...line].length).toBe(8);
+      expect(height(line)).toBeGreaterThanOrEqual(last);
+      last = height(line);
+    }
+    expect(miniSkyline(1)).toContain('█');
   });
 
-  it('the dashboard still fits small terminals with the caption', () => {
+  it('the panel shows it in its header and still fits small terminals', () => {
     const state = { steps: [step('prepare', 'done'), step('build', 'running', { progress: 0.4 }), step('open', 'pending')] };
     for (const [c, r] of [[80, 24], [120, 40], [200, 60]]) {
-      const lines = renderDashboard(state, 1, c, r, { color: false });
-      expect(lines.length).toBeLessThanOrEqual(r);
-      for (const l of lines) expect(width(l)).toBeLessThanOrEqual(c);
+      const lines = renderPanel(state, 1, c, r, { color: false });
+      expect(lines[0]).toContain(miniSkyline(stepsGrowth(state.steps)));
+      expect(lines.length).toBeLessThan(r);
+      for (const l of lines) expect(width(l)).toBeLessThan(c);
     }
   });
 });

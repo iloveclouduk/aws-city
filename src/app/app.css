@@ -22,4 +22,11 @@
 @import './styles/19-glossary.css';
 @import './styles/20-world.css';
 @import './styles/21-status-and-cards.css';
+@import './styles/23-workshops.css';
+@import './styles/24-clients.css';
+@import './styles/25-stations.css';
+@import './styles/26-build.css';
+@import './styles/27-loops.css';
+@import './styles/28-simple.css';
+/* Accessibility overrides stay last. */
 @import './styles/22-access.css';

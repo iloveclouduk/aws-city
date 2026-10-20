@@ -4,11 +4,13 @@ Called from generate_tiles.build_landmarks as culture_art.build(add).
 
 Footprints match src/world/layout.ts buildSites(): the five big sites are 3x3, plaques/board/kiosk/sign are 1x1,
 and the delivery van is a 1x1 vehicle in four facings (src/game/Ops.ts swaps frames, so all four share one canvas).
+culture:northhall (3x3) is AWS North Hall, a conference centre; `established` (1x1) is the gold plaque that stands in
+front of a landmark once its workshop is finished.
 Amazon culture, drawn in the city's own palette: no third-party logos, only generic shapes and a few pixel letters.
 """
 from generate_tiles import (A, CLEAR, CON_D, CON_L, CON_M, GLASS, GLASS_D, GRASS, GRASS_D, HH, HW, NAVY, NAVY_D, ORANGE,  # noqa: F401
                             ORANGE_D, OUTLINE, PACKIMG, WATER, WHITE, WOOD, WOOD_D, Canvas, seeded, shade, stripe_block)
-from landmarks_aws_a import cyl, dot, lwin, rwin
+from shapes import cyl, dot, lwin, rwin
 
 LIT = (255, 214, 120)
 GOLD = (236, 186, 52)
@@ -32,13 +34,21 @@ FONT = {
     "P": ["XX.", "X.X", "XX.", "X..", "X.."], "O": [".X.", "X.X", "X.X", "X.X", ".X."],
     "?": ["XX.", "..X", ".X.", "...", ".X."], " ": ["...", "...", "...", "...", "..."],
 }
+# the North Hall's sign: square letters that stay legible on a sloping face
+SIGN = {
+    "N": ["XX.", "X.X", "X.X", "X.X", "X.X"], "O": ["XXX", "X.X", "X.X", "X.X", "XXX"],
+    "R": ["XX.", "X.X", "XX.", "X.X", "X.X"], "T": ["XXX", ".X.", ".X.", ".X.", ".X."],
+    "H": ["X.X", "X.X", "XXX", "X.X", "X.X"],
+}
+# AWS category colours for the North Hall's bunting and banners
+CATEGORY = [(237, 113, 0), (122, 161, 22), (201, 37, 209), (140, 79, 255), (221, 52, 76), (1, 168, 141), (231, 21, 123)]
 
 
-def text_l(c, s, u, v, z, col, light=False):
+def text_l(c, s, u, v, z, col, light=False, font=None):
     """Pixel text on a left-facing (v = const) face; (u, v, z) is the first glyph's top-left."""
     x0, y0 = c.P(u, v, z)
     for i, ch in enumerate(s):
-        for r, row in enumerate(FONT[ch]):
+        for r, row in enumerate((font or FONT)[ch]):
             for k, px in enumerate(row):
                 if px == "X":
                     xx, yy = x0 + i * 4 + k, y0 + r + (i * 4 + k) // 2
@@ -182,6 +192,104 @@ def expohall():
         c.d.line([(x, y), (x, y - 26)], fill=A(CON_L))
         c.d.rectangle((x + 1, y - 25, x + 4, y - 15), fill=A(col))
         c.d.point([(x + 2, y - 21)], fill=A(WHITE))
+    return c
+
+
+def bunting(c, a, b, sag, key, light=True):
+    """A string of pennants from screen point a to b, sagging by `sag` px, in the AWS category colours."""
+    (x0, y0), (x1, y1) = a, b
+    n = max(2, abs(x1 - x0) // 3)
+    pts = []
+    for k in range(n + 1):
+        t = k / n
+        pts.append((round(x0 + (x1 - x0) * t), round(y0 + (y1 - y0) * t + sag * 4 * t * (1 - t))))
+    c.d.line(pts, fill=A(CON_L))
+    for k, (x, y) in enumerate(pts[1:-1]):
+        col = CATEGORY[(k + len(key)) % len(CATEGORY)]
+        c.d.polygon([(x - 1, y + 1), (x + 1, y + 1), (x, y + 3)], fill=A(col))
+        if light and k % 2 == 0:
+            c.ld.point([(x, y)], fill=A(LIT))
+
+
+def northhall():
+    """AWS North Hall: a conference centre with a tall glass atrium, a stage screen on the front, banners and
+    bunting in the AWS category colours, and its name over the doors. Lit at night."""
+    c = Canvas(3, 3, 80)
+    c.box(0.05, 0.05, 2.95, 2.95, 0, 2, CON_L, top=shade(CON_L, 1.02))
+    # the main hall behind
+    u0, v0, u1, v1 = 0.3, 0.25, 2.75, 1.55
+    c.box(u0, v0, u1, v1, 2, 32, CON_L)
+    c.louvres(u0, v0, u1, v1, 18, 32, CON_L)
+    c.box(u0 - 0.04, v0 - 0.04, u1 + 0.04, v1 + 0.04, 32, 34, NAVY, top=(132, 142, 158))
+    for k in range(3):  # skylights and plant on the roof
+        a = u0 + 0.35 + k * 0.6
+        c.poly([(a, v0 + 0.2, 34), (a + 0.3, v0 + 0.2, 34), (a + 0.3, v1 - 0.2, 34), (a, v1 - 0.2, 34)], GLASS_D)
+        c.poly([(a, v0 + 0.2, 34), (a + 0.3, v0 + 0.2, 34), (a + 0.3, v1 - 0.2, 34), (a, v1 - 0.2, 34)], (255, 214, 120, 255), c.ld)
+    c.box(u1 - 0.45, v0 + 0.1, u1 - 0.15, v0 + 0.4, 34, 38, CON_M)
+    c.rface(u1, v0, v1, 28, 30, ORANGE_D)
+    for k, col in enumerate(CATEGORY[:5]):  # tall banners down the right face
+        a = v0 + 0.1 + k * 0.25
+        c.rface(u1, a, a + 0.12, 8, 26, shade(col, 0.85))
+        c.rface(u1, a, a + 0.12, 8, 10, WHITE)
+    # the glass atrium (front left), taller than the hall
+    a0, a1, b0, b1, ah = 0.25, 1.3, 1.2, 2.65, 46
+    c.box(a0, b0, a1, b1, 2, ah, GLASS)
+    for k in range(6):
+        u = a0 + 0.04 + k * 0.17
+        c.lface(b1, u, u + 0.14, 4, ah - 2, GLASS)
+        for f, z in enumerate((4, 15, 27, 39)):
+            if (k + f) % 3 != 1:
+                c.lface(b1, u, u + 0.14, z + 2, z + 9, GLASS, light=True)
+    for k in range(7):
+        v = b0 + 0.04 + k * 0.205
+        c.rface(a1, v, v + 0.17, 4, ah - 2, GLASS_D)
+        for f, z in enumerate((4, 15, 27, 39)):
+            if (k + f) % 2 == 0:
+                c.rface(a1, v, v + 0.17, z + 2, z + 9, GLASS_D, light=True)
+    for z in (14, 26, 38):  # floor lines
+        c.lface(b1, a0, a1, z, z + 1, shade(GLASS_D, 0.8))
+        c.rface(a1, b0, b1, z, z + 1, shade(GLASS_D, 0.7))
+    c.box(a0 - 0.03, b0 - 0.03, a1 + 0.03, b1 + 0.03, ah, ah + 2, WHITE)
+    c.pyramid(a0, b0, a1, b1, ah + 2, 10, GLASS_D)
+    c.lface(b1, 0.5, 1.0, 2, 11, NAVY_D)  # doors
+    c.lface(b1, 0.74, 0.76, 2, 11, CON_M)
+    c.poly([(0.4, b1, 12), (1.1, b1, 12), (1.1, b1 + 0.28, 11), (0.4, b1 + 0.28, 11)], ORANGE)  # canopy
+    # the stage block (front right) with its big screen
+    s0, s1, sv0, sv1 = 1.4, 2.75, 1.7, 2.75
+    c.box(s0, sv0, s1, sv1, 2, 22, CON_M)
+    c.rface(s1, sv0, sv1, 4, 18, GLASS_D)
+    c.rface(s1, sv0 + 0.1, sv1 - 0.1, 6, 11, GLASS_D, light=True)
+    for k in range(3):
+        c.rface(s1, sv0 + 0.08 + k * 0.27, sv0 + 0.1 + k * 0.27, 4, 18, CON_D)
+    c.lface(sv1, s0 + 0.06, s1 - 0.06, 5, 20, NAVY_D)
+    c.lface(sv1, s0 + 0.1, s1 - 0.1, 6, 19, (24, 30, 58))
+    c.poly([(s0 + 0.1, sv1, 6), (s1 - 0.1, sv1, 6), (s1 - 0.1, sv1, 19), (s0 + 0.1, sv1, 19)], (60, 70, 130, 255), c.ld)
+    # on screen: a speaker at a lectern under coloured stage lights
+    x0, y0 = c.P(s0 + 0.1, sv1, 19)
+    for k, col in enumerate(CATEGORY):
+        xx = x0 + 3 + k * 4
+        yy = y0 + (xx - x0) // 2
+        c.d.line([(xx, yy + 1), (xx + 1, yy + 6)], fill=A(col))
+        c.ld.line([(xx, yy + 1), (xx + 1, yy + 6)], fill=A(col))
+    xm, ym = c.P((s0 + s1) / 2, sv1, 10)
+    c.d.rectangle((xm - 1, ym - 6, xm + 1, ym - 3), fill=A(WHITE))   # speaker
+    c.d.rectangle((xm - 1, ym - 8, xm + 1, ym - 7), fill=A((232, 190, 150)))
+    c.d.rectangle((xm + 3, ym - 4, xm + 6, ym + 1), fill=A(ORANGE))  # lectern
+    c.ld.rectangle((xm - 2, ym - 9, xm + 7, ym + 2), fill=A(LIT, 120))
+    c.lface(sv1, s0, s1, 20, 22, ORANGE)
+    c.box(s0 + 0.1, sv1 - 0.06, s1 - 0.1, sv1, 22, 29, NAVY)
+    text_l(c, "NORTH", s0 + 0.24, sv1, 28, WHITE, light=True, font=SIGN)
+    # bunting from the atrium's front corner to two masts at the plaza edge
+    corner = c.P(a1, b1, ah - 4)
+    masts = []
+    for (u, v) in ((0.12, 2.88), (2.88, 1.45)):
+        x, y = c.P(u, v, 2)
+        c.d.line([(x, y), (x, y - 30)], fill=A(CON_L))
+        c.d.point([(x, y - 31)], fill=A(ORANGE))
+        c.ld.point([(x, y - 31)], fill=A(LIT))
+        masts.append((x, y - 29))
+    bunting(c, masts[0], corner, 5, "a")
+    bunting(c, c.P(a1, b0, ah - 4), masts[1], 6, "bb")
     return c
 
 
@@ -342,6 +450,30 @@ def plaque(face, plinth, key):
     return c
 
 
+def established():
+    """A finished workshop's marker: a stone plinth with a gold plaque and a little ribbon flag, softly lit."""
+    c = Canvas(1, 1, 30)
+    c.box(0.24, 0.24, 0.76, 0.76, 0, 3, STONE_D)
+    c.box(0.32, 0.32, 0.68, 0.68, 3, 12, STONE)
+    c.lface(0.68, 0.32, 0.68, 10, 11, shade(STONE, 0.85))
+    pts = [(0.27, 0.73, 12), (0.73, 0.73, 12), (0.73, 0.42, 17), (0.27, 0.42, 17)]
+    c.poly(pts, GOLD)
+    c.poly([(0.73, 0.73, 12), (0.73, 0.42, 17), (0.73, 0.42, 15), (0.73, 0.73, 10)], shade(GOLD, 0.6))
+    c.poly([(0.33, 0.67, 13), (0.67, 0.67, 13), (0.67, 0.48, 16), (0.33, 0.48, 16)], GOLD_L)
+    x, y = c.P(0.5, 0.58, 14.5)
+    c.d.line([(x - 4, y - 1), (x + 1, y + 1)], fill=A(shade(GOLD, 0.62)))
+    c.d.line([(x - 2, y + 1), (x + 2, y + 3)], fill=A(shade(GOLD, 0.62)))
+    c.d.point([(x + 3, y - 2)], fill=A(WHITE))
+    c.ld.polygon([c.P(*p) for p in pts], fill=A(GOLD_L, 120))
+    # the ribbon flag on a little pole behind
+    x, y = c.P(0.7, 0.3, 3)
+    c.d.line([(x, y), (x, y - 22)], fill=A(GOLD))
+    c.d.point([(x, y - 23)], fill=A(GOLD_L))
+    c.d.polygon([(x + 1, y - 22), (x + 8, y - 21), (x + 6, y - 19), (x + 8, y - 17), (x + 1, y - 17)], fill=A(RED))
+    c.d.line([(x + 1, y - 20), (x + 6, y - 19)], fill=A(shade(RED, 0.75)))
+    return c
+
+
 def coeboard():
     """Correction of Error board: a notice board on legs, pinned with write-ups."""
     c = Canvas(1, 1, 34)
@@ -446,6 +578,7 @@ def build(add):
     add("culture:day1office", day1office())
     add("culture:goldenhall", goldenhall())
     add("culture:expohall", expohall())
+    add("culture:northhall", northhall())
     add("culture:fulfilment", fulfilment())
     dc, blinks = data_centre()
     add("culture:dc:0", dc)
@@ -455,6 +588,7 @@ def build(add):
     add("culture:dc:1", substation(), lights=False)
     add("culture:lpplaque", plaque(ORANGE, STONE, "lp"), lights=False)
     add("culture:mechplaque", plaque((120, 200, 230), NAVY, "mech"), lights=False)
+    add("established", established())
     add("culture:coeboard", coeboard(), lights=False)
     add("culture:aboutplaque", kiosk(), lights=False)
     add("culture:regionsign", regionsign(), lights=False)

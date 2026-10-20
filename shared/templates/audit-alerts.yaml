@@ -1,0 +1,194 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the night watch. CloudTrail archives every API call to a private S3 bucket; an EventBridge rule sends each GuardDuty finding to a Lambda function that alerts the security team through SNS. Turn GuardDuty on first (it has one detector per account and Region, so this stack doesn't create it).
+
+Resources:
+  TrailBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  TrailBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TrailBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CloudTrailCheck
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt TrailBucket.Arn
+            Condition:
+              StringEquals:
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/${AWS::StackName}-trail'
+          - Sid: CloudTrailWrite
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub '${TrailBucket.Arn}/AWSLogs/${AWS::AccountId}/*'
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/${AWS::StackName}-trail'
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt TrailBucket.Arn
+              - !Sub '${TrailBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  AuditTrail:
+    Type: AWS::CloudTrail::Trail
+    DependsOn: TrailBucketPolicy
+    Properties:
+      TrailName: !Sub '${AWS::StackName}-trail'
+      S3BucketName: !Ref TrailBucket
+      IsLogging: true
+      IsMultiRegionTrail: true
+      IncludeGlobalServiceEvents: true
+      EnableLogFileValidation: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Security alerts
+      KmsMasterKeyId: alias/aws/sns
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ResponderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: publish-alerts-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref AlertTopic
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ResponderFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Role: !GetAtt ResponderRole.Arn
+      MemorySize: 128
+      Timeout: 10
+      Environment:
+        Variables:
+          TOPIC: !Ref AlertTopic
+      Code:
+        ZipFile: |
+          const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
+          const sns = new SNSClient({});
+          exports.handler = async (event) => {
+            const f = event.detail;
+            await sns.send(new PublishCommand({
+              TopicArn: process.env.TOPIC,
+              Subject: `GuardDuty: ${f.type}`.slice(0, 100),
+              Message: `Severity ${f.severity}: ${f.title}\n${f.description}`,
+            }));
+          };
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  RuleDeadLetters:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  FindingsRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Every GuardDuty finding goes to the responder
+      EventPattern:
+        source:
+          - aws.guardduty
+        detail-type:
+          - GuardDuty Finding
+      Targets:
+        - Id: responder
+          Arn: !GetAtt ResponderFunction.Arn
+          RetryPolicy:
+            MaximumRetryAttempts: 4
+          DeadLetterConfig:
+            Arn: !GetAtt RuleDeadLetters.Arn
+
+  RuleDeadLettersPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref RuleDeadLetters
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt RuleDeadLetters.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt FindingsRule.Arn
+
+  ResponderPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ResponderFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt FindingsRule.Arn
+
+Outputs:
+  TrailBucketName:
+    Description: CloudTrail log files land here (query them with Athena)
+    Value: !Ref TrailBucket
+  AlertTopicArn:
+    Description: Subscribe the security team's email to this topic
+    Value: !Ref AlertTopic

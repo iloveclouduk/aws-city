@@ -2,6 +2,7 @@
 // sea lane when the coast has open water. Moved in the scene's update, no tweens; drawn under the bridge decks they
 // pass beneath. Under reduced motion they lie at anchor.
 import Phaser from 'phaser';
+import { GRID } from '@/world/layout';
 import { RIVER, type Terrain } from '@/world/terrain';
 import { addSprite, hasSprite } from './assets';
 import { CITY_ISO, dirFor, entityDepth, toScreen } from './iso';
@@ -39,17 +40,17 @@ export class Boats {
     return this.boats.length;
   }
 
-  /** Launch the boats for a landscape (a Region change rebuilds them). */
-  build(t: Terrain, cap: number, still: boolean) {
+  /** Launch the boats for a landscape (a Region change rebuilds them). `size`: the city plan's core size. */
+  build(t: Terrain, cap: number, still: boolean, size = GRID) {
     this.clear();
     this.still = still;
     this.bridges = t.bridges.flatMap((b) => b.tiles);
     const mid = (RIVER.from + RIVER.to) / 2;
     const wanted: Omit<Boat, 'img' | 'cum' | 'len' | 's' | 'phase'>[] = [];
-    const sea = seaLane(t);
+    const sea = seaLane(t, size);
     if (sea && hasSprite('veh:ferry:SE')) wanted.push({ skin: 'veh:ferry', fp: 2, pts: sea, way: 1, loop: false, speed: 0.55 });
-    if (hasSprite('veh:sail:SE')) wanted.push({ skin: 'veh:sail', fp: 1, pts: riverLoop(mid - 0.4), way: 1, loop: true, speed: 0.7 });
-    if (hasSprite('veh:barge:SE')) wanted.push({ skin: 'veh:barge', fp: 2, pts: riverLoop(mid + 0.4), way: -1, loop: true, speed: 0.4 });
+    if (hasSprite('veh:sail:SE')) wanted.push({ skin: 'veh:sail', fp: 1, pts: riverLoop(mid - 0.4, size), way: 1, loop: true, speed: 0.7 });
+    if (hasSprite('veh:barge:SE')) wanted.push({ skin: 'veh:barge', fp: 2, pts: riverLoop(mid + 0.4, size), way: -1, loop: true, speed: 0.4 });
     for (const w of wanted.slice(0, cap)) {
       const m = measure(w.pts);
       const img = addSprite(this.scene, `${w.skin}:SE`, 0, 0);

@@ -1,13 +1,13 @@
 // Where things sit on the isometric grid. The city is a 3×3 grid of 12×12 plots separated by roads.
 // The centre plot is the Town Square; each district claims one plot and fills its six landmark
 // slots in the order services are listed in shared/world.json. South of the square is the Day 1 Quarter
-// (Amazon culture), and the south-east plot is the Global Gate: the global services (shared/region-facts.json `global`,
-// IAM, Route 53, CloudFront) that are the same in every Region's city, beside the fulfilment centre and the Region sign.
+// (Amazon culture), and the south-east plot is the Global Gate: the global services (shared/region-facts.json `global`:
+// Route 53, CloudFront, IAM, Global Accelerator) that are the same in every Region's city, beside the fulfilment centre and the Region sign.
 // The whole city is one Region; its Availability Zones are islands across the river (azsFor), and those islands hold
 // the Region's real data centres.
 
 import { MECHANISMS, PRINCIPLES } from './culture';
-import { isGlobalService, zoneIndex, zonesFor, type Zone } from './regions';
+import { FACTS, isGlobalService, zoneIndex, zonesFor, type Zone } from './regions';
 import { DISTRICTS, SERVICES, type DistrictId } from './taxonomy';
 
 export const PLOT = 12;
@@ -27,8 +27,11 @@ export interface Tile {
 
 const plotOrigin = (cx: number, cy: number): Tile => ({ x: ROAD + cx * (PLOT + ROAD), y: ROAD + cy * (PLOT + ROAD) });
 
-/** Plot cell for each district; Town Square is (1,1). */
-const DISTRICT_CELLS: Record<DistrictId, [number, number]> = {
+/**
+ * Plot cell for each district; Town Square is (1,1). The 3×3 city has no plot for a seventh district (management):
+ * it stands only on a real street plan (zoning.ts), and the classic city leaves it out (unplacedServices).
+ */
+const DISTRICT_CELLS: Partial<Record<DistrictId, [number, number]>> = {
   storage: [0, 0],
   compute: [1, 0],
   database: [2, 0],
@@ -42,7 +45,7 @@ const DAY1_CELL: [number, number] = [1, 2];
 const CAMPUS_CELL: [number, number] = [2, 2];
 
 /** Landmark footprints inside a plot, in plot-local coordinates. */
-const SLOTS: Rect[] = [
+export const SLOTS: Rect[] = [
   { x: 1, y: 1, w: 3, h: 3 },
   { x: 5, y: 1, w: 3, h: 3 },
   { x: 9, y: 1, w: 3, h: 3 },
@@ -51,10 +54,16 @@ const SLOTS: Rect[] = [
   { x: 9, y: 6, w: 3, h: 3 },
 ];
 const HQ_SLOT: Rect = { x: 5, y: 10, w: 2, h: 2 };
-/** The Global Gate's lots on the campus, the front row first (the fulfilment centre keeps the north-west lot). */
-const GATE_SLOTS: Rect[] = [SLOTS[3], SLOTS[4], SLOTS[5], SLOTS[1], SLOTS[2]];
-/** Services that are the same in every Region (IAM, Route 53, CloudFront): they stand at the Global Gate. */
-export const GLOBAL_SERVICE_IDS: string[] = SERVICES.filter((s) => isGlobalService(s.id)).map((s) => s.id);
+/**
+ * The Global Gate's lots on the campus, the front row first (the fulfilment centre keeps the north-west lot and AWS
+ * North Hall the north-east one).
+ */
+const GATE_SLOTS: Rect[] = [SLOTS[3], SLOTS[4], SLOTS[5], SLOTS[1]];
+/**
+ * Services that are the same in every Region (Route 53, CloudFront, IAM, Global Accelerator): they stand at the Global
+ * Gate, taking its lots in shared/region-facts.json `global` order (a new one goes at the end, so nobody moves).
+ */
+export const GLOBAL_SERVICE_IDS: string[] = FACTS.global.filter((id) => SERVICES.some((s) => s.id === id));
 
 export interface PlotLayout {
   id: string;
@@ -71,19 +80,30 @@ export interface LandmarkLayout {
   footprint: Rect;
   /** Walkable tile where the agent stands to work. */
   workSpot: Tile;
+  /** Which side its front (work spot, front row) is on: south (+y) unless 'E' (+x), on a real street plan's east-facing lot. */
+  front?: 'S' | 'E';
 }
 
 const offset = (o: Tile, r: Rect): Rect => ({ x: o.x + r.x, y: o.y + r.y, w: r.w, h: r.h });
+/**
+ * The row in front of a landmark's lot: the tiles a tier-3 plaza paves (the middle one is its work spot). South of the
+ * lot, or east of it for an east-facing lot on a real street plan (zoning.ts). Decor keeps it clear.
+ */
+export const frontRowTiles = (l: Pick<LandmarkLayout, 'footprint' | 'front'>): Tile[] =>
+  l.front === 'E'
+    ? Array.from({ length: l.footprint.h }, (_, i) => ({ x: l.footprint.x + l.footprint.w, y: l.footprint.y + i }))
+    : Array.from({ length: l.footprint.w }, (_, i) => ({ x: l.footprint.x + i, y: l.footprint.y + l.footprint.h }));
 const frontOf = (r: Rect): Tile => ({ x: r.x + Math.floor(r.w / 2), y: r.y + r.h });
 
 export const TOWN_SQUARE: PlotLayout = { id: 'square', rect: { ...plotOrigin(1, 1), w: PLOT, h: PLOT } };
 
-export const DISTRICT_PLOTS: Record<DistrictId, PlotLayout> = Object.fromEntries(
-  DISTRICTS.map((d) => {
-    const [cx, cy] = DISTRICT_CELLS[d.id];
-    return [d.id, { id: d.id, rect: { ...plotOrigin(cx, cy), w: PLOT, h: PLOT } }];
+/** The districts the 3×3 city has a plot for (every one but management). */
+export const DISTRICT_PLOTS: Partial<Record<DistrictId, PlotLayout>> = Object.fromEntries(
+  DISTRICTS.flatMap((d) => {
+    const cell = DISTRICT_CELLS[d.id];
+    return cell ? [[d.id, { id: d.id, rect: { ...plotOrigin(...cell), w: PLOT, h: PLOT } }]] : [];
   }),
-) as Record<DistrictId, PlotLayout>;
+);
 
 export const FUTURE_PLOTS: PlotLayout[] = FUTURE_CELLS.map(([cx, cy], i) => ({
   id: `future-${i}`,
@@ -115,6 +135,8 @@ function buildSites(): LandmarkLayout[] {
   const c = CAMPUS_PLOT.rect;
   // The Region's data centres are on the AZ islands (terrain.ts); the campus keeps the fulfilment centre and the sign.
   site(c, { x: 1, y: 1, w: 3, h: 3 }, 'fulfilment', 'culture:fulfilment', 'Amazon.com Fulfilment Centre');
+  // AWS North Hall: the talks from the AWS North conference, one stage each (src/ui/NorthHall.tsx).
+  site(c, { x: 9, y: 1, w: 3, h: 3 }, 'northhall', 'culture:northhall', 'AWS North Hall');
   site(c, { x: 11, y: 10, w: 1, h: 1 }, 'regionsign', 'culture:regionsign', 'Region sign', false);
   return out;
 }
@@ -174,9 +196,14 @@ export const ISLAND_ROAD = 2;
  * AZ ID and, when the account told us, its name for it. The count and order come from zonesFor (CLAUDE.md: each Region
  * is built from real facts).
  */
-export const azsFor = (region: string, account?: { name: string; id: string }[]): AzIsland[] => {
+export const azsFor = (
+  region: string,
+  account?: { name: string; id: string }[],
+  /** The city plan's island slots (CityPlan.azSlots); the legacy city's by default. */
+  slotsFor: (n: number) => readonly string[] = azSlotsFor,
+): AzIsland[] => {
   const zones = zonesFor(region, account).slice(0, MAX_ISLANDS);
-  const slots = azSlotsFor(zones.length);
+  const slots = slotsFor(zones.length);
   return zones.map((z, i) => {
     const slot = slots[i];
     const side = slot[0] as 'N' | 'W';
@@ -210,6 +237,20 @@ export const GATE: Tile = { x: GRID - 1, y: CAMPUS_PLOT.rect.y + 5 };
 /** @deprecated The Region gate's old name (kept for one release): use GATE. */
 export const REGION_EDGE: Tile = GATE;
 
+/**
+ * Which slot each of a district's services takes: the first six in world.json order take the six slots (a global
+ * service's slot stays open ground, since it stands at the Global Gate), and a later service takes a lot a global one
+ * left open, in order, so every landmark that was already there keeps its place. Plot-local slots. The 3×3 city is
+ * full: a service with no slot left (or in a district with no plot) isn't in the classic city (unplacedServices); a
+ * real street plan places every one.
+ */
+function lotsOf(districtId: string): { id: string; slot?: Rect }[] {
+  const services = SERVICES.filter((s) => s.districtId === districtId);
+  if (!(DISTRICT_PLOTS as Record<string, PlotLayout | undefined>)[districtId]) return services.map((s) => ({ id: s.id }));
+  const open = services.slice(0, SLOTS.length).flatMap((s, i) => (isGlobalService(s.id) ? [SLOTS[i]] : []));
+  return services.map((s, i) => ({ id: s.id, slot: SLOTS[i] ?? (isGlobalService(s.id) ? undefined : open.shift()) }));
+}
+
 function buildLandmarks(): LandmarkLayout[] {
   const out: LandmarkLayout[] = [];
   const sq = TOWN_SQUARE.rect;
@@ -222,15 +263,14 @@ function buildLandmarks(): LandmarkLayout[] {
   out.push({ id: 'workshop', footprint: workshop, workSpot: frontOf(workshop) });
 
   for (const d of DISTRICTS) {
-    const o = DISTRICT_PLOTS[d.id].rect;
+    const o = DISTRICT_PLOTS[d.id]?.rect;
+    if (!o) continue;
     // A global service keeps its district (colour, HQ) but stands at the Global Gate; its district lot stays open
     // ground, so every other landmark keeps its place.
-    SERVICES.filter((s) => s.districtId === d.id).forEach((s, i) => {
-      const slot = SLOTS[i];
-      if (!slot) throw new Error(`District ${d.id} has more services than landmark slots`);
-      if (isGlobalService(s.id)) return;
+    lotsOf(d.id).forEach(({ id, slot }) => {
+      if (isGlobalService(id) || !slot) return;
       const fp = offset(o, slot);
-      out.push({ id: s.id, districtId: d.id, footprint: fp, workSpot: frontOf(fp) });
+      out.push({ id, districtId: d.id, footprint: fp, workSpot: frontOf(fp) });
     });
     const hq = offset(o, HQ_SLOT);
     out.push({ id: `hq:${d.id}`, districtId: d.id, footprint: hq, workSpot: frontOf(hq) });
@@ -244,6 +284,11 @@ function buildLandmarks(): LandmarkLayout[] {
 }
 
 export const LANDMARKS: LandmarkLayout[] = buildLandmarks();
+/**
+ * The services the classic 3×3 city has no lot for (the seventh district, and each district's services past its six
+ * slots), in world.json order. They're "not in this city" on the legacy plan only; every real street plan places them.
+ */
+export const UNPLACED_SERVICES: string[] = SERVICES.filter((s) => !LANDMARKS.some((l) => l.id === s.id)).map((s) => s.id);
 export const landmarkLayout = (id: string) => LANDMARKS.find((l) => l.id === id);
 /** The Global Gate's landmarks, front row first. */
 export const GLOBAL_LANDMARKS: LandmarkLayout[] = LANDMARKS.filter((l) => l.global);
@@ -252,9 +297,8 @@ export const GLOBAL_LANDMARKS: LandmarkLayout[] = LANDMARKS.filter((l) => l.glob
 export const openLots = (districtId: string): Rect[] => {
   const o = (DISTRICT_PLOTS as Record<string, { rect: Rect }>)[districtId]?.rect;
   if (!o) return [];
-  return SERVICES.filter((s) => s.districtId === districtId)
-    .map((s, i) => (isGlobalService(s.id) && SLOTS[i] ? offset(o, SLOTS[i]) : undefined))
-    .filter((r): r is Rect => !!r);
+  const lots = lotsOf(districtId);
+  return SLOTS.filter((slot) => !lots.some((l) => l.slot === slot && !isGlobalService(l.id))).map((slot) => offset(o, slot));
 };
 /** Where the Global Gate's sign stands: over the middle of its lots. */
 export const GLOBAL_GATE_SIGN: Tile = { x: CAMPUS_PLOT.rect.x + 6, y: CAMPUS_PLOT.rect.y + 5 };
@@ -263,7 +307,7 @@ export const homeRectFor = (id: string): Rect | undefined => {
   const l = landmarkLayout(id);
   if (l?.global) return CAMPUS_PLOT.rect;
   const d = l?.districtId ?? SERVICES.find((s) => s.id === id)?.districtId;
-  return d ? DISTRICT_PLOTS[d].rect : undefined;
+  return d ? DISTRICT_PLOTS[d]?.rect : undefined;
 };
 
 export const FOUNTAIN: Tile = { x: TOWN_SQUARE.rect.x + 8, y: TOWN_SQUARE.rect.y + 8 };
@@ -284,7 +328,10 @@ export function plotAt(t: Tile): string | undefined {
   if (inRect(t, TOWN_SQUARE.rect)) return 'square';
   if (inRect(t, DAY1_PLOT.rect)) return 'day1';
   if (inRect(t, CAMPUS_PLOT.rect)) return 'campus';
-  for (const d of DISTRICTS) if (inRect(t, DISTRICT_PLOTS[d.id].rect)) return d.id;
+  for (const d of DISTRICTS) {
+    const r = DISTRICT_PLOTS[d.id]?.rect;
+    if (r && inRect(t, r)) return d.id;
+  }
   for (const f of FUTURE_PLOTS) if (inRect(t, f.rect)) return f.id;
   return undefined;
 }

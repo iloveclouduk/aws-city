@@ -1,6 +1,6 @@
 # AWS City — Privacy Policy
 
-*Last updated: 11 October 2026*
+*Last updated: 17 October 2026*
 
 AWS City is a learning game (a browser extension for Chrome, Edge, Firefox and Safari) that teaches Amazon Web Services. This page explains
 what the game stores, why, and how to delete it. We don't sell data, show ads, or use your data to
@@ -15,6 +15,8 @@ train AI models.
 | Your AWS account link: account id, role name, region and a random setup code (ExternalId) | So agents can build in *your* AWS account after you approve | DynamoDB, until you delete your account or the AWSCity stack |
 | Your linked AWS account's month-to-date cost totals, by service and Region (only if you turn the city's bill on; off by default) | So the city can show what your account costs this month | DynamoDB, replaced by the next read (at most once a day) and deleted when you delete your account |
 | Request counts per minute from your linked AWS account's CloudWatch (load balancer, Lambda, API Gateway, DynamoDB writes), only if you turn live traffic on (off by default) | So the city's traffic can follow your real requests | In the server's memory only, replaced by the next read (at most every 5 minutes) and gone when you close the city |
+| A public Mayor name (two words picked by the game, like "Kind Otter"; you never type it), only if you turn on **Show me on leaderboards** (off by default) | So other players can see you in the live city and on the weekly leaderboards | DynamoDB: your presence row expires 90 seconds after you close the city; leaderboard rows after 9 weeks. Turning the switch off removes both at once |
+| Your best weekly mini-game scores and your city's rank points, only while that switch is on | The weekly leaderboards | DynamoDB, 9 weeks |
 | A daily count of AI requests | To keep the free tier fair (a daily limit) | DynamoDB, expires after 2 days |
 | Screenshots you choose to send to the Lookout | So it can tell you what the page is about | Amazon S3, deleted automatically after 1 day |
 
@@ -35,6 +37,8 @@ the game. You can remove that access at any time by deleting the `AWSCity` stack
   addresses are removed before anything leaves the page.
 - **AWS's public status and news:** the server reads the public AWS Health Dashboard and AWS What's New feeds itself,
   once for all players. Nothing about you, your account or your city is sent to fetch them.
+- **Maps:** the city's streets (from OpenStreetMap) are bundled with the extension. It makes no map requests, so no map
+  service learns where you are or which city you're playing.
 - **Server logs** record errors and counts, never your questions, page contents, tokens or keys;
   players appear only as a one-way hash. Logs are kept for 30 days.
 
@@ -63,7 +67,10 @@ incidents), not to track you.
 
 ## Deleting your data
 
-In the game: **Deploy → Delete my account**. This deletes your progress, account link, cached bill and sign-in
+Other players never see your account id or email: the live city and leaderboards store you under a one-way scrambled
+code, with only the Mayor name the game picked for you.
+
+In the game: **Deploy → Delete my account**. This deletes your progress, account link, cached bill, live-city presence, leaderboard scores and sign-in
 (`DELETE /me`) from the live database immediately; screenshots expire within a day anyway. Then delete the
 `AWSCity` stack in your AWS account's CloudFormation console to remove the role.
 

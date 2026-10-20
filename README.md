@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/images/terminal.webp" alt="AWS City in the terminal: the title over a night skyline of AWS landmarks, with Lambda, S3, EC2, VPC and Bedrock vehicles driving by" width="760">
+<img src="docs/images/terminal.webp" alt="AWS City in the terminal: the title in orange block letters over a still night skyline of AWS landmarks (VPC, EC2, AI, RDS, IAM, S3, ECS), with a moon, a monorail and a bridge over the bay, and the "Play again?" line under it at the left" width="760">
 
 # 🏙️ AWS City
 
@@ -10,7 +10,7 @@
 <!-- TODO: add the date, the prize and the team's names, e.g. "October 2026 · Team: …" -->
 
 [![CI](https://github.com/iloveclouduk/AWS-North-Hackathon/actions/workflows/ci.yml/badge.svg)](https://github.com/iloveclouduk/AWS-North-Hackathon/actions/workflows/ci.yml)
-![Node 24+](https://img.shields.io/badge/node-24%2B-339933?logo=nodedotjs&logoColor=white)
+![Node 24](https://img.shields.io/badge/node-24-339933?logo=nodedotjs&logoColor=white)
 ![Chrome · Edge · Firefox · Safari](https://img.shields.io/badge/browsers-Chrome%20%C2%B7%20Edge%20%C2%B7%20Firefox%20%C2%B7%20Safari-4285F4)
 ![Built on AWS](https://img.shields.io/badge/built%20on-AWS-FF9900?logo=amazonwebservices&logoColor=white)
 ![Claude on Amazon Bedrock](https://img.shields.io/badge/agents-Claude%20on%20Amazon%20Bedrock-D97757)
@@ -19,7 +19,7 @@
 A browser extension with a living isometric pixel city, where **every AWS service is a place** and its agent does
 that service's real job. The more you learn, the taller your city grows.
 
-[**▶ Play in 2 minutes**](#for-kids-and-parents-the-quick-path) · [Run it on your AWS](#2--run-it-on-your-own-aws-one-command) · [How it works](#how-it-works)
+[**▶ Play the demo**](#for-kids-and-parents-the-quick-path) · [Run it on your AWS](#2--run-it-on-your-own-aws-one-command) · [How it works](#how-it-works)
 
 </div>
 
@@ -53,7 +53,10 @@ The Legend's crown shines a beam over the city at night.
 
 ### 🚶 A city to explore
 
-- **Walk there.** A quest's visit counts when Kai arrives, and "Go →" walks him over.
+- **Today's shift** (with Everything on). The City tab has one big button that says exactly what happens next ("Walk to S3 Lake",
+  "Review 5 cards", "Solve: Static site"), an order board of client jobs, the buildings one step from their next level,
+  and an end-of-shift card that tells you what will be ready tomorrow.
+- **Walk there.** A quest's visit counts when Kai arrives; "Walk there" walks him over. Each step done gets a ✓.
 - **Citizens ask for help.** A gold **?** over a passer-by means a quick AWS question. Answer it and that building grows.
 - **Six golden tokens** are hidden on every city's streets. They glint only when you're close.
 - **re:Play Park** rides open as your buildings level up. Tap one and Kai hops on.
@@ -61,21 +64,39 @@ The Legend's crown shines a beam over the city at night.
 
 ### 🎮 Play, learn, grow
 
+**Simple or Everything.** The game starts **Simple**: the City tab is one plain **To do** list of 3 to 5 tasks, each with
+a box to tick, one line on why, and one button that says exactly what happens ("Walk to S3 Lake", "Review 5 cards",
+"Play S3 Fishing"). A bar fills as you go, then it says "Done for today. Come back tomorrow: 4 cards ready." The top bar
+shows your stars ⭐, your coins, "To do 2/4", Decorate and ⋯. Want the lot (ranks, badges, City Lights, the season road,
+the Codex, AWS news, Launch Day, the Drawing board)? Open **⋯ → Show everything**. **⋯ → Keep it simple** tucks it all
+away again; nothing you've earned is lost either way.
+
+
 - **6 mini-games**, each built for one service: S3 fishing, the Lambda kitchen, the Route 53 dance, the Shield wall,
   EC2 rush hour and the DynamoDB sorting office. Questions get harder as you play, and an Expert round opens at level 3.
 - **300 flashcards** with spaced repetition, in simple words first and the full answer one tap away.
-- **Architecture puzzles** scored on the 6 Well-Architected pillars, including a "Region goes dark" drill.
-- **22 quests** that together cover all 36 services, each ending with *Explain it back*.
-- **Today**: a few cards, a puzzle, a game and a fix keep your streak alive.
+- **Puzzles** (architecture drawings) scored on the 6 Well-Architected pillars, including a "Region goes dark" drill.
+- **45 quests** that together cover all 58 services, each ending with *Explain it back*.
+- **Today's goals**: a few cards, a puzzle, a game and a fix keep your streak alive (a ring on the shift).
+- **Hands-on workshops.** Type each AWS CLI command in a practice terminal (Tab finishes a word, 💡 Hint types the next
+  one for a star, *Fill my names* reuses the names you picked), then run it for real in AWS CloudShell and let the city
+  check your account, read-only. Finishing one puts an *Established* plaque in front of its building.
+- **18 City Clients** in every city (the Jobs tab): an air cargo hub, a bank, a stadium, a hospital, a shop, a school,
+  a streaming studio, a game studio, a news site, a port, an energy company, a factory, a farm co-op, a car maker, a phone
+  network, the town council, a hotel and a charity. Each has three levels of side jobs taken from AWS's own guidance:
+  wire an architecture, run a CLI command, pick the right service, fix a setting or play a quick station game. Kai walks
+  to the job's station, and each level done grows the business's building.
 
 <p align="center"><img src="docs/images/mini-games.webp" alt="Four mini-games: S3 fishing, the Lambda food stall, the Route 53 dance hall and the Shield wall" width="760"></p>
 
 ### ☁️ Real AWS, safely
 
 - **Ask anything.** The agents answer in plain words, grounded in the official AWS docs, with links.
-- **Console Copilot.** Tick *Do it in my console* and an agent walks you through real AWS Console pages. It highlights
-  each button and explains why, and risky buttons are always your click.
-- **Build for real.** Connect *your own* AWS account with a small, restricted role. Every change waits for your
+- **Console Copilot.** In the side panel (or Firefox sidebar), turn on the *Do it in my console* switch above the prompt
+  and an agent walks you through real AWS Console pages. It highlights each button and explains why, and risky buttons
+  are always your click. In the demo it (and the Lookout's camera) uses the **practice console**, a page inside the
+  extension that looks like the AWS console, where nothing touches AWS.
+- **Deploy for real.** Connect *your own* AWS account with a small, restricted role. Every change waits for your
   **Approve**.
 - **City care.** Citizens spot real issues in your account (a public bucket, a table without backups) and explain
   the fix. You approve each one.
@@ -97,7 +118,7 @@ The Legend's crown shines a beam over the city at night.
 | **Draw the architecture.** Drop services on a real AWS diagram, scored on the Well-Architected pillars. | **Cards in plain words.** Spaced repetition, with the full answer and AWS docs one tap away. |
 | [<img src="docs/images/shots/building-card.webp" alt="The EC2 Factory card: level, progress, Play Rush Hour, Learn with cards and further reading">](docs/images/shots/building-card.webp) | [<img src="docs/images/shots/city-care.webp" alt="Noor the reliability citizen says I spotted a problem, tap me, beside the DynamoDB Library">](docs/images/shots/city-care.webp) |
 | **Every building is a lesson.** Its level, its game, its cards and a "which one should I pick?" guide. | **City care.** Citizens spot real issues and explain the fix; you approve each one. |
-| [<img src="docs/images/shots/world-map-build.webp" alt="The world map of AWS Regions next to the Build tab's blueprints and practice account">](docs/images/shots/world-map-build.webp) | [<img src="docs/images/shots/letters.webp" alt="The Day 1 Quarter: Amazon's letters to shareholders from 1997, each with an AWS takeaway">](docs/images/shots/letters.webp) |
+| [<img src="docs/images/shots/world-map-build.webp" alt="The world map of AWS Regions next to the Deploy tab's blueprints and practice account">](docs/images/shots/world-map-build.webp) | [<img src="docs/images/shots/letters.webp" alt="The Day 1 Quarter: Amazon's letters to shareholders from 1997, each with an AWS takeaway">](docs/images/shots/letters.webp) |
 | **Every Region is a city.** Build from blueprints with a practice account first. | **Day 1 culture.** Letters to Shareholders, the Leadership Principles and Golden Jacket Hall. |
 | [<img src="docs/images/shots/expo-hall.webp" alt="The re:Invent Expo Hall: AWS launches by year from S3 in 2006 onwards, and a launch-year quiz">](docs/images/shots/expo-hall.webp) | [<img src="docs/images/citizen-question.webp" alt="A citizen's question card: three answers, the right one ticked, and the building it grew">](docs/images/citizen-question.webp) |
 | **re:Invent Expo Hall.** Two decades of launches, and a quest to guess the year. | **Help a citizen.** A quick question in the street grows the building it's about. |
@@ -106,16 +127,32 @@ The Legend's crown shines a beam over the city at night.
 
 ## For kids and parents: the quick path
 
-1. Install AWS City from your browser's store (below). The city opens in a tab by itself.
-2. Press **Play the demo** at the top. No account, no AWS, nothing real is created or charged.
-   When you want to keep your city, open the **⋯** menu and pick **Sign in to save your city**.
+The browser stores don't list AWS City yet, so for now it opens from a copy on your computer. It takes about five
+minutes the first time, and it starts in **Demo mode**: no account, no AWS, nothing real is created or charged.
 
-No store? With [Node 24+](https://nodejs.org) installed, two lines open the demo in its own browser window:
+**You need two free tools** (install each once, with its normal installer):
+[Git](https://git-scm.com/downloads) and [Node.js 24](https://nodejs.org) (24.15+ recommended; the "LTS" download is right).
+
+**Open a terminal.** On a Mac, press <kbd>⌘ Command</kbd> + <kbd>Space</kbd>, type **Terminal** and press Return.
+On Windows, press the <kbd>Windows</kbd> key, type **cmd** and press Enter (Command Prompt). Then paste these two lines:
 
 ```bash
 git clone https://github.com/iloveclouduk/AWS-North-Hackathon.git && cd AWS-North-Hackathon
-npm install && npm run open
+npm start
 ```
+
+The first time, `npm start` installs what it needs (a minute or three, with one quiet progress line), plays a
+two-second title animation (the AWS City skyline rising at the left of the terminal; any key skips it, `--no-intro` turns it off)
+and asks two questions: press Enter twice for the demo in the AWS City browser. It downloads that
+browser once (about 150 MB). Then a new browser window opens with two tabs:
+
+- **your city**, in front. Pick a Region on the world map and start exploring.
+- **the practice console**, a page inside the extension that looks like the AWS console. Clicking around there can't
+  change anything real, and it's where the demo's Copilot and Lookout work.
+
+The terminal stays open as the city's remote control: press **q** there when you're done (it closes the window too).
+When you want to keep your city, open the **⋯** menu and pick **Sign in to save your city**. Next time, open a terminal,
+type `cd AWS-North-Hackathon`, then `npm start`, and press Enter at **Play again?**
 
 ---
 
@@ -125,7 +162,7 @@ npm install && npm run open
 |---|---|---|
 | **Chrome**, Edge, Brave, Opera | Chrome Web Store *(link once published)* | side panel |
 | **Firefox** 140+ | Firefox Add-ons *(link once published)* | sidebar |
-| **Safari** 16.4+ on macOS | Mac App Store *(link once published)* | full city in a tab (Safari has no side panel, so the Lookout and Console Copilot need Chrome, Edge or Firefox) |
+| **Safari** 16.4+ on macOS | Mac App Store *(link once published)* | full city in a tab (Safari has no side panel: the demo's Lookout and Copilot use the practice console; on a real account they need Chrome, Edge or Firefox) |
 
 Publishing guides: [Chrome Web Store](docs/chrome-web-store.md) · [Firefox Add-ons](docs/firefox-addons.md) · [Safari](docs/safari.md).
 
@@ -135,38 +172,59 @@ Publishing guides: [Chrome Web Store](docs/chrome-web-store.md) · [Firefox Add-
 
 ```bash
 git clone https://github.com/iloveclouduk/AWS-North-Hackathon.git && cd AWS-North-Hackathon
-npm install
 npm start
 ```
 
-`npm start` draws the city, then asks two things and handles the rest:
-1. **How do you want to play?** 🎮 the demo (no AWS) · ☁️ real AWS on this computer · 🚀 put it online for everyone.
+**The first time** it installs the packages (the full npm output goes to `.cache/npm-install.log`), plays the title
+animation once, and asks two things:
+1. **How do you want to play?** the demo (no AWS) · real AWS on this computer · put it online for everyone.
 2. **Which browser?** It lists the ones you have. *AWS City browser* (Chrome for Testing) opens with the extension
    already loaded; Google Chrome, Edge and Brave take 3 guided clicks (they block auto-loading); Firefox opens with it
    loaded; Safari builds the Xcode project and walks you through enabling it.
 
-For real AWS it connects your account the easy way — **sign in with your browser** (`aws login`, no keys to copy),
-**paste the keys** from Workshop Studio (it reads them from your clipboard), or **SSO** — checks Claude on Bedrock,
-then starts the local server. It remembers your answers for next time. Nothing needs Docker.
+**After that** it's one line: `Play again? demo · Chrome for Testing`. Press Enter to play, **c** to change, **q** to
+quit. It only rebuilds the extension when something in `src/`, `shared/` or `public/` changed (`--rebuild` forces it).
+
+**What you'll see** is a short checklist that ticks itself off, then the keys:
+
+```text
+  ▃▅█▆▄▇▅▂  AWS City   demo · Chrome for Testing
+
+  ✓ Get the browser ready  Chrome for Testing                             0.7 s
+  ✓ Build the city         up to date (no changes)                        0.1 s
+  ✓ Open the city          a new window: the city + a practice console    2.5 s
+
+  You're in
+    The new window's front tab is your city; the other is a safe practice console.
+    Click once in the city for sound. Arrows walk, E talks, + and − zoom.
+
+  › Demo mode: a practice account, nothing touches AWS.
+  c city · p practice console · a AWS console · r reopen · q quit
+```
+
+**c** brings the city tab forward, **p** opens the practice console, **a** the real AWS console, **r** reopens the
+browser, and **q** (or Ctrl-C) closes everything. If a step fails it says why and offers **t** to try again (and a fix
+when there is one, such as **k** to close an AWS City window that's already open).
+
+For real AWS it connects your account the easy way: **sign in with your browser** (`aws login`, no keys to copy),
+**paste the keys** from Workshop Studio (it reads them from your clipboard), or **SSO**. Then it checks Claude on
+Bedrock and starts the local server. Nothing needs Docker.
 
 **On stage, or in a hurry**, skip the questions:
 
 ```bash
 npm start -- --demo --browser cft      # straight to the demo in the AWS City browser, zero clicks
 npm start -- --demo --browser chrome   # the same in Google Chrome (edge, brave, firefox, safari work too)
-npm start -- --help                    # every option (--live for real AWS, --no-intro to skip the animation)
+npm start -- --help                    # every option (--live, --profile, --region, --rebuild, --no-intro)
 ```
 
-Keep the `--`: without it npm keeps the options for itself. Once the city is open the terminal stays its control
-panel: **c** brings the city tab forward, **p** opens the S3 practice page, **a** the real AWS console, **r** reopens
-the browser and **q** (or Ctrl-C) closes everything. Click once in the city to turn the sound on: browsers keep a page
-quiet until you click it.
+Keep the `--`: without it npm keeps the options for itself.
 
 ## Choose your path (the commands behind `npm start`)
 
 | | You need | Time | Command |
 |---|---|---|---|
-| **1. Play now** (demo agents, no AWS) | Node 24+ | 2 min | `npm run open` |
+| **1. Play now** (demo agents, no AWS) | Node 24 (24.15+ recommended) | 2 min | `npm run open` |
 | **2. Run it on your own AWS** (real agents, sign-in, alarms) | an AWS account | ~25 min, mostly waiting | `npm run setup` |
 | **3. Develop against real AWS locally** | an AWS profile with Bedrock, AWS CLI 2.32+ | 5 min | `npm run live` (`-- --help` lists the options) |
 
@@ -196,7 +254,7 @@ The guided `npm start` and the scripts are built for macOS first; on Linux and W
 - The toolbar icon opens the **side panel**; **⋯ → Open the full city in a tab ↗** opens the full-screen city.
 - Move Kai by clicking or with **WASD / arrow keys**, and press **E** to talk or enter.
 - **⋯ → Replay the tour** shows the first-run tour again.
-- `npm run open` opens the city and a safe S3 practice page. Add `-- --console` to open the real AWS console sign-in too.
+- `npm run open` opens the city and the practice console (`practice.html` inside the extension). Add `-- --console` to open the real AWS console sign-in too.
 
 ### 2 · Run it on your own AWS (one command)
 
@@ -305,7 +363,7 @@ flowchart LR
 
 ```
 src/          the extension: app/ (shell), ui/ (panels), game/ (Phaser city), console/ (Copilot), backend/ (the only network I/O)
-shared/       content as data: 36 services, flashcards, puzzles, quests, culture, regions
+shared/       content as data: 58 services, flashcards, puzzles, quests, culture, regions
 art/          pixel-art generators (characters, city tiles, landmarks) → public/assets
 server/       the backend (Node + TS): agents on Bedrock, approvals, tenants, stores — local or hosted
 infra/        CDK stacks (data, auth, service, edge WAF, budget, CI) + setup wizard + player role
@@ -362,6 +420,17 @@ Built at the **North Hackathon at Northumbria University**, where AWS City won *
 
 The code is [MIT](LICENSE). The AWS Architecture Icons, the Kenney sounds and the fonts keep their own terms (below),
 and AWS, Amazon and the service names are trademarks of Amazon.
+
+## Map data
+
+Each Region's streets, water and parks come from [OpenStreetMap](https://www.openstreetmap.org), © OpenStreetMap
+contributors, available under the [Open Database License (ODbL) 1.0](https://opendatacommons.org/licenses/odbl/1-0/)
+([openstreetmap.org/copyright](https://www.openstreetmap.org/copyright)). The derived street plans in
+`shared/city-maps/` are under the ODbL too (`shared/city-maps/LICENSE.md`); the code that makes them stays MIT.
+`npm run city-maps` builds them once, ahead of time; the extension ships them and makes no map requests.
+
+Each city is centred on the Region's named city downtown (`shared/city-centres.json`: Trafalgar Square for London,
+Rosslyn for N. Virginia, and so on). That's where the game draws the city, not where AWS's data centres are.
 
 ## Credits
 

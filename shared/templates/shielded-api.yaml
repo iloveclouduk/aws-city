@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - an API ready for a flood. CloudFront takes every request at the edge, where Shield Standard is always on and an AWS WAF web ACL blocks floods and common attacks, before an HTTP API invokes a Lambda function. Deploy in us-east-1, the only Region for a CloudFront web ACL.
+
+Resources:
+  ShopRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ShopFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Role: !GetAtt ShopRole.Arn
+      MemorySize: 128
+      Timeout: 5
+      # A ceiling on how many copies run at once, so a flood that gets through can't run up the bill.
+      ReservedConcurrentExecutions: 50
+      Code:
+        ZipFile: |
+          exports.handler = async () => ({ statusCode: 200, body: JSON.stringify({ open: true }) });
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ShopApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-api'
+      ProtocolType: HTTP
+      Target: !GetAtt ShopFunction.Arn
+      Tags:
+        managed-by: aws-city
+
+  ShopPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ShopFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${ShopApi}/*'
+
+  EdgeAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub '${AWS::StackName}-edge'
+      Scope: CLOUDFRONT
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: edge
+      Rules:
+        - Name: rate-limit
+          Priority: 0
+          Action:
+            Block: {}
+          Statement:
+            RateBasedStatement:
+              # Requests from one IP address in any 5-minute window.
+              Limit: 1000
+              AggregateKeyType: IP
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: rate-limit
+        - Name: common-attacks
+          Priority: 1
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: common-attacks
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ShopDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        HttpVersion: http2and3
+        WebACLId: !GetAtt EdgeAcl.Arn
+        Origins:
+          - Id: api
+            DomainName: !Select [2, !Split ['/', !GetAtt ShopApi.ApiEndpoint]]
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+        DefaultCacheBehavior:
+          TargetOriginId: api
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+          # Managed policies: CachingDisabled, and AllViewerExceptHostHeader (made for API Gateway origins).
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+Outputs:
+  SiteUrl:
+    Description: Call the API through CloudFront (point your Route 53 alias record here)
+    Value: !Sub 'https://${ShopDistribution.DomainName}'
+  WebAclArn:
+    Description: The web ACL guarding the distribution
+    Value: !GetAtt EdgeAcl.Arn

@@ -6,6 +6,7 @@ import { bus } from '@/state/bus';
 import { useCity } from '@/state/store';
 import type { Progress } from '@/backend/contract';
 import { ambientStats, tweenCensus } from '@/game/Ambient';
+import { buildProbe } from '@/game/BuildLayer';
 import * as runtime from './runtime';
 import { startRuntime, type Layout } from './runtime';
 import './app.css';
@@ -24,6 +25,7 @@ export function mount(layout: Layout) {
         bus,
         loadProgress: (p: Progress) => useCity.getState().loadProgress({ ...p, updatedAt: new Date().toISOString() }),
         ambient: { stats: ambientStats, tweens: tweenCensus },
+        build: buildProbe,
       },
     });
   document.body.classList.add(`layout-${layout}`);

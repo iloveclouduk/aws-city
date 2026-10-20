@@ -80,6 +80,13 @@ describe('server speaks the frontend contract', () => {
     expect(events.every(isServerEvent)).toBe(true);
   });
 
+  it('an "Explain it back" for a side job goes to the job\'s own service, not one the answer mentions', async () => {
+    const { orchestrator, events, emit } = setup([]);
+    const q = 'Explain it back for the side job “Waiting room”, about Amazon CloudFront (service: cloudfront). The question: Why cache? My answer, in my own words: “a VPC route table and Route 53 records”';
+    await orchestrator.ask({ requestId: 'r2', districtId: 'networking', question: q, context: {} }, emit);
+    expect(events.filter((e) => e.type === 'chat.answer').at(-1)).toMatchObject({ done: true, agentId: 'cloudfront' });
+  });
+
   it('page.classify returns only valid service ids', async () => {
     const { orchestrator, events, emit } = setup([message([toolUse('r', 'report_page', { serviceIds: ['ec2', 'made-up'], summary: 'EC2 instances list.' })], 'tool_use')]);
     await orchestrator.classifyPage({ requestId: 'c1', context: { url: 'https://us-west-2.console.aws.amazon.com/ec2/home', title: 'Instances' } }, emit);

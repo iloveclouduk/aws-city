@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-10-12",
+  "asOf": "2026-10-17",
   "note": "Which one should I pick? Side-by-side cards for AWS services people mix up (src/ui/CompareCard.tsx). Facts from the AWS decision guides and each service's own docs (`source`); the wording is ours.",
   "comparisons": [
     {
@@ -158,6 +158,465 @@
         { "label": "Role", "values": { "elasticache": "A fast copy", "dynamodb": "The real data" } }
       ],
       "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html"
+    },
+    {
+      "id": "managed-instances-or-ec2",
+      "title": "Lambda Managed Instances or EC2?",
+      "simple": "Managed Instances runs Lambda functions on EC2 servers that Lambda looks after. Plain EC2 leaves the upkeep to you.",
+      "options": [
+        { "serviceId": "lambda", "pick": "Pick it for steady, heavy traffic in Lambda's model, with Lambda patching and scaling the servers." },
+        { "serviceId": "ec2", "pick": "Pick it when you need full control of the machine and its software, all the time." }
+      ],
+      "rows": [
+        { "label": "You manage", "values": { "lambda": "Your function code", "ec2": "The OS, patches and scaling" }},
+        { "label": "You pay", "values": { "lambda": "EC2 price plus a 15% fee", "ec2": "The EC2 price" }},
+        { "label": "Scaling", "values": { "lambda": "Automatic on CPU use, no cold starts", "ec2": "Whatever you set up" }},
+        { "label": "Discounts", "values": { "lambda": "Savings Plans cover the EC2 part", "ec2": "Savings Plans and Reserved Instances" }}
+      ],
+      "source": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances.html"
+    },
+    {
+      "id": "tenant-isolation",
+      "title": "Cognito, API Gateway or IAM for tenants?",
+      "simple": "Cognito knows which tenant a user is, API Gateway checks every call, and IAM limits what the code may touch.",
+      "options": [
+        { "serviceId": "cognito", "pick": "Pick it to sign users in and stamp each one with a tenant they can't change themselves." },
+        { "serviceId": "apigateway", "pick": "Pick it to check every request at the door and pass the caller's tenant on to your code." },
+        { "serviceId": "iam", "pick": "Pick it to limit each request's keys to one tenant's rows, so a bug can't cross over." }
+      ],
+      "rows": [
+        { "label": "Its job", "values": { "cognito": "Who the user is, and their tenant", "apigateway": "Let each call in, or not", "iam": "What the code may read and write" }},
+        { "label": "How", "values": { "cognito": "A read-only custom:tenantID attribute", "apigateway": "A Lambda authorizer returns a policy and context", "iam": "A session policy on dynamodb:LeadingKeys" }},
+        { "label": "Noisy tenants", "values": { "cognito": "Not its job", "apigateway": "Usage plans throttle each key (best effort)", "iam": "Not its job" }}
+      ],
+      "source": "https://docs.aws.amazon.com/cognito/latest/developerguide/custom-attribute-based-multi-tenancy.html"
+    },
+    {
+      "id": "graph-or-key-value",
+      "title": "Neptune or DynamoDB?",
+      "simple": "DynamoDB fetches items by their key, fast, for millions of users. Neptune follows the links between things.",
+      "options": [
+        { "serviceId": "dynamodb", "pick": "Pick it for huge numbers of quick lookups by key, like sessions or shopping carts." },
+        { "serviceId": "neptune", "pick": "Pick it when the links matter most: social networks, fraud rings or recommendations." }
+      ],
+      "rows": [
+        { "label": "Data model", "values": { "dynamodb": "Key-value items", "neptune": "Graph: things and the links between them" }},
+        { "label": "Good for", "values": { "dynamodb": "Session stores, shopping carts", "neptune": "Social networks, fraud detection, recommendations" }},
+        { "label": "Built for", "values": { "dynamodb": "Single-digit millisecond reads at any scale", "neptune": "Following many links and spotting patterns fast" }},
+        { "label": "Serverless", "values": { "dynamodb": "Yes, always", "neptune": "Yes, with Neptune Serverless" }}
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/databases-on-aws-how-to-choose.html"
+    },
+    {
+      "id": "vision-or-documents",
+      "title": "Rekognition or Textract?",
+      "simple": "Rekognition says what's in a photo or video. Textract reads documents and keeps their tables and forms.",
+      "options": [
+        { "serviceId": "rekognition", "pick": "Pick it to find objects, faces, unsafe content or words in photos and videos." },
+        { "serviceId": "textract", "pick": "Pick it to pull text, tables and form fields out of scanned pages, forms and files." }
+      ],
+      "rows": [
+        { "label": "Looks at", "values": { "rekognition": "Images and videos", "textract": "Scanned documents and forms" }},
+        { "label": "Finds", "values": { "rekognition": "Objects, scenes, faces, unsafe content", "textract": "Printed and handwritten text, tables, form fields" }},
+        { "label": "Text", "values": { "rekognition": "Text it spots in a picture", "textract": "Text with its structure and reading order" }},
+        { "label": "Make it yours", "values": { "rekognition": "Custom Labels for your own objects", "textract": "Adapters trained on your documents" }}
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/ml-guide.html"
+    },
+    {
+      "id": "app-platforms",
+      "title": "Elastic Beanstalk, ECS or Lambda?",
+      "simple": "Beanstalk runs your web app's code on servers it sets up. ECS runs containers. Lambda runs code only when events arrive.",
+      "options": [
+        { "serviceId": "beanstalk", "pick": "Pick it to deploy a web app quickly from code, with AWS setting up servers and scaling." },
+        { "serviceId": "ecs", "pick": "Pick it when your app is already packed in containers and runs all the time." },
+        { "serviceId": "lambda", "pick": "Pick it for short jobs that run when something happens, with no servers at all." }
+      ],
+      "rows": [
+        { "label": "You hand over", "values": { "beanstalk": "Your code, or a Docker image", "ecs": "Container images", "lambda": "Functions" }},
+        { "label": "AWS handles", "values": { "beanstalk": "Servers, load balancing, scaling, health", "ecs": "Where containers run, restarts", "lambda": "Servers, patching, scaling, logging" }},
+        { "label": "Runs for", "values": { "beanstalk": "As long as you like", "ecs": "As long as you like", "lambda": "Up to 15 minutes a run" }},
+        { "label": "Extra charge", "values": { "beanstalk": "None: you pay for what it creates", "ecs": "None: you pay for EC2 or Fargate", "lambda": "Per request and run time" }}
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/choosing-aws-compute-service.html"
+    },
+    {
+      "id": "watch-detect-test",
+      "title": "CloudWatch, GuardDuty or Security Agent?",
+      "simple": "CloudWatch watches health and logs actions. GuardDuty spots attacks. Security Agent attacks your own app as a test.",
+      "options": [
+        { "serviceId": "cloudwatch", "pick": "Pick it to see how things run, get alarms, and keep an audit trail with CloudTrail." },
+        { "serviceId": "guardduty", "pick": "Pick it to be warned of attacks or misuse in your account, always on." },
+        { "serviceId": "securityagent", "pick": "Pick it before a release, to find weak spots with an authorised practice attack." }
+      ],
+      "rows": [
+        { "label": "Its job", "values": { "cloudwatch": "Metrics, logs, alarms; CloudTrail logs actions", "guardduty": "Threat detection", "securityagent": "Penetration tests on your own app" }},
+        { "label": "Runs", "values": { "cloudwatch": "All the time", "guardduty": "All the time", "securityagent": "On demand, per test" }},
+        { "label": "Gives you", "values": { "cloudwatch": "Graphs, alarms and searchable logs", "guardduty": "Findings with a severity", "securityagent": "Proven findings with steps to fix" }}
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/choosing-aws-security-services.html"
+    },
+    {
+      "id": "edge-or-dns",
+      "title": "CloudFront or Route 53?",
+      "simple": "Route 53 tells browsers where your site lives. CloudFront serves it from a place near each visitor.",
+      "options": [
+        { "serviceId": "cloudfront", "pick": "Pick it to make a site load faster everywhere by keeping copies near your users." },
+        { "serviceId": "route53", "pick": "Pick it to point your domain name at your app, and send users to a healthy copy." }
+      ],
+      "rows": [
+        { "label": "Its job", "values": { "cloudfront": "Content delivery network: caches and serves content", "route53": "Domain Name System: turns names into addresses" }},
+        { "label": "Speeds things up by", "values": { "cloudfront": "Serving copies from edge locations", "route53": "Latency routing to the quickest Region" }},
+        { "label": "Keeps you up by", "values": { "cloudfront": "Absorbing traffic at the edge", "route53": "Health checks and failover records" }},
+        { "label": "Often used", "values": { "cloudfront": "Together: Route 53 points your name at CloudFront", "route53": "Together: an alias record to the distribution" }}
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/choosing-networking-and-content-delivery-service.html"
+    },
+    {
+      "id": "keys-or-identities",
+      "title": "KMS or IAM?",
+      "simple": "IAM decides who may do what in AWS. KMS holds the keys that lock your data, and decides who may use each key.",
+      "options": [
+        { "serviceId": "iam", "pick": "Pick it to give people and apps only the access to AWS they need." },
+        { "serviceId": "kms", "pick": "Pick it to encrypt data with keys you control, and see each time a key is used." }
+      ],
+      "rows": [
+        { "label": "Controls", "values": { "iam": "Who can call which AWS action on what", "kms": "Who can use each encryption key" }},
+        { "label": "Rules live in", "values": { "iam": "Policies on users, roles and resources", "kms": "One key policy per key, plus IAM if it allows" }},
+        { "label": "Cost", "values": { "iam": "No extra charge", "kms": "Monthly fee per key you create, plus requests" }}
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/choosing-aws-security-services.html"
+    },
+    {
+      "id": "lake-permissions",
+      "title": "Lake Formation or IAM for a data lake?",
+      "simple": "IAM opens the door to the lake's services. Lake Formation decides which tables, columns and rows each person sees.",
+      "options": [
+        { "serviceId": "lakeformation", "pick": "Pick it to grant people just some tables, columns or rows, like in a database." },
+        { "serviceId": "iam", "pick": "Pick it for broad access: who may use Lake Formation, Glue and the other services at all." }
+      ],
+      "rows": [
+        { "label": "Grants on", "values": { "lakeformation": "Databases, tables, columns, rows", "iam": "AWS actions, buckets and objects" }},
+        { "label": "Style", "values": { "lakeformation": "Database-style grant and revoke", "iam": "JSON policies" }},
+        { "label": "In a data lake", "values": { "lakeformation": "Fine-grained: what each person can read", "iam": "Coarse-grained: which services they can call" }},
+        { "label": "Checked by", "values": { "lakeformation": "Athena, Glue, EMR, Redshift Spectrum", "iam": "Every AWS request" }}
+      ],
+      "source": "https://docs.aws.amazon.com/lake-formation/latest/dg/upgrade-glue-lake-formation.html"
+    },
+    {
+      "id": "network-or-web-firewall",
+      "title": "VPC rules or AWS WAF?",
+      "simple": "Your VPC's security groups and network rules decide which addresses and ports get in. AWS WAF reads each web request.",
+      "options": [
+        { "serviceId": "vpc", "pick": "Pick it to keep resources private and allow only the addresses and ports they need." },
+        { "serviceId": "shield", "pick": "Pick it to block bad web requests, like injection attacks or floods, before your app." }
+      ],
+      "rows": [
+        { "label": "Checks", "values": { "vpc": "Addresses, ports and protocols", "shield": "The content of each web request" }},
+        { "label": "Tools", "values": { "vpc": "Security groups, network ACLs, private subnets", "shield": "AWS WAF rules, Shield for DDoS" }},
+        { "label": "Protects", "values": { "vpc": "Everything inside your network", "shield": "Websites and APIs: CloudFront, load balancers, API Gateway" }}
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/choosing-networking-and-content-delivery-service.html"
+    },
+    {
+      "id": "agents-or-models",
+      "title": "AgentCore or Bedrock?",
+      "simple": "Bedrock gives you the AI models. AgentCore runs the agents built on them, with memory, tools and safe sessions.",
+      "options": [
+        { "serviceId": "bedrock", "pick": "Pick it to call foundation models from your app, with knowledge bases and guardrails." },
+        { "serviceId": "agentcore", "pick": "Pick it to deploy and run agents in production, with any framework and any model." }
+      ],
+      "rows": [
+        { "label": "Gives you", "values": { "bedrock": "Access to 100+ foundation models", "agentcore": "A platform to run and operate agents" }},
+        { "label": "Models", "values": { "bedrock": "From Amazon and other AI companies", "agentcore": "Any model, in or outside Bedrock" }},
+        { "label": "Building blocks", "values": { "bedrock": "Knowledge Bases, Guardrails, Converse API", "agentcore": "Runtime, Memory, Gateway, Identity" }},
+        { "label": "Servers", "values": { "bedrock": "None to manage", "agentcore": "None to manage" }}
+      ],
+      "source": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/what-is-bedrock-agentcore.html"
+    },
+    {
+      "id": "app-runner-or-express",
+      "title": "App Runner or ECS Express Mode?",
+      "simple": "Both turn one container image into a running website. App Runner takes no new customers, so new apps use Express Mode.",
+      "options": [
+        { "serviceId": "apprunner", "pick": "Pick it only if your team already runs apps on it: it's closed to new customers." },
+        { "serviceId": "ecs", "pick": "Pick it (Express Mode) for a new web app from one container image, with AWS building the stack." }
+      ],
+      "rows": [
+        { "label": "New customers", "values": { "apprunner": "No, since 30 April 2026", "ecs": "Yes" } },
+        { "label": "Deploys from", "values": { "apprunner": "Source code or a container image", "ecs": "A container image (add a build step for code)" } },
+        { "label": "Runs in", "values": { "apprunner": "App Runner's managed service", "ecs": "Your account: Fargate, a load balancer, scaling" } },
+        { "label": "Extra charge", "values": { "apprunner": "Compute by the second, plus deployment and build fees", "ecs": "None beyond the resources it creates" } }
+      ],
+      "source": "https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html"
+    },
+    {
+      "id": "jobs-or-functions",
+      "title": "Batch or Lambda?",
+      "simple": "Lambda runs short bits of code the moment something happens. Batch queues long jobs and runs them on capacity it scales.",
+      "options": [
+        { "serviceId": "batch", "pick": "Pick it for long, heavy jobs, like rendering or simulations, that can wait in a queue." },
+        { "serviceId": "lambda", "pick": "Pick it for short tasks, up to 15 minutes each, that run as soon as an event happens." }
+      ],
+      "rows": [
+        { "label": "Longest run", "values": { "batch": "As long as the job needs", "lambda": "15 minutes per invocation" } },
+        { "label": "Starts", "values": { "batch": "When capacity fits the queued job", "lambda": "On each event, in moments" } },
+        { "label": "Runs on", "values": { "batch": "Containers on EC2, Spot or Fargate", "lambda": "Managed functions" } },
+        { "label": "Extra charge", "values": { "batch": "None: you pay for the compute", "lambda": "Per request and per millisecond" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/choosing-aws-compute-service.html"
+    },
+    {
+      "id": "simple-hosting",
+      "title": "Lightsail, Beanstalk or EC2?",
+      "simple": "Lightsail is all-in-one for a fixed price. Beanstalk runs your code and handles servers. EC2 gives full control.",
+      "options": [
+        { "serviceId": "lightsail", "pick": "Pick it for a simple site or blog at a fixed, predictable monthly price, with little setup." },
+        { "serviceId": "beanstalk", "pick": "Pick it to upload your code and let AWS handle the servers, scaling and health checks." },
+        { "serviceId": "ec2", "pick": "Pick it when you need full control of the server, the network and the pricing options." }
+      ],
+      "rows": [
+        { "label": "Pricing", "values": { "lightsail": "Fixed monthly plans", "beanstalk": "No extra charge: pay for what it creates", "ec2": "Pay per use, or commit for less" } },
+        { "label": "Setup", "values": { "lightsail": "Very easy: preconfigured instances", "beanstalk": "Easy: upload your code", "ec2": "You set up and manage it all" } },
+        { "label": "Scaling", "values": { "lightsail": "Simple: a range of plan sizes", "beanstalk": "Auto scaling built in", "ec2": "Fully customisable auto scaling" } },
+        { "label": "Best for", "values": { "lightsail": "Blogs, small sites, prototypes", "beanstalk": "Web apps and APIs", "ec2": "Large apps, custom networking" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/lightsail-elastic-beanstalk-ec2.html"
+    },
+    {
+      "id": "backup-or-snapshots",
+      "title": "AWS Backup or EBS snapshots on their own?",
+      "simple": "Data Lifecycle Manager schedules snapshots of EC2 disks. AWS Backup runs one plan across many services.",
+      "options": [
+        { "serviceId": "backup", "pick": "Pick it for one backup plan across many services, with locked vaults and copies to other accounts." },
+        { "serviceId": "ebs", "pick": "Pick it when you only need scheduled snapshots of EC2 disks, with Data Lifecycle Manager." }
+      ],
+      "rows": [
+        { "label": "Covers", "values": { "backup": "EC2, EBS, S3, DynamoDB, RDS, EFS and more", "ebs": "EBS snapshots and EBS-backed AMIs" } },
+        { "label": "Schedules with", "values": { "backup": "Backup plans, assigned by tag", "ebs": "Data Lifecycle Manager policies" } },
+        { "label": "Locks against deletion", "values": { "backup": "Vault Lock", "ebs": "Not part of Data Lifecycle Manager" } },
+        { "label": "Extra charge", "values": { "backup": "Backup storage, restores and copies", "ebs": "Data Lifecycle Manager adds none" } }
+      ],
+      "source": "https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html"
+    },
+    {
+      "id": "stream-or-queue",
+      "title": "Kinesis or SQS?",
+      "simple": "A queue hands each message to one worker. A stream keeps every record in order, so many readers can each read it all.",
+      "options": [
+        { "serviceId": "kinesis", "pick": "Pick it when many apps must read the same records, in order, and maybe read them again." },
+        { "serviceId": "sqs", "pick": "Pick it when each job should go to one worker, at its own pace, then be deleted." }
+      ],
+      "rows": [
+        { "label": "Who reads", "values": { "kinesis": "Every consumer reads every record", "sqs": "Each message goes to one consumer" } },
+        { "label": "Keeps data", "values": { "kinesis": "24 hours, up to 365 days", "sqs": "Until processed, up to 14 days" } },
+        { "label": "Order", "values": { "kinesis": "In order per partition key", "sqs": "FIFO queues keep strict order" } },
+        { "label": "Read again", "values": { "kinesis": "Yes, within retention", "sqs": "No: processed messages are deleted" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/application-integration-on-aws-how-to-choose.html"
+    },
+    {
+      "id": "search-or-key-value",
+      "title": "OpenSearch or DynamoDB?",
+      "simple": "DynamoDB finds an item when you know its key. OpenSearch finds items by any words inside them.",
+      "options": [
+        { "serviceId": "dynamodb", "pick": "Pick it to store items and fetch each one fast by its key, at any scale." },
+        { "serviceId": "opensearch", "pick": "Pick it to search text by any word, analyse logs, or find similar items with vector search." }
+      ],
+      "rows": [
+        { "label": "Finds things by", "values": { "dynamodb": "Primary key, or an index you add", "opensearch": "Any word or field in the documents" } },
+        { "label": "Best at", "values": { "dynamodb": "Fast reads and writes at any scale", "opensearch": "Search, log analytics and vector search" } },
+        { "label": "Serverless", "values": { "dynamodb": "Yes, always", "opensearch": "Yes, with OpenSearch Serverless" } },
+        { "label": "Together", "values": { "dynamodb": "Stays the source of truth", "opensearch": "Zero-ETL keeps a searchable copy" } }
+      ],
+      "source": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/OpenSearchIngestionForDynamoDB.html"
+    },
+    {
+      "id": "documents-or-key-value",
+      "title": "DocumentDB or DynamoDB?",
+      "simple": "DynamoDB fetches items by key, fast, at any scale. DocumentDB stores rich documents you can query by any field.",
+      "options": [
+        { "serviceId": "dynamodb", "pick": "Pick it for huge numbers of quick reads and writes by key, like sessions or shopping carts." },
+        { "serviceId": "documentdb", "pick": "Pick it for documents you query in rich ways, or apps already built with MongoDB drivers." }
+      ],
+      "rows": [
+        { "label": "Data model", "values": { "dynamodb": "Key-value", "documentdb": "JSON-like documents" } },
+        { "label": "Good for", "values": { "dynamodb": "Session stores, shopping carts", "documentdb": "Product catalogues, user profiles, content" } },
+        { "label": "Built for", "values": { "dynamodb": "Single-digit millisecond reads at any scale", "documentdb": "Rich queries across any field of a document" } },
+        { "label": "Works with", "values": { "dynamodb": "Its own API and SDKs", "documentdb": "MongoDB drivers and tools" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/databases-on-aws-how-to-choose.html"
+    },
+    {
+      "id": "peering-or-hub",
+      "title": "VPC peering or Transit Gateway?",
+      "simple": "Peering joins two networks directly. A transit gateway is one hub that every network plugs into.",
+      "options": [
+        { "serviceId": "vpc", "pick": "Pick it (VPC peering) to link a few VPCs in pairs, with nothing in between." },
+        { "serviceId": "transitgateway", "pick": "Pick it when many VPCs, accounts and office links must reach each other through one hub." }
+      ],
+      "rows": [
+        { "label": "Shape", "values": { "vpc": "Direct links between pairs of VPCs", "transitgateway": "Hub and spoke" } },
+        { "label": "Passes traffic on", "values": { "vpc": "No: peering isn't transitive", "transitgateway": "Yes, as its route tables allow" } },
+        { "label": "Office links", "values": { "vpc": "Can't share one VPC's VPN or gateway", "transitgateway": "VPN and Direct Connect attach to the hub" } },
+        { "label": "Keeping networks apart", "values": { "vpc": "Only peer the pairs that may talk", "transitgateway": "Separate route tables" } }
+      ],
+      "source": "https://docs.aws.amazon.com/whitepapers/latest/building-scalable-secure-multi-vpc-network-infrastructure/transit-gateway.html"
+    },
+    {
+      "id": "cdn-or-accelerator",
+      "title": "CloudFront or Global Accelerator?",
+      "simple": "CloudFront keeps copies of web content near people. Global Accelerator carries any traffic fast to your app's Regions.",
+      "options": [
+        { "serviceId": "cloudfront", "pick": "Pick it to make websites, images, videos and APIs faster for people around the world." },
+        { "serviceId": "globalaccelerator", "pick": "Pick it for fixed IP addresses, fast Region failover, or traffic that isn't web pages, like games." }
+      ],
+      "rows": [
+        { "label": "Its job", "values": { "cloudfront": "Caches and delivers web content at the edge", "globalaccelerator": "Carries traffic over the AWS network to your Regions" } },
+        { "label": "Good for", "values": { "cloudfront": "Websites, images, video, APIs", "globalaccelerator": "Gaming, IoT, voice calls, fixed-address apps" } },
+        { "label": "Entry point", "values": { "cloudfront": "A distribution's domain name", "globalaccelerator": "Two static anycast IP addresses" } },
+        { "label": "DDoS protection", "values": { "cloudfront": "AWS Shield", "globalaccelerator": "AWS Shield" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/choosing-networking-and-content-delivery-service.html"
+    },
+    {
+      "id": "secrets-or-keys",
+      "title": "Secrets Manager or KMS?",
+      "simple": "KMS makes and guards the keys that lock data. Secrets Manager stores passwords and API keys and changes them.",
+      "options": [
+        { "serviceId": "secretsmanager", "pick": "Pick it to keep database passwords, API keys and tokens out of code, and rotate them." },
+        { "serviceId": "kms", "pick": "Pick it to create and control the keys that encrypt your data, in AWS services or your app." }
+      ],
+      "rows": [
+        { "label": "Holds", "values": { "secretsmanager": "Passwords, API keys, tokens", "kms": "Encryption keys" } },
+        { "label": "Your code gets", "values": { "secretsmanager": "The secret value, at run time", "kms": "Encrypt and decrypt results; the key never leaves" } },
+        { "label": "Rotation", "values": { "secretsmanager": "Changes the secret on your schedule", "kms": "New key material yearly by default" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/choosing-aws-security-services.html"
+    },
+    {
+      "id": "threats-flaws-data",
+      "title": "GuardDuty, Inspector or Macie?",
+      "simple": "GuardDuty spots attackers, Inspector finds known software flaws, and Macie finds sensitive data left in buckets.",
+      "options": [
+        { "serviceId": "guardduty", "pick": "Pick it to be warned of attacks or misuse in your account, from its logs." },
+        { "serviceId": "inspector", "pick": "Pick it to find known flaws and open network paths on servers, images and functions." },
+        { "serviceId": "macie", "pick": "Pick it to find personal or secret data in S3, and buckets left open." }
+      ],
+      "rows": [
+        { "label": "Looks at", "values": { "guardduty": "Logs: CloudTrail, VPC Flow Logs, DNS", "inspector": "EC2, container images, Lambda", "macie": "S3 buckets and their objects" } },
+        { "label": "Finds", "values": { "guardduty": "Threats and suspicious activity", "inspector": "Software flaws (CVEs) and network exposure", "macie": "Sensitive data and risky bucket settings" } },
+        { "label": "Free trial", "values": { "guardduty": "30 days", "inspector": "15 days", "macie": "30 days" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/choosing-aws-security-services.html"
+    },
+    {
+      "id": "personal-data-finders",
+      "title": "Macie or Comprehend for personal data?",
+      "simple": "Macie hunts for personal data stored in your S3 buckets. Comprehend finds and hides it in text your app handles.",
+      "options": [
+        { "serviceId": "macie", "pick": "Pick it to discover where sensitive data sits in S3 and which buckets are exposed." },
+        { "serviceId": "comprehend", "pick": "Pick it to detect or redact personal details in text as part of your own pipeline." }
+      ],
+      "rows": [
+        { "label": "Looks at", "values": { "macie": "Objects in your S3 buckets", "comprehend": "Text you send it" } },
+        { "label": "Finds", "values": { "macie": "Credentials, financial and personal data", "comprehend": "Personal details like addresses and phone numbers" } },
+        { "label": "Then", "values": { "macie": "Raises findings for review", "comprehend": "Returns locations, or a redacted copy" } }
+      ],
+      "source": "https://docs.aws.amazon.com/wellarchitected/latest/framework/sec_data_classification_auto_classification.html"
+    },
+    {
+      "id": "watcher-or-board",
+      "title": "GuardDuty or Security Hub?",
+      "simple": "GuardDuty is one watcher that finds threats. Security Hub puts every watcher's findings on one board.",
+      "options": [
+        { "serviceId": "guardduty", "pick": "Pick it to detect threats like stolen keys or crypto mining from your logs." },
+        { "serviceId": "securityhub", "pick": "Pick it to see, rank and act on findings from all your security services in one place." }
+      ],
+      "rows": [
+        { "label": "Its job", "values": { "guardduty": "Detect threats", "securityhub": "Collect, correlate and rank findings" } },
+        { "label": "Checks of its own", "values": { "guardduty": "Threats in logs", "securityhub": "Best-practice controls (CSPM)" } },
+        { "label": "Needs", "values": { "guardduty": "Nothing else switched on", "securityhub": "AWS Config for most controls" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/choosing-aws-security-services.html"
+    },
+    {
+      "id": "speak-read-scan",
+      "title": "Polly, Comprehend or Textract?",
+      "simple": "Textract reads scanned pages, Comprehend works out what text means, and Polly reads text aloud.",
+      "options": [
+        { "serviceId": "polly", "pick": "Pick it to turn text into natural speech for apps, games or accessibility." },
+        { "serviceId": "comprehend", "pick": "Pick it to find the mood, names, key phrases and personal data in typed text." },
+        { "serviceId": "textract", "pick": "Pick it to pull text, tables and form fields out of scanned pages and documents." }
+      ],
+      "rows": [
+        { "label": "Takes in", "values": { "polly": "Text, with optional speech tags", "comprehend": "Typed text", "textract": "Images and PDFs of documents" } },
+        { "label": "Gives back", "values": { "polly": "Audio, or word timings", "comprehend": "Entities, sentiment, language, key phrases", "textract": "Text, tables and form fields" } },
+        { "label": "Long jobs", "values": { "polly": "Background task saves audio to S3", "comprehend": "Asynchronous jobs on files in S3", "textract": "Asynchronous jobs for multipage files" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/ml-guide.html"
+    },
+    {
+      "id": "workflow-or-events",
+      "title": "Step Functions or EventBridge?",
+      "simple": "Step Functions conducts the steps of one job in order. EventBridge passes news of events on to whoever cares.",
+      "options": [
+        { "serviceId": "stepfunctions", "pick": "Pick it to run a job's steps in order, with branches, retries and waits." },
+        { "serviceId": "eventbridge", "pick": "Pick it to route events between services, or to run things on a schedule." }
+      ],
+      "rows": [
+        { "label": "Kind", "values": { "stepfunctions": "Workflows: one conductor runs the steps", "eventbridge": "Events: senders and listeners stay apart" } },
+        { "label": "Best for", "values": { "stepfunctions": "Business processes, data pipelines, microservice coordination", "eventbridge": "Event-driven apps and scheduled tasks" } },
+        { "label": "Handles", "values": { "stepfunctions": "Order, branches, parallel steps, retries and errors", "eventbridge": "Matching events to rules and delivering them" } },
+        { "label": "Servers", "values": { "stepfunctions": "None to manage", "eventbridge": "None to manage" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/application-integration-on-aws-how-to-choose.html"
+    },
+    {
+      "id": "build-or-run",
+      "title": "CloudFormation or Systems Manager?",
+      "simple": "CloudFormation builds your resources from a blueprint. Systems Manager looks after the servers once they run.",
+      "options": [
+        { "serviceId": "cloudformation", "pick": "Pick it to create, update and delete resources together from a template." },
+        { "serviceId": "systemsmanager", "pick": "Pick it to patch, run commands on and connect to servers you already have." }
+      ],
+      "rows": [
+        { "label": "Job", "values": { "cloudformation": "Provision infrastructure as code", "systemsmanager": "Operate and manage nodes" } },
+        { "label": "Works with", "values": { "cloudformation": "A template and the stack built from it", "systemsmanager": "Managed nodes running the SSM Agent" } },
+        { "label": "Typical task", "values": { "cloudformation": "Build the same setup in every Region", "systemsmanager": "Patch every server on Tuesday night" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/cloud-governance-on-aws-how-to-choose.html"
+    },
+    {
+      "id": "prevent-or-detect",
+      "title": "Organizations or Config?",
+      "simple": "Organizations sets limits accounts cannot cross. Config checks how things are set up and flags what breaks your rules.",
+      "options": [
+        { "serviceId": "organizations", "pick": "Pick it to group accounts and set guardrails, like SCPs, that stop actions before they happen." },
+        { "serviceId": "config", "pick": "Pick it to record settings over time, check them against rules and fix what breaks them." }
+      ],
+      "rows": [
+        { "label": "Works on", "values": { "organizations": "Accounts and organizational units", "config": "Resources and their settings" } },
+        { "label": "Approach", "values": { "organizations": "Prevents: caps what accounts can do", "config": "Detects: flags resources that break rules" } },
+        { "label": "Fixing", "values": { "organizations": "The action is stopped before it happens", "config": "Remediation with Systems Manager runbooks" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/cloud-governance-on-aws-how-to-choose.html"
+    },
+    {
+      "id": "graphql-or-rest",
+      "title": "AppSync or API Gateway?",
+      "simple": "AppSync gives apps one GraphQL endpoint to ask many sources at once. API Gateway runs classic web APIs, one route each.",
+      "options": [
+        { "serviceId": "appsync", "pick": "Pick it for GraphQL: one request for exactly the fields an app needs, with live updates." },
+        { "serviceId": "apigateway", "pick": "Pick it for classic web APIs and WebSocket APIs in front of your services." }
+      ],
+      "rows": [
+        { "label": "API style", "values": { "appsync": "GraphQL (and AppSync Events)", "apigateway": "REST, HTTP and WebSocket" } },
+        { "label": "Requests", "values": { "appsync": "One endpoint for many data sources", "apigateway": "One route per resource or action" } },
+        { "label": "Live updates", "values": { "appsync": "Built-in subscriptions", "apigateway": "WebSocket APIs you program" } },
+        { "label": "Servers", "values": { "appsync": "None to manage", "apigateway": "None to manage" } }
+      ],
+      "source": "https://docs.aws.amazon.com/decision-guides/latest/decision-guides/front-end-mobile.html"
     }
   ]
 }

@@ -1,28 +1,89 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { planDeploy, submitPrompt } from '@/app/runtime';
 import { bus } from '@/state/bus';
+import { nextAction } from '@/state/next';
 import { agentName, useCity, type FeedItem, type TaskView } from '@/state/store';
+import { agentOffer, liveStep, paidLine, taskPhase, taskStory } from '@/state/watch';
+import { placeFor } from '@/world/places';
+import { feel } from './feedback';
+import { offlineReason } from './logic';
 import { agentColor, Portrait } from './Portrait';
+import type { OpenTab } from './QuestLog';
 import { Plain } from './Term';
 
 const TASK_LABEL = { routing: 'Finding an agent', running: 'Working', done: '✓ Done', failed: '✗ Didn’t work' } as const;
 const STEP_ICON = { pending: '·', running: '▸', done: '✓', failed: '✗', skipped: '⤼' } as const;
 
+/** The task's steps as a bar and a list, in step with the agent in the city. */
+function Steps({ task }: { task: TaskView }) {
+  return (
+    <>
+      <div className="segs" aria-hidden="true">
+        {task.steps.map((s, i) => (
+          <i key={i} className={s.status === 'done' || s.status === 'skipped' ? 'done' : s.status === 'running' ? 'now' : s.status === 'failed' ? 'fail' : ''} />
+        ))}
+      </div>
+      <ol className="steps">
+        {task.steps.map((s, i) => (
+          <li key={i} className={s.status}>
+            <span className="ico">{STEP_ICON[s.status]}</span> <Plain text={s.text} />
+          </li>
+        ))}
+      </ol>
+    </>
+  );
+}
+
 /**
- * A task an agent ran for you: the result first, then what you asked. The steps show while it runs; the AWS API
- * calls (and the finished steps) wait behind "Details".
+ * Watch it done (src/state/watch.ts): an agent's task as a short story. Before it starts, who will do what and where,
+ * with Watch (the camera follows the agent and the card folds to one live line); while it runs, its steps in step with
+ * the city; after, what was built, what it teaches, what it paid and the next step, and in the demo "See it in Deploy"
+ * when the task matches a practice template. The AWS API calls (and the finished steps) wait behind "Details".
+ * `openTab` (Home passes it) lets "See it in Deploy" open the Deploy tab. `quiet` (Simple mode's To-do list): no "Next"
+ * button and no filled one, since the list under it holds the next step.
  */
-export function TaskCard({ task }: { task: TaskView }) {
-  const who = task.agentId ?? 'concierge';
-  const finished = task.status === 'done' || task.status === 'failed';
+export function TaskCard({ task, openTab, quiet = false }: { task: TaskView; openTab?: OpenTab; quiet?: boolean }) {
+  const story = taskStory(task);
+  const who = task.agentId ?? (task.status === 'routing' ? 'concierge' : story.agentId);
+  const phase = taskPhase(task);
+  const finished = phase === 'result' || phase === 'failed';
   const [details, setDetails] = useState(false);
+  const [watching, setWatching] = useState(false);
+  const [deploy, setDeploy] = useState<'idle' | 'asked' | 'link'>('idle');
   const done = task.steps.filter((s) => s.status === 'done' || s.status === 'skipped').length;
   const calls = task.calls ?? [];
   // Honest labels: the demo backend only pretends to call AWS.
   const demo = useCity((s) => s.backendKind === 'mock');
-  const showSteps = task.steps.length > 0 && (!finished || details);
-  const hasDetails = calls.length > 0 || (finished && task.steps.length > 0);
+  const linked = useCity((s) => s.account.linked);
+  const offline = useCity((s) => offlineReason(s.backendKind, s.backendStatus));
+  const progress = useCity((s) => s.progress);
+  const cityRegion = useCity((s) => s.cityRegion);
+  const clientFocus = useCity((s) => s.clientFocus);
+  // The one next step (src/state/next.ts), read once the task is done.
+  const next = useMemo(() => (phase === 'result' && !quiet ? nextAction({ progress, cityRegion, clientFocus }) : undefined), [phase, quiet, progress, cityRegion, clientFocus]);
+  const now = liveStep(task);
+  const showSteps = task.steps.length > 0 && (finished ? details : !watching || details);
+  const hasDetails = calls.length > 0 || task.steps.length > 0;
+  // A capped repeat still pays a few City Coins: say so, so watching again isn't dead time.
+  const paid = [paidLine(task), task.coins ? `+${task.coins} City Coins for watching` : undefined].filter(Boolean).join(' · ') || undefined;
+  const watch = () => {
+    feel.tap();
+    setWatching(true);
+    bus.emit('flyTo', { id: `agent:${story.agentId}` });
+  };
+  const seeInDeploy = () => {
+    if (!story.templateId) return;
+    feel.send();
+    // Like a quest's deploy step: the practice account must be linked first (the Deploy tab does that).
+    if (!linked) setDeploy('link');
+    else {
+      planDeploy(story.templateId, task.taskId);
+      setDeploy('asked');
+    }
+    openTab?.('deploy');
+  };
   return (
-    <div className={`task ${task.status} ${showSteps ? '' : 'folded'}`}>
+    <div className={`task ${task.status} phase-${phase} ${showSteps ? '' : 'folded'}`} aria-live="polite">
       <div className="task-head">
         <Portrait id={who} size={30} />
         <div className="task-who">
@@ -33,19 +94,65 @@ export function TaskCard({ task }: { task: TaskView }) {
             {task.steps.length > 0 ? ` · ${task.status === 'running' ? `${done}/` : ''}${task.steps.length} steps` : ''}
           </span>
         </div>
-        {hasDetails && (
+        {!finished && (
+          <button className={`btn tiny watch-btn ${watching ? 'on' : ''}`} aria-pressed={watching} onClick={watch} title={`Follow ${story.who} in the city`}>
+            👀 {watching ? 'Watching' : 'Watch'}
+          </button>
+        )}
+        {hasDetails && (finished || watching) && (
           <button className="btn ghost tiny" aria-expanded={details} onClick={() => setDetails((o) => !o)}>
-            {details ? 'Hide' : 'Details'}
+            {details ? 'Hide' : finished ? 'Details' : 'Steps'}
           </button>
         )}
       </div>
-      {/* The plain answer first, then what you asked. */}
-      {task.result && (
+      <div className="task-prompt">“{task.prompt}”</div>
+      {phase === 'framing' && (
+        <p className="watch-framing">
+          <Plain text={story.framing} /> {story.watch}
+        </p>
+      )}
+      {/* While watching, the card names the step the canvas shows (the walk there too), in step with its bubble. */}
+      {!finished && watching && now && !details && (
+        <p className="watch-live" aria-label={`Step ${now.index + 1} of ${now.of}`}>
+          <span className="watch-count">
+            {now.index + 1}/{now.of}
+          </span>{' '}
+          <Plain text={now.text} />
+        </p>
+      )}
+      {phase === 'result' && (
+        <div className="watch-result">
+          {task.result && (
+            <p className="task-result">
+              <b>What {story.who} built:</b> <Plain text={task.result} />
+            </p>
+          )}
+          {story.teaches && (
+            <p className="watch-teaches">
+              💡 <b>What it teaches:</b> <Plain text={story.teaches} />
+            </p>
+          )}
+          {paid && <p className={`watch-paid ${task.capped ? 'capped' : ''}`}>{paid}</p>}
+          <div className="actions">
+            {demo && story.templateId && (
+              <button className={`btn tiny ${quiet ? '' : 'primary'}`} disabled={!!offline || deploy === 'asked'} title={offline ?? 'Plan the real thing in the practice account: you see every change and approve it'} onClick={seeInDeploy}>
+                {deploy === 'asked' ? '✓ Preview on its way in Deploy' : '🏗️ See it in Deploy'}
+              </button>
+            )}
+            {next && (
+              <button className={`btn tiny ${demo && story.templateId ? '' : 'primary'}`} onClick={() => (feel.tap(), nextAction(useCity.getState()).run())}>
+                Next: {next.label} →
+              </button>
+            )}
+          </div>
+          {deploy === 'link' && <p className="muted small">Link the practice account in Deploy first, then press “See it in Deploy” again.</p>}
+        </div>
+      )}
+      {phase === 'failed' && task.result && (
         <div className="task-result">
           <Plain text={task.result} />
         </div>
       )}
-      <div className="task-prompt">“{task.prompt}”</div>
       {details && calls.length > 0 && (
         <div className="calls" aria-label="AWS API calls made">
           <span className="calls-label">{demo ? 'AWS calls (simulated)' : 'Real AWS calls'}</span>
@@ -56,23 +163,41 @@ export function TaskCard({ task }: { task: TaskView }) {
           ))}
         </div>
       )}
-      {showSteps && (
-        <>
-          <div className="segs" aria-hidden="true">
-            {task.steps.map((s, i) => (
-              <i key={i} className={s.status === 'done' || s.status === 'skipped' ? 'done' : s.status === 'running' ? 'now' : s.status === 'failed' ? 'fail' : ''} />
-            ))}
-          </div>
-          <ol className="steps">
-            {task.steps.map((s, i) => (
-              <li key={i} className={s.status}>
-                <span className="ico">{STEP_ICON[s.status]}</span> <Plain text={s.text} />
-              </li>
-            ))}
-          </ol>
-        </>
-      )}
+      {showSteps && <Steps task={task} />}
     </div>
+  );
+}
+
+/**
+ * An agent offering to do something for you, told as a little story: who they are, what they'll do and where, and that
+ * you can watch. "Watch it done" sends the task; its TaskCard takes over from there.
+ */
+export function AgentOffer({ serviceId, ask, onSent }: { serviceId: string; ask?: string; onSent?: () => void }) {
+  const offer = agentOffer(serviceId);
+  const offline = useCity((s) => offlineReason(s.backendKind, s.backendStatus));
+  if (!offer) return null;
+  const name = placeFor(serviceId)?.agentName ?? agentName(serviceId);
+  return (
+    <section className="agent-offer" aria-label={`${name} can help`}>
+      <Portrait id={serviceId} size={30} />
+      <div className="agent-offer-text">
+        <b>{name}</b>
+        {ask && <span className="agent-offer-ask">“{ask}”</span>}
+        <span className="muted small">{offer.story}</span>
+      </div>
+      <button
+        className="btn tiny primary"
+        disabled={!!offline}
+        title={offline ?? `Ask: “${offer.prompt}”`}
+        onClick={() => {
+          feel.send();
+          submitPrompt(offer.prompt);
+          onSent?.();
+        }}
+      >
+        Watch it done
+      </button>
+    </section>
   );
 }
 

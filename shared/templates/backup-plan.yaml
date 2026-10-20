@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - Bea's strongroom. One AWS Backup plan backs up every resource tagged backup=daily each day, keeps each recovery point 365 days in a vault encrypted with its own KMS key, and copies it to a vault in a second Region. The vault lock here is governance mode; compliance mode cannot be undone, so turn it on yourself once you're sure.
+
+Parameters:
+  CopyVaultArn:
+    Type: String
+    Description: The ARN of a backup vault in a second Region to copy every backup to
+    AllowedPattern: '^arn:aws[a-z-]*:backup:[a-z0-9-]+:\d{12}:backup-vault:.+$'
+
+Resources:
+  VaultKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Encrypts the city's backups, separately from the resources' own keys
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AccountAdmin
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+            Action: kms:*
+            Resource: '*'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  CityVault:
+    Type: AWS::Backup::BackupVault
+    Properties:
+      BackupVaultName: city-strongroom
+      EncryptionKeyArn: !GetAtt VaultKey.Arn
+      LockConfiguration:
+        MinRetentionDays: 7
+        MaxRetentionDays: 400
+      BackupVaultTags:
+        managed-by: aws-city
+
+  BackupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: backup.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  DailyPlan:
+    Type: AWS::Backup::BackupPlan
+    Properties:
+      BackupPlan:
+        BackupPlanName: city-daily
+        BackupPlanRule:
+          - RuleName: daily-keep-a-year
+            TargetBackupVault: !Ref CityVault
+            ScheduleExpression: cron(0 3 * * ? *)
+            StartWindowMinutes: 480
+            Lifecycle:
+              DeleteAfterDays: 365
+            CopyActions:
+              - DestinationBackupVaultArn: !Ref CopyVaultArn
+                Lifecycle:
+                  DeleteAfterDays: 365
+      BackupPlanTags:
+        managed-by: aws-city
+
+  TaggedResources:
+    Type: AWS::Backup::BackupSelection
+    Properties:
+      BackupPlanId: !Ref DailyPlan
+      BackupSelection:
+        SelectionName: tagged-daily
+        IamRoleArn: !GetAtt BackupRole.Arn
+        ListOfTags:
+          - ConditionType: STRINGEQUALS
+            ConditionKey: backup
+            ConditionValue: daily
+
+Outputs:
+  VaultName:
+    Value: !Ref CityVault
+  BackupPlanId:
+    Description: Tag a table, file system or volume backup=daily and this plan protects it
+    Value: !Ref DailyPlan

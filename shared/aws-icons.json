@@ -1,7 +1,7 @@
 {
  "source": "https://aws.amazon.com/architecture/icons/",
  "zip": "https://d1.awsstatic.com/onedam/marketing-channels/website/public/shared/architecture-icon-release/Icon-package_07312026.5846e92413caa21490223536cc97f1269e44fa92.zip",
- "asOf": "2026-10-10",
+ "asOf": "2026-10-19",
  "icons": {
   "ec2": {
    "file": "Architecture-Service-Icons_07312026/Arch_Compute/48/Arch_Amazon-EC2_48.svg",
@@ -27,6 +27,18 @@
    "file": "Architecture-Service-Icons_07312026/Arch_Compute/48/Arch_AWS-Elastic-Beanstalk_48.svg",
    "path": "/assets/aws-icons/beanstalk.svg"
   },
+  "apprunner": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Compute/48/Arch_AWS-App-Runner_48.svg",
+   "path": "/assets/aws-icons/apprunner.svg"
+  },
+  "batch": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Compute/48/Arch_AWS-Batch_48.svg",
+   "path": "/assets/aws-icons/batch.svg"
+  },
+  "lightsail": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Compute/48/Arch_Amazon-Lightsail_48.svg",
+   "path": "/assets/aws-icons/lightsail.svg"
+  },
   "s3": {
    "file": "Architecture-Service-Icons_07312026/Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.svg",
    "path": "/assets/aws-icons/s3.svg"
@@ -50,6 +62,14 @@
   "lakeformation": {
    "file": "Architecture-Service-Icons_07312026/Arch_Analytics/48/Arch_AWS-Lake-Formation_48.svg",
    "path": "/assets/aws-icons/lakeformation.svg"
+  },
+  "backup": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Storage/48/Arch_AWS-Backup_48.svg",
+   "path": "/assets/aws-icons/backup.svg"
+  },
+  "kinesis": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Analytics/48/Arch_Amazon-Kinesis-Data-Streams_48.svg",
+   "path": "/assets/aws-icons/kinesis.svg"
   },
   "dynamodb": {
    "file": "Architecture-Service-Icons_07312026/Arch_Databases/48/Arch_Amazon-DynamoDB_48.svg",
@@ -75,6 +95,14 @@
    "file": "Architecture-Service-Icons_07312026/Arch_Databases/48/Arch_Amazon-Neptune_48.svg",
    "path": "/assets/aws-icons/neptune.svg"
   },
+  "opensearch": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Analytics/48/Arch_Amazon-OpenSearch-Service_48.svg",
+   "path": "/assets/aws-icons/opensearch.svg"
+  },
+  "documentdb": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Databases/48/Arch_Amazon-DocumentDB_48.svg",
+   "path": "/assets/aws-icons/documentdb.svg"
+  },
   "vpc": {
    "file": "Architecture-Service-Icons_07312026/Arch_Networking-Content-Delivery/48/Arch_Amazon-Virtual-Private-Cloud_48.svg",
    "path": "/assets/aws-icons/vpc.svg"
@@ -98,6 +126,14 @@
   "eventbridge": {
    "file": "Architecture-Service-Icons_07312026/Arch_Application-Integration/48/Arch_Amazon-EventBridge_48.svg",
    "path": "/assets/aws-icons/eventbridge.svg"
+  },
+  "transitgateway": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Networking-Content-Delivery/48/Arch_AWS-Transit-Gateway_48.svg",
+   "path": "/assets/aws-icons/transitgateway.svg"
+  },
+  "globalaccelerator": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Networking-Content-Delivery/48/Arch_AWS-Global-Accelerator_48.svg",
+   "path": "/assets/aws-icons/globalaccelerator.svg"
   },
   "iam": {
    "file": "Architecture-Service-Icons_07312026/Arch_Security-Identity/48/Arch_AWS-Identity-and-Access-Management_48.svg",
@@ -123,6 +159,26 @@
    "file": "Architecture-Service-Icons_07312026/Arch_Management-Tools/48/Arch_Amazon-CloudWatch_48.svg",
    "path": "/assets/aws-icons/cloudwatch.svg"
   },
+  "securityagent": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Security-Identity/48/Arch_AWS-Security-Agent_48.svg",
+   "path": "/assets/aws-icons/securityagent.svg"
+  },
+  "secretsmanager": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Security-Identity/48/Arch_AWS-Secrets-Manager_48.svg",
+   "path": "/assets/aws-icons/secretsmanager.svg"
+  },
+  "inspector": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Security-Identity/48/Arch_Amazon-Inspector_48.svg",
+   "path": "/assets/aws-icons/inspector.svg"
+  },
+  "securityhub": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Security-Identity/48/Arch_AWS-Security-Hub_48.svg",
+   "path": "/assets/aws-icons/securityhub.svg"
+  },
+  "macie": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Security-Identity/48/Arch_Amazon-Macie_48.svg",
+   "path": "/assets/aws-icons/macie.svg"
+  },
   "bedrock": {
    "file": "Architecture-Service-Icons_07312026/Arch_Artificial-Intelligence/48/Arch_Amazon-Bedrock_48.svg",
    "path": "/assets/aws-icons/bedrock.svg"
@@ -146,6 +202,38 @@
   "textract": {
    "file": "Architecture-Service-Icons_07312026/Arch_Artificial-Intelligence/48/Arch_Amazon-Textract_48.svg",
    "path": "/assets/aws-icons/textract.svg"
+  },
+  "polly": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Artificial-Intelligence/48/Arch_Amazon-Polly_48.svg",
+   "path": "/assets/aws-icons/polly.svg"
+  },
+  "comprehend": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Artificial-Intelligence/48/Arch_Amazon-Comprehend_48.svg",
+   "path": "/assets/aws-icons/comprehend.svg"
+  },
+  "stepfunctions": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Application-Integration/48/Arch_AWS-Step-Functions_48.svg",
+   "path": "/assets/aws-icons/stepfunctions.svg"
+  },
+  "cloudformation": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Management-Tools/48/Arch_AWS-CloudFormation_48.svg",
+   "path": "/assets/aws-icons/cloudformation.svg"
+  },
+  "systemsmanager": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Management-Tools/48/Arch_AWS-Systems-Manager_48.svg",
+   "path": "/assets/aws-icons/systemsmanager.svg"
+  },
+  "config": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Management-Tools/48/Arch_AWS-Config_48.svg",
+   "path": "/assets/aws-icons/config.svg"
+  },
+  "organizations": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Management-Tools/48/Arch_AWS-Organizations_48.svg",
+   "path": "/assets/aws-icons/organizations.svg"
+  },
+  "appsync": {
+   "file": "Architecture-Service-Icons_07312026/Arch_Application-Integration/48/Arch_AWS-AppSync_48.svg",
+   "path": "/assets/aws-icons/appsync.svg"
   }
  },
  "groups": {
