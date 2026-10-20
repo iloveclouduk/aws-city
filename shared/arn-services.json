@@ -54,6 +54,9 @@
     "q": "q",
     "qdeveloper": "q",
     "rekognition": "rekognition",
-    "textract": "textract"
+    "textract": "textract",
+    "es": "opensearch",
+    "ec2:transit-gateway": "transitgateway",
+    "globalaccelerator": "globalaccelerator"
   }
 }

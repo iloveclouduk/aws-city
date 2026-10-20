@@ -39,6 +39,24 @@
     "Amazon SageMaker": "sagemaker",
     "Amazon Q": "q",
     "Amazon Rekognition": "rekognition",
-    "Amazon Textract": "textract"
+    "Amazon Textract": "textract",
+    "AWS App Runner": "apprunner",
+    "Amazon Lightsail": "lightsail",
+    "AWS Backup": "backup",
+    "Amazon Kinesis": "kinesis",
+    "Amazon OpenSearch Service": "opensearch",
+    "Amazon DocumentDB (with MongoDB compatibility)": "documentdb",
+    "AWS Global Accelerator": "globalaccelerator",
+    "AWS Secrets Manager": "secretsmanager",
+    "Amazon Inspector": "inspector",
+    "Amazon Macie": "macie",
+    "AWS Security Hub": "securityhub",
+    "Amazon Polly": "polly",
+    "Amazon Comprehend": "comprehend",
+    "AWS Step Functions": "stepfunctions",
+    "AWS CloudFormation": "cloudformation",
+    "AWS Systems Manager": "systemsmanager",
+    "AWS Config": "config",
+    "AWS AppSync": "appsync"
   }
 }

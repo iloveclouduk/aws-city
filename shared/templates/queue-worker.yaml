@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - a queue and a worker. An SQS queue with a dead-letter queue, drained by a Lambda function.
+
+Resources:
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  WorkQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      # At least six times the function's timeout, so a message isn't handed out twice while it's being worked on.
+      VisibilityTimeout: 60
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 5
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  WorkerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: read-this-queue-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt WorkQueue.Arn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  WorkerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Role: !GetAtt WorkerRole.Arn
+      MemorySize: 128
+      Timeout: 10
+      Code:
+        ZipFile: |
+          exports.handler = async (event) => {
+            for (const record of event.Records) console.log('job', record.messageId, record.body);
+            return { batchItemFailures: [] };
+          };
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  WorkerMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt WorkQueue.Arn
+      FunctionName: !Ref WorkerFunction
+      BatchSize: 10
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+
+Outputs:
+  QueueUrl:
+    Description: Send jobs here
+    Value: !Ref WorkQueue

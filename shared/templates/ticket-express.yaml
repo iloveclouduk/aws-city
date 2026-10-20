@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the ticket express. A Global Accelerator with two fixed IP addresses in front of the ticket API's servers (EC2 instances or their load balancers) in two Regions; health checks move riders to the healthy Region in seconds. Global Accelerator is managed from US West (Oregon), so deploy this stack in us-west-2.
+
+Parameters:
+  FirstRegion:
+    Type: String
+    Default: us-east-1
+    AllowedPattern: '^[a-z]{2}(-[a-z]+)+-\d$'
+    Description: The first Region the ticket API runs in
+  FirstEndpointArn:
+    Type: String
+    AllowedPattern: '^(arn:aws[a-z-]*:elasticloadbalancing:.+|i-[0-9a-f]{8,17})$'
+    Description: The API's load balancer ARN, or its EC2 instance ID, in the first Region
+  SecondRegion:
+    Type: String
+    Default: eu-west-1
+    AllowedPattern: '^[a-z]{2}(-[a-z]+)+-\d$'
+    Description: The second Region the ticket API runs in
+  SecondEndpointArn:
+    Type: String
+    AllowedPattern: '^(arn:aws[a-z-]*:elasticloadbalancing:.+|i-[0-9a-f]{8,17})$'
+    Description: The API's load balancer ARN, or its EC2 instance ID, in the second Region
+
+Resources:
+  TicketAccelerator:
+    Type: AWS::GlobalAccelerator::Accelerator
+    Properties:
+      Name: !Sub '${AWS::StackName}-tickets'
+      Enabled: true
+      IpAddressType: IPV4
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  HttpsListener:
+    Type: AWS::GlobalAccelerator::Listener
+    Properties:
+      AcceleratorArn: !Ref TicketAccelerator
+      Protocol: TCP
+      PortRanges:
+        - FromPort: 443
+          ToPort: 443
+      ClientAffinity: NONE
+
+  FirstRegionGroup:
+    Type: AWS::GlobalAccelerator::EndpointGroup
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      EndpointGroupRegion: !Ref FirstRegion
+      TrafficDialPercentage: 100
+      HealthCheckProtocol: TCP
+      HealthCheckPort: 443
+      HealthCheckIntervalSeconds: 10
+      ThresholdCount: 3
+      EndpointConfigurations:
+        - EndpointId: !Ref FirstEndpointArn
+          Weight: 128
+          ClientIPPreservationEnabled: true
+
+  SecondRegionGroup:
+    Type: AWS::GlobalAccelerator::EndpointGroup
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      EndpointGroupRegion: !Ref SecondRegion
+      TrafficDialPercentage: 100
+      HealthCheckProtocol: TCP
+      HealthCheckPort: 443
+      HealthCheckIntervalSeconds: 10
+      ThresholdCount: 3
+      EndpointConfigurations:
+        - EndpointId: !Ref SecondEndpointArn
+          Weight: 128
+          ClientIPPreservationEnabled: true
+
+Outputs:
+  StaticIps:
+    Description: The two fixed addresses partners allow in their firewalls
+    Value: !Join [', ', !GetAtt TicketAccelerator.Ipv4Addresses]
+  DnsName:
+    Description: The accelerator's DNS name
+    Value: !GetAtt TicketAccelerator.DnsName

@@ -1,0 +1,18 @@
+{
+ "asOf": "2026-10-17",
+ "source": "https://knowledge-mcp.global.api.aws (AWS Knowledge MCP Server)",
+ "services": {
+  "atLeast": 200,
+  "text": "over 200 AWS services",
+  "source": "https://docs.aws.amazon.com/whitepapers/latest/aws-overview/introduction.html"
+ },
+ "edge": {
+  "pops": 410,
+  "edgeLocations": 400,
+  "regionalCaches": 13,
+  "cities": 90,
+  "countries": 48,
+  "text": "over 410 PoPs, including more than 400 Edge Locations, and 13 regional mid-tier caches in over 90 cities across 48 countries",
+  "source": "https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/points-of-presence.html"
+ }
+}

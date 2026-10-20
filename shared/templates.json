@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-10-11",
+  "asOf": "2026-10-18",
   "templates": [
     {
       "id": "static-site",
@@ -54,6 +54,615 @@
       ],
       "outputs": ["QueueUrl"],
       "costNote": "Free Tier: 1M SQS requests and 1M Lambda requests per month."
+    },
+    {
+      "id": "members-api",
+      "title": "Members-only API",
+      "serviceIds": ["cognito", "apigateway", "lambda", "dynamodb", "iam"],
+      "summary": "Cognito signs members in. An HTTP API's JWT authorizer checks each token before a Lambda function, with a role for one table only, reads and writes DynamoDB.",
+      "resources": [
+        { "logicalId": "MembersPool", "type": "AWS::Cognito::UserPool" },
+        { "logicalId": "MembersClient", "type": "AWS::Cognito::UserPoolClient" },
+        { "logicalId": "MembersTable", "type": "AWS::DynamoDB::Table" },
+        { "logicalId": "MembersRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "MembersFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "MembersApi", "type": "AWS::ApiGatewayV2::Api" },
+        { "logicalId": "MembersAuthorizer", "type": "AWS::ApiGatewayV2::Authorizer" },
+        { "logicalId": "MembersIntegration", "type": "AWS::ApiGatewayV2::Integration" },
+        { "logicalId": "MembersRoute", "type": "AWS::ApiGatewayV2::Route" },
+        { "logicalId": "MembersStage", "type": "AWS::ApiGatewayV2::Stage" },
+        { "logicalId": "MembersPermission", "type": "AWS::Lambda::Permission" }
+      ],
+      "outputs": ["ApiUrl", "UserPoolId", "UserPoolClientId"],
+      "costNote": "Cognito: the first 10,000 monthly active users a month are free on the Essentials plan these pools use. Lambda: 1M free requests a month. HTTP API and DynamoDB on-demand: pennies for light use."
+    },
+    {
+      "id": "receipts-lake",
+      "title": "Lake of receipts",
+      "serviceIds": ["s3", "glue", "athena", "lakeformation", "iam"],
+      "summary": "Receipts stay as files in a private S3 bucket. A Glue crawler records their tables, Athena queries them in place with a 1 GB scan limit per query, and the bucket is registered with Lake Formation for table and column grants. Registering needs a Lake Formation administrator.",
+      "resources": [
+        { "logicalId": "ReceiptsBucket", "type": "AWS::S3::Bucket" },
+        { "logicalId": "ResultsBucket", "type": "AWS::S3::Bucket" },
+        { "logicalId": "ReceiptsDatabase", "type": "AWS::Glue::Database" },
+        { "logicalId": "CrawlerRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "ReceiptsCrawler", "type": "AWS::Glue::Crawler" },
+        { "logicalId": "AnalystWorkGroup", "type": "AWS::Athena::WorkGroup" },
+        { "logicalId": "ReceiptsLocation", "type": "AWS::LakeFormation::Resource" }
+      ],
+      "outputs": ["ReceiptsBucketName", "WorkGroupName"],
+      "costNote": "Athena bills per TB scanned (this workgroup stops any query past 1 GB). The crawler bills per run while it works. S3 storage costs pennies; Lake Formation itself adds no charge."
+    },
+    {
+      "id": "hr-knowledge-base",
+      "title": "HR policy knowledge base",
+      "serviceIds": ["bedrock", "s3", "cognito", "iam"],
+      "summary": "Policy documents in a private S3 bucket feed a Bedrock knowledge base that stores its vectors in Amazon S3 Vectors. Staff accounts live in Cognito. The agent itself runs on AgentCore Runtime from your own container image and asks this knowledge base.",
+      "resources": [
+        { "logicalId": "DocsBucket", "type": "AWS::S3::Bucket" },
+        { "logicalId": "VectorBucket", "type": "AWS::S3Vectors::VectorBucket" },
+        { "logicalId": "VectorIndex", "type": "AWS::S3Vectors::Index" },
+        { "logicalId": "KnowledgeBaseRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "KnowledgeBase", "type": "AWS::Bedrock::KnowledgeBase" },
+        { "logicalId": "DocsSource", "type": "AWS::Bedrock::DataSource" },
+        { "logicalId": "StaffPool", "type": "AWS::Cognito::UserPool" },
+        { "logicalId": "StaffClient", "type": "AWS::Cognito::UserPoolClient" }
+      ],
+      "outputs": ["KnowledgeBaseId", "DocsBucketName", "UserPoolId"],
+      "costNote": "Not free: each sync pays for Titan embeddings per token, and every answer pays for the model you call. S3 Vectors bills storage and queries, with no servers running between questions."
+    },
+    {
+      "id": "shielded-api",
+      "title": "API behind the shield",
+      "serviceIds": ["cloudfront", "shield", "apigateway", "lambda", "iam"],
+      "summary": "CloudFront takes every request at the edge, where Shield Standard is always on and an AWS WAF web ACL rate-limits each address and blocks common attacks, before an HTTP API invokes a Lambda function. Deploy it in us-east-1.",
+      "resources": [
+        { "logicalId": "ShopRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "ShopFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "ShopApi", "type": "AWS::ApiGatewayV2::Api" },
+        { "logicalId": "ShopPermission", "type": "AWS::Lambda::Permission" },
+        { "logicalId": "EdgeAcl", "type": "AWS::WAFv2::WebACL" },
+        { "logicalId": "ShopDistribution", "type": "AWS::CloudFront::Distribution" }
+      ],
+      "outputs": ["SiteUrl", "WebAclArn"],
+      "costNote": "Not free: a web ACL bills monthly, plus each rule and managed rule group, plus per million requests. Shield Standard costs nothing. Lambda and HTTP API cost pennies for light use."
+    },
+    {
+      "id": "audit-alerts",
+      "title": "Audit trail and alerts",
+      "serviceIds": ["cloudwatch", "s3", "guardduty", "eventbridge", "lambda", "sqs", "iam"],
+      "summary": "CloudTrail archives every API call to a private, versioned S3 bucket. An EventBridge rule sends each GuardDuty finding to a Lambda function that alerts the team through SNS, with retries and a dead-letter queue. Turn GuardDuty on first: the stack doesn't create its detector.",
+      "resources": [
+        { "logicalId": "TrailBucket", "type": "AWS::S3::Bucket" },
+        { "logicalId": "TrailBucketPolicy", "type": "AWS::S3::BucketPolicy" },
+        { "logicalId": "AuditTrail", "type": "AWS::CloudTrail::Trail" },
+        { "logicalId": "AlertTopic", "type": "AWS::SNS::Topic" },
+        { "logicalId": "ResponderRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "ResponderFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "RuleDeadLetters", "type": "AWS::SQS::Queue" },
+        { "logicalId": "FindingsRule", "type": "AWS::Events::Rule" },
+        { "logicalId": "RuleDeadLettersPolicy", "type": "AWS::SQS::QueuePolicy" },
+        { "logicalId": "ResponderPermission", "type": "AWS::Lambda::Permission" }
+      ],
+      "outputs": ["TrailBucketName", "AlertTopicArn"],
+      "costNote": "The first trail's management events are free (you pay S3 storage for the log files). GuardDuty bills by what it analyses after its 30-day trial. EventBridge, Lambda, SNS and SQS cost pennies here."
+    },
+    {
+      "id": "container-service",
+      "title": "Containers on Fargate",
+      "serviceIds": ["ecs", "fargate", "apigateway", "aurora", "elasticache", "vpc", "iam"],
+      "summary": "API Gateway reaches a private load balancer through a VPC link. ECS keeps two Fargate tasks running behind it, with an ElastiCache Serverless cache and an Aurora Serverless v2 PostgreSQL cluster, all in your private subnets.",
+      "resources": [
+        { "logicalId": "AppCluster", "type": "AWS::ECS::Cluster" },
+        { "logicalId": "AppLogs", "type": "AWS::Logs::LogGroup" },
+        { "logicalId": "ExecutionRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "AppTaskDefinition", "type": "AWS::ECS::TaskDefinition" },
+        { "logicalId": "VpcLinkSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "LoadBalancerSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "AppSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "DbSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "CacheSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "AppLoadBalancer", "type": "AWS::ElasticLoadBalancingV2::LoadBalancer" },
+        { "logicalId": "AppTargetGroup", "type": "AWS::ElasticLoadBalancingV2::TargetGroup" },
+        { "logicalId": "AppListener", "type": "AWS::ElasticLoadBalancingV2::Listener" },
+        { "logicalId": "AppService", "type": "AWS::ECS::Service" },
+        { "logicalId": "DbSubnets", "type": "AWS::RDS::DBSubnetGroup" },
+        { "logicalId": "CatalogDb", "type": "AWS::RDS::DBCluster" },
+        { "logicalId": "CatalogDbWriter", "type": "AWS::RDS::DBInstance" },
+        { "logicalId": "AppCache", "type": "AWS::ElastiCache::ServerlessCache" },
+        { "logicalId": "AppVpcLink", "type": "AWS::ApiGatewayV2::VpcLink" },
+        { "logicalId": "AppApi", "type": "AWS::ApiGatewayV2::Api" },
+        { "logicalId": "AppIntegration", "type": "AWS::ApiGatewayV2::Integration" },
+        { "logicalId": "AppRoute", "type": "AWS::ApiGatewayV2::Route" },
+        { "logicalId": "AppStage", "type": "AWS::ApiGatewayV2::Stage" }
+      ],
+      "outputs": ["ApiUrl", "ClusterName"],
+      "costNote": "Not free: two Fargate tasks, the load balancer, Aurora capacity and the ElastiCache cache all bill by the hour while they exist, plus a NAT gateway if your subnets use one. Delete the stack when you finish."
+    },
+    {
+      "id": "two-region-api",
+      "title": "Two-Region API (primary half)",
+      "serviceIds": ["dynamodb", "apigateway", "lambda", "route53", "iam"],
+      "summary": "A DynamoDB global table with a replica in a second Region, an HTTP API with a Lambda function, and a Route 53 health check on the API. Run the same API in the second Region and add failover records on your domain to finish the design.",
+      "resources": [
+        { "logicalId": "BookingsTable", "type": "AWS::DynamoDB::GlobalTable" },
+        { "logicalId": "BookingsRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "BookingsFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "BookingsApi", "type": "AWS::ApiGatewayV2::Api" },
+        { "logicalId": "BookingsPermission", "type": "AWS::Lambda::Permission" },
+        { "logicalId": "ApiHealthCheck", "type": "AWS::Route53::HealthCheck" }
+      ],
+      "outputs": ["ApiUrl", "HealthCheckId", "TableName"],
+      "costNote": "Global tables bill writes in every Region they replicate to. A Route 53 health check bills monthly. Lambda and HTTP API cost pennies for light use."
+    },
+    {
+      "id": "tenant-api",
+      "title": "Multi-tenant API",
+      "serviceIds": ["cognito", "cloudfront", "apigateway", "lambda", "dynamodb", "iam"],
+      "summary": "Each user's token carries a tenantId the user can't change. CloudFront fronts an HTTP API whose JWT authorizer checks the token, and the function reads only that tenant's partition of one pooled DynamoDB table.",
+      "resources": [
+        { "logicalId": "TenantPool", "type": "AWS::Cognito::UserPool" },
+        { "logicalId": "TenantClient", "type": "AWS::Cognito::UserPoolClient" },
+        { "logicalId": "TenantTable", "type": "AWS::DynamoDB::Table" },
+        { "logicalId": "TenantRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "TenantFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "TenantApi", "type": "AWS::ApiGatewayV2::Api" },
+        { "logicalId": "TenantAuthorizer", "type": "AWS::ApiGatewayV2::Authorizer" },
+        { "logicalId": "TenantIntegration", "type": "AWS::ApiGatewayV2::Integration" },
+        { "logicalId": "TenantRoute", "type": "AWS::ApiGatewayV2::Route" },
+        { "logicalId": "TenantStage", "type": "AWS::ApiGatewayV2::Stage" },
+        { "logicalId": "TenantPermission", "type": "AWS::Lambda::Permission" },
+        { "logicalId": "TenantDistribution", "type": "AWS::CloudFront::Distribution" }
+      ],
+      "outputs": ["ApiUrl", "UserPoolId", "UserPoolClientId"],
+      "costNote": "Cognito: the first 10,000 monthly active users a month are free on the Essentials plan these pools use. CloudFront has a free monthly allowance. Lambda, HTTP API and DynamoDB on-demand cost pennies for light use."
+    },
+    {
+      "id": "beanstalk-app",
+      "title": "Beanstalk app with its own database",
+      "serviceIds": ["beanstalk", "ec2", "rds", "iam"],
+      "summary": "Elastic Beanstalk runs the app on two to four EC2 servers behind a load balancer, with rolling deployments. A Multi-AZ RDS PostgreSQL database lives outside the environment, reachable only from the app servers, with its password in Secrets Manager.",
+      "resources": [
+        { "logicalId": "InstanceRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "InstanceProfile", "type": "AWS::IAM::InstanceProfile" },
+        { "logicalId": "AppSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "DbSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "DbSubnets", "type": "AWS::RDS::DBSubnetGroup" },
+        { "logicalId": "MembersDb", "type": "AWS::RDS::DBInstance" },
+        { "logicalId": "GardenApp", "type": "AWS::ElasticBeanstalk::Application" },
+        { "logicalId": "GardenEnvironment", "type": "AWS::ElasticBeanstalk::Environment" }
+      ],
+      "outputs": ["AppUrl", "DbEndpoint"],
+      "costNote": "Not free: Beanstalk adds no charge, but two EC2 servers, the load balancer and a Multi-AZ database (two instances' worth) bill by the hour. Delete the stack when you finish."
+    },
+    {
+      "id": "eks-storage",
+      "title": "EKS with disks and shared files",
+      "serviceIds": ["eks", "ec2", "ebs", "efs", "iam"],
+      "summary": "An EKS cluster runs two Graviton worker nodes in two Availability Zones. The EBS CSI driver gives a pod its own volume, and the EFS CSI driver mounts one shared, encrypted file system; each driver gets its own IAM role through EKS Pod Identity.",
+      "resources": [
+        { "logicalId": "ClusterRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "HarbourCluster", "type": "AWS::EKS::Cluster" },
+        { "logicalId": "NodeRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "HarbourNodes", "type": "AWS::EKS::Nodegroup" },
+        { "logicalId": "PodIdentityAgent", "type": "AWS::EKS::Addon" },
+        { "logicalId": "EbsDriverRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "EbsDriver", "type": "AWS::EKS::Addon" },
+        { "logicalId": "EfsDriverRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "EfsDriver", "type": "AWS::EKS::Addon" },
+        { "logicalId": "FilesSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "SharedFiles", "type": "AWS::EFS::FileSystem" },
+        { "logicalId": "MountTargetA", "type": "AWS::EFS::MountTarget" },
+        { "logicalId": "MountTargetB", "type": "AWS::EFS::MountTarget" }
+      ],
+      "outputs": ["ClusterName", "FileSystemId"],
+      "costNote": "Not free: the EKS control plane bills by the hour, plus the two EC2 nodes, their EBS disks and EFS storage. Delete the stack when you finish."
+    },
+    {
+      "id": "redshift-warehouse",
+      "title": "Warehouse that reads the lake",
+      "serviceIds": ["redshift", "s3", "glue", "iam"],
+      "summary": "Redshift Serverless holds this year's tables. A Glue crawler records the old receipts' tables in the Data Catalog, and a role that reads only that bucket and catalog lets Redshift query the files in place through an external schema.",
+      "resources": [
+        { "logicalId": "ReceiptsBucket", "type": "AWS::S3::Bucket" },
+        { "logicalId": "ReceiptsDatabase", "type": "AWS::Glue::Database" },
+        { "logicalId": "CrawlerRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "ReceiptsCrawler", "type": "AWS::Glue::Crawler" },
+        { "logicalId": "WarehouseRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "LedgerNamespace", "type": "AWS::RedshiftServerless::Namespace" },
+        { "logicalId": "LedgerWorkgroup", "type": "AWS::RedshiftServerless::Workgroup" }
+      ],
+      "outputs": ["ReceiptsBucketName", "WorkgroupName"],
+      "costNote": "Redshift Serverless bills RPU-hours only while queries run (a 60-second minimum each time), plus managed storage. Set a maximum RPU-hours limit in the console to cap spending."
+    },
+    {
+      "id": "document-pipeline",
+      "title": "Claims document pipeline",
+      "serviceIds": ["s3", "eventbridge", "lambda", "rekognition", "textract", "dynamodb", "iam"],
+      "summary": "Uploads land in a private, encrypted S3 bucket. An EventBridge rule sends each Object Created event to a Lambda function that checks images with Rekognition, reads forms with Textract and saves the results in DynamoDB, with retries and a dead-letter queue.",
+      "resources": [
+        { "logicalId": "InboxBucket", "type": "AWS::S3::Bucket" },
+        { "logicalId": "ClaimsTable", "type": "AWS::DynamoDB::Table" },
+        { "logicalId": "WorkerRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "WorkerFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "RuleDeadLetters", "type": "AWS::SQS::Queue" },
+        { "logicalId": "UploadRule", "type": "AWS::Events::Rule" },
+        { "logicalId": "RuleDeadLettersPolicy", "type": "AWS::SQS::QueuePolicy" },
+        { "logicalId": "WorkerPermission", "type": "AWS::Lambda::Permission" }
+      ],
+      "outputs": ["InboxBucketName", "TableName"],
+      "costNote": "You pay per page Textract analyses and per image Rekognition checks, and nothing between claims. Lambda, EventBridge and DynamoDB on-demand cost pennies here."
+    },
+    {
+      "id": "graph-api",
+      "title": "Graph API on Neptune",
+      "serviceIds": ["neptune", "lambda", "apigateway", "vpc", "iam"],
+      "summary": "A Neptune Serverless cluster in your private subnets holds the account graph, encrypted and with IAM authentication on. An HTTP API that accepts only IAM-signed calls invokes a Lambda function inside the VPC that runs read-only openCypher queries, signed with IAM too.",
+      "resources": [
+        { "logicalId": "FunctionSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "GraphSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "GraphSubnets", "type": "AWS::Neptune::DBSubnetGroup" },
+        { "logicalId": "GraphCluster", "type": "AWS::Neptune::DBCluster" },
+        { "logicalId": "GraphWriter", "type": "AWS::Neptune::DBInstance" },
+        { "logicalId": "QueryRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "QueryFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "FraudApi", "type": "AWS::ApiGatewayV2::Api" },
+        { "logicalId": "FraudIntegration", "type": "AWS::ApiGatewayV2::Integration" },
+        { "logicalId": "FraudRoute", "type": "AWS::ApiGatewayV2::Route" },
+        { "logicalId": "FraudStage", "type": "AWS::ApiGatewayV2::Stage" },
+        { "logicalId": "FraudPermission", "type": "AWS::Lambda::Permission" }
+      ],
+      "outputs": ["ApiUrl", "ClusterEndpoint"],
+      "costNote": "Not free: Neptune Serverless never scales to zero, so it bills at least 1 NCU every hour until you delete it, plus storage. Lambda and HTTP API cost pennies."
+    },
+    {
+      "id": "ml-workspace",
+      "title": "Encrypted model lab",
+      "serviceIds": ["sagemaker", "s3", "kms", "iam", "vpc"],
+      "summary": "A customer managed KMS key encrypts the records bucket and the SageMaker Studio domain. Training jobs and endpoints run under an execution role that may use only that bucket and that key. The domain is VPC-only, so your subnets need VPC endpoints or a NAT gateway.",
+      "resources": [
+        { "logicalId": "ClinicKey", "type": "AWS::KMS::Key" },
+        { "logicalId": "ClinicKeyAlias", "type": "AWS::KMS::Alias" },
+        { "logicalId": "RecordsBucket", "type": "AWS::S3::Bucket" },
+        { "logicalId": "ExecutionRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "StudioDomain", "type": "AWS::SageMaker::Domain" },
+        { "logicalId": "ScientistProfile", "type": "AWS::SageMaker::UserProfile" }
+      ],
+      "outputs": ["RecordsBucketName", "KeyArn", "ExecutionRoleArn", "DomainId"],
+      "costNote": "You pay for Studio apps while they run, each training job for its length, endpoints by the hour, the domain's EFS storage, and the KMS key (monthly, plus requests)."
+    },
+    {
+      "id": "chat-alerts",
+      "title": "Alarms in the team chat",
+      "serviceIds": ["lambda", "cloudwatch", "sqs", "q", "kms", "iam"],
+      "summary": "A CloudWatch alarm on the shop function's errors publishes to an SNS topic encrypted with a customer managed key, and Amazon Q Developer in chat applications posts it in your Slack channel. Read-only guardrails cap what anyone can do from chat. Authorize Slack in its console first.",
+      "resources": [
+        { "logicalId": "ShopRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "ShopFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "AlarmKey", "type": "AWS::KMS::Key" },
+        { "logicalId": "AlarmTopic", "type": "AWS::SNS::Topic" },
+        { "logicalId": "AlarmTopicPolicy", "type": "AWS::SNS::TopicPolicy" },
+        { "logicalId": "ErrorAlarm", "type": "AWS::CloudWatch::Alarm" },
+        { "logicalId": "ChannelRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "TeamChannel", "type": "AWS::Chatbot::SlackChannelConfiguration" }
+      ],
+      "outputs": ["FunctionName", "AlarmTopicArn"],
+      "costNote": "Notifications through Amazon Q Developer in chat applications cost nothing extra; chatting with Amazon Q there uses its Free tier. One alarm and the KMS key bill monthly; SNS and Lambda cost pennies."
+    },
+    {
+      "id": "express-shop",
+      "title": "Move the shop to ECS Express Mode",
+      "serviceIds": ["ecs", "fargate", "iam"],
+      "summary": "ECS Express Mode builds an ECS service on Fargate, an internet-facing Application Load Balancer, auto scaling and networking in your default VPC from the shop's container image and two roles with only their AWS managed policies. Test its address, then shift your domain over with Route 53 weighted records and delete the App Runner service.",
+      "resources": [
+        { "logicalId": "TaskExecutionRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "InfrastructureRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "ShopService", "type": "AWS::ECS::ExpressGatewayService" }
+      ],
+      "outputs": ["ServiceUrl", "ServiceArn"],
+      "costNote": "Not free: Express Mode adds no charge, but the Fargate tasks and the load balancer bill by the hour. Delete the stack when you finish."
+    },
+    {
+      "id": "render-queue",
+      "title": "Overnight renders with AWS Batch",
+      "serviceIds": ["s3", "eventbridge", "batch", "iam"],
+      "summary": "Each scene file uploaded under scenes/ in a private, encrypted S3 bucket matches an EventBridge rule that submits an AWS Batch job. The job queue runs on Fargate Spot, which scales with the queue and back to nothing; each job may retry three times and writes its frames under frames/ with a role for those two prefixes only.",
+      "resources": [
+        { "logicalId": "ScenesBucket", "type": "AWS::S3::Bucket" },
+        { "logicalId": "RenderSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "ExecutionRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "JobRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "RenderCompute", "type": "AWS::Batch::ComputeEnvironment" },
+        { "logicalId": "RenderQueue", "type": "AWS::Batch::JobQueue" },
+        { "logicalId": "RenderJob", "type": "AWS::Batch::JobDefinition" },
+        { "logicalId": "SubmitRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "UploadRule", "type": "AWS::Events::Rule" }
+      ],
+      "outputs": ["BucketName", "JobQueueArn"],
+      "costNote": "Batch adds no charge, and nothing runs while the queue is empty. Each job bills Fargate Spot by the second while it renders; the bucket costs pennies."
+    },
+    {
+      "id": "lightsail-site",
+      "title": "The sailing club's blog",
+      "serviceIds": ["lightsail"],
+      "summary": "A Lightsail WordPress instance with automatic daily snapshots and SSH open only to your own address, a static IP that survives restarts, and a Lightsail managed MySQL database for the posts. Add an A record for your domain in Route 53 pointing at the static IP.",
+      "resources": [
+        { "logicalId": "ClubSite", "type": "AWS::Lightsail::Instance" },
+        { "logicalId": "ClubAddress", "type": "AWS::Lightsail::StaticIp" },
+        { "logicalId": "PostsDatabase", "type": "AWS::Lightsail::Database" }
+      ],
+      "outputs": ["StaticIp", "DatabaseName"],
+      "costNote": "Not free: the instance and the database each bill a fixed monthly price for their plans, and snapshots add a little. The static IP is free while attached. Delete the stack when you finish."
+    },
+    {
+      "id": "backup-plan",
+      "title": "Daily backups kept for a year",
+      "serviceIds": ["backup", "kms", "iam"],
+      "summary": "One AWS Backup plan backs up every resource tagged backup=daily each night, keeps each recovery point 365 days in a vault encrypted with its own KMS key, and copies it to a vault you name in a second Region. The vault lock is governance mode; compliance mode can never be undone, so add it yourself once the retention is right.",
+      "resources": [
+        { "logicalId": "VaultKey", "type": "AWS::KMS::Key" },
+        { "logicalId": "CityVault", "type": "AWS::Backup::BackupVault" },
+        { "logicalId": "BackupRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "DailyPlan", "type": "AWS::Backup::BackupPlan" },
+        { "logicalId": "TaggedResources", "type": "AWS::Backup::BackupSelection" }
+      ],
+      "outputs": ["VaultName", "BackupPlanId"],
+      "costNote": "You pay for backup storage, copies to the other Region and any restores, plus the KMS key each month. Nothing is backed up until you tag a resource backup=daily."
+    },
+    {
+      "id": "click-stream",
+      "title": "Live scoreboard from a stream",
+      "serviceIds": ["kinesis", "lambda", "dynamodb", "sqs", "iam"],
+      "summary": "An on-demand Kinesis data stream, encrypted with KMS, takes the clicks. A Lambda function reads each shard in order and adds points to each player's score in DynamoDB, with three retries, split batches and an SQS queue for batches it can't process.",
+      "resources": [
+        { "logicalId": "ClickStream", "type": "AWS::Kinesis::Stream" },
+        { "logicalId": "ScoresTable", "type": "AWS::DynamoDB::Table" },
+        { "logicalId": "FailedBatches", "type": "AWS::SQS::Queue" },
+        { "logicalId": "ScorerRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "ScorerFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "StreamMapping", "type": "AWS::Lambda::EventSourceMapping" }
+      ],
+      "outputs": ["StreamName", "TableName"],
+      "costNote": "Not free: an on-demand stream bills by the hour and per GB written and read. Lambda, DynamoDB and SQS cost pennies at this size. Delete the stack when you finish."
+    },
+    {
+      "id": "product-search",
+      "title": "Search the catalogue by any words",
+      "serviceIds": ["dynamodb", "opensearch", "apigateway", "lambda", "s3", "iam"],
+      "summary": "The catalogue stays in DynamoDB. An OpenSearch Ingestion pipeline copies the whole table once (through a private S3 bucket) and then every change from its stream into an OpenSearch Serverless collection. An HTTP API's function searches it by any words, signed with a role that may only read.",
+      "resources": [
+        { "logicalId": "CatalogueTable", "type": "AWS::DynamoDB::Table" },
+        { "logicalId": "ExportBucket", "type": "AWS::S3::Bucket" },
+        { "logicalId": "PipelineRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "SearchRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "CollectionEncryption", "type": "AWS::OpenSearchServerless::SecurityPolicy" },
+        { "logicalId": "CollectionNetwork", "type": "AWS::OpenSearchServerless::SecurityPolicy" },
+        { "logicalId": "CollectionAccess", "type": "AWS::OpenSearchServerless::AccessPolicy" },
+        { "logicalId": "SearchCollection", "type": "AWS::OpenSearchServerless::Collection" },
+        { "logicalId": "CataloguePipeline", "type": "AWS::OSIS::Pipeline" },
+        { "logicalId": "SearchFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "SearchApi", "type": "AWS::ApiGatewayV2::Api" },
+        { "logicalId": "ApiPermission", "type": "AWS::Lambda::Permission" }
+      ],
+      "outputs": ["TableName", "SearchUrl"],
+      "costNote": "Not free: the pipeline bills per OCU-hour (at least one) and the collection bills OCU-hours for indexing and search, even when idle. DynamoDB, Lambda and S3 cost pennies. Delete the stack when you finish."
+    },
+    {
+      "id": "recipe-box",
+      "title": "A managed archive for the recipe app",
+      "serviceIds": ["documentdb", "ecs", "fargate", "vpc", "kms"],
+      "summary": "An encrypted Amazon DocumentDB cluster with a replica in a second Availability Zone, its password created and kept in Secrets Manager, open only to the app's security group. An ECS cluster on Fargate is ready for the club's MongoDB app, which connects without a rewrite.",
+      "resources": [
+        { "logicalId": "AppSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "DatabaseSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "RecipeSubnets", "type": "AWS::DocDB::DBSubnetGroup" },
+        { "logicalId": "RecipeCluster", "type": "AWS::DocDB::DBCluster" },
+        { "logicalId": "PrimaryInstance", "type": "AWS::DocDB::DBInstance" },
+        { "logicalId": "ReplicaInstance", "type": "AWS::DocDB::DBInstance" },
+        { "logicalId": "AppCluster", "type": "AWS::ECS::Cluster" }
+      ],
+      "outputs": ["ClusterEndpoint", "EcsClusterName", "AppSecurityGroupId"],
+      "costNote": "Not free: each DocumentDB instance bills by the hour (two here), plus storage and I/O. The ECS cluster is free until tasks run. Delete the stack when you finish; it keeps a final snapshot."
+    },
+    {
+      "id": "network-hub",
+      "title": "One interchange for three networks",
+      "serviceIds": ["transitgateway", "vpc"],
+      "summary": "A transit gateway links three new VPCs: shop, payments and a test copy. Each attachment has its own route table, so the shop reaches both others, payments reaches only the shop, and the test copy can never reach payments. Head office's VPN can join the same hub.",
+      "resources": [
+        { "logicalId": "CityHub", "type": "AWS::EC2::TransitGateway" },
+        { "logicalId": "ShopVpc", "type": "AWS::EC2::VPC" },
+        { "logicalId": "ShopSubnet", "type": "AWS::EC2::Subnet" },
+        { "logicalId": "ShopRoutes", "type": "AWS::EC2::RouteTable" },
+        { "logicalId": "ShopSubnetRoutes", "type": "AWS::EC2::SubnetRouteTableAssociation" },
+        { "logicalId": "ShopAttachment", "type": "AWS::EC2::TransitGatewayAttachment" },
+        { "logicalId": "ShopToHub", "type": "AWS::EC2::Route" },
+        { "logicalId": "ShopHubTable", "type": "AWS::EC2::TransitGatewayRouteTable" },
+        { "logicalId": "ShopHubAssociation", "type": "AWS::EC2::TransitGatewayRouteTableAssociation" },
+        { "logicalId": "PaymentsVpc", "type": "AWS::EC2::VPC" },
+        { "logicalId": "PaymentsSubnet", "type": "AWS::EC2::Subnet" },
+        { "logicalId": "PaymentsRoutes", "type": "AWS::EC2::RouteTable" },
+        { "logicalId": "PaymentsSubnetRoutes", "type": "AWS::EC2::SubnetRouteTableAssociation" },
+        { "logicalId": "PaymentsAttachment", "type": "AWS::EC2::TransitGatewayAttachment" },
+        { "logicalId": "PaymentsToHub", "type": "AWS::EC2::Route" },
+        { "logicalId": "PaymentsHubTable", "type": "AWS::EC2::TransitGatewayRouteTable" },
+        { "logicalId": "PaymentsHubAssociation", "type": "AWS::EC2::TransitGatewayRouteTableAssociation" },
+        { "logicalId": "TestVpc", "type": "AWS::EC2::VPC" },
+        { "logicalId": "TestSubnet", "type": "AWS::EC2::Subnet" },
+        { "logicalId": "TestRoutes", "type": "AWS::EC2::RouteTable" },
+        { "logicalId": "TestSubnetRoutes", "type": "AWS::EC2::SubnetRouteTableAssociation" },
+        { "logicalId": "TestAttachment", "type": "AWS::EC2::TransitGatewayAttachment" },
+        { "logicalId": "TestToHub", "type": "AWS::EC2::Route" },
+        { "logicalId": "TestHubTable", "type": "AWS::EC2::TransitGatewayRouteTable" },
+        { "logicalId": "TestHubAssociation", "type": "AWS::EC2::TransitGatewayRouteTableAssociation" },
+        { "logicalId": "ShopLearnsShop", "type": "AWS::EC2::TransitGatewayRouteTablePropagation" },
+        { "logicalId": "ShopLearnsPayments", "type": "AWS::EC2::TransitGatewayRouteTablePropagation" },
+        { "logicalId": "ShopLearnsTest", "type": "AWS::EC2::TransitGatewayRouteTablePropagation" },
+        { "logicalId": "PaymentsLearnsShop", "type": "AWS::EC2::TransitGatewayRouteTablePropagation" },
+        { "logicalId": "PaymentsLearnsPayments", "type": "AWS::EC2::TransitGatewayRouteTablePropagation" },
+        { "logicalId": "TestLearnsShop", "type": "AWS::EC2::TransitGatewayRouteTablePropagation" },
+        { "logicalId": "TestLearnsTest", "type": "AWS::EC2::TransitGatewayRouteTablePropagation" }
+      ],
+      "outputs": ["TransitGatewayId", "ShopVpcId"],
+      "costNote": "Not free: each of the three attachments bills by the hour, plus a charge per GB that crosses the hub. The VPCs and subnets are free. Delete the stack when you finish."
+    },
+    {
+      "id": "ticket-express",
+      "title": "Two fixed addresses for the ticket API",
+      "serviceIds": ["globalaccelerator", "ec2"],
+      "summary": "A Global Accelerator gives the ticket API two fixed IP addresses on AWS's network, in front of its servers in two Regions. Health checks every 10 seconds move riders to the healthy Region. Deploy in us-west-2, where Global Accelerator is managed.",
+      "resources": [
+        { "logicalId": "TicketAccelerator", "type": "AWS::GlobalAccelerator::Accelerator" },
+        { "logicalId": "HttpsListener", "type": "AWS::GlobalAccelerator::Listener" },
+        { "logicalId": "FirstRegionGroup", "type": "AWS::GlobalAccelerator::EndpointGroup" },
+        { "logicalId": "SecondRegionGroup", "type": "AWS::GlobalAccelerator::EndpointGroup" }
+      ],
+      "outputs": ["StaticIps", "DnsName"],
+      "costNote": "Not free: the accelerator bills a fixed hourly fee, plus a premium per GB on top of normal data transfer. Delete the stack when you finish."
+    },
+    {
+      "id": "secret-password",
+      "title": "Take the password out of the code",
+      "serviceIds": ["rds", "secretsmanager", "lambda", "apigateway", "kms", "vpc"],
+      "summary": "A private MySQL database on RDS whose password RDS creates, keeps in Secrets Manager encrypted with KMS, and rotates. The library function behind an HTTP API fetches the login each time through a private Secrets Manager endpoint, and only it may read that secret.",
+      "resources": [
+        { "logicalId": "FunctionSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "DatabaseSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "EndpointSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "SecretsEndpoint", "type": "AWS::EC2::VPCEndpoint" },
+        { "logicalId": "DatabaseSubnets", "type": "AWS::RDS::DBSubnetGroup" },
+        { "logicalId": "LibraryDatabase", "type": "AWS::RDS::DBInstance" },
+        { "logicalId": "FunctionRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "LibraryFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "LibraryApi", "type": "AWS::ApiGatewayV2::Api" },
+        { "logicalId": "ApiPermission", "type": "AWS::Lambda::Permission" }
+      ],
+      "outputs": ["ApiUrl", "SecretArn"],
+      "costNote": "Not free: the database instance and the endpoint bill by the hour, and the secret by the month. Lambda and the API cost pennies. Delete the stack when you finish; it keeps a final snapshot."
+    },
+    {
+      "id": "security-findings-hub",
+      "title": "One board for every security warning",
+      "serviceIds": ["securityhub", "guardduty", "macie", "eventbridge", "sqs"],
+      "summary": "Turns on Security Hub, GuardDuty and Macie in this Region, and an EventBridge rule sends every critical finding to an encrypted SQS queue for the on-call team. Turn on Amazon Inspector in its console; its findings join the same board.",
+      "resources": [
+        { "logicalId": "SecurityBoard", "type": "AWS::SecurityHub::HubV2" },
+        { "logicalId": "Watchtower", "type": "AWS::GuardDuty::Detector" },
+        { "logicalId": "DataDetective", "type": "AWS::Macie::Session" },
+        { "logicalId": "OnCallQueue", "type": "AWS::SQS::Queue" },
+        { "logicalId": "OnCallQueuePolicy", "type": "AWS::SQS::QueuePolicy" },
+        { "logicalId": "CriticalFinding", "type": "AWS::Events::Rule" }
+      ],
+      "outputs": ["QueueUrl", "DetectorId"],
+      "costNote": "Not free after their trials: GuardDuty bills by the events and data it analyses, Macie by buckets watched and data inspected, Security Hub by what it checks and ingests. Disable them when you finish."
+    },
+    {
+      "id": "voice-of-the-people",
+      "title": "Read the comments, voice the kind ones",
+      "serviceIds": ["s3", "lambda", "comprehend", "dynamodb", "polly", "eventbridge"],
+      "summary": "Each comment saved under comments/ in a private bucket wakes a function through EventBridge. Comprehend reads its mood and finds personal details, which are hidden before the result is kept in DynamoDB, and Polly reads the positive ones into audio/ in the same bucket.",
+      "resources": [
+        { "logicalId": "CommentsBucket", "type": "AWS::S3::Bucket" },
+        { "logicalId": "ResultsTable", "type": "AWS::DynamoDB::Table" },
+        { "logicalId": "ReaderRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "ReaderFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "NewComment", "type": "AWS::Events::Rule" },
+        { "logicalId": "RulePermission", "type": "AWS::Lambda::Permission" }
+      ],
+      "outputs": ["BucketName", "TableName"],
+      "costNote": "Pennies for a few comments: Comprehend and Polly bill per character, Lambda per call, DynamoDB per request. Delete the stack when you finish."
+    },
+    {
+      "id": "order-saga",
+      "title": "Bakery orders that undo themselves",
+      "serviceIds": ["apigateway", "stepfunctions", "lambda", "dynamodb"],
+      "summary": "An HTTP API starts a Step Functions workflow named after the order, so the same order never runs twice. It saves the order, sets the cakes aside and charges the card; if the charge fails, it puts the cakes back and cancels the order. A stand-in payment declines totals over 100.",
+      "resources": [
+        { "logicalId": "OrdersTable", "type": "AWS::DynamoDB::Table" },
+        { "logicalId": "PaymentRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "PaymentFunction", "type": "AWS::Lambda::Function" },
+        { "logicalId": "WorkflowLogs", "type": "AWS::Logs::LogGroup" },
+        { "logicalId": "WorkflowRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "OrderWorkflow", "type": "AWS::StepFunctions::StateMachine" },
+        { "logicalId": "ApiRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "OrdersApi", "type": "AWS::ApiGatewayV2::Api" },
+        { "logicalId": "StartWorkflow", "type": "AWS::ApiGatewayV2::Integration" },
+        { "logicalId": "OrderRoute", "type": "AWS::ApiGatewayV2::Route" },
+        { "logicalId": "DefaultStage", "type": "AWS::ApiGatewayV2::Stage" }
+      ],
+      "outputs": ["OrdersUrl", "StateMachineArn"],
+      "costNote": "Pennies: Standard workflows bill per state transition, plus Lambda, DynamoDB and API requests. Delete the stack when you finish."
+    },
+    {
+      "id": "no-open-doors",
+      "title": "Servers with no open doors",
+      "serviceIds": ["systemsmanager", "ec2", "vpc", "cloudwatch"],
+      "summary": "A small server in a private subnet with no inbound rules, no SSH key and IMDSv2 only. Session Manager reaches it through three private endpoints, Patch Manager installs patches every Sunday, and a log group waits for Session Manager to record every session.",
+      "resources": [
+        { "logicalId": "ServerSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "EndpointSecurityGroup", "type": "AWS::EC2::SecurityGroup" },
+        { "logicalId": "SsmEndpoint", "type": "AWS::EC2::VPCEndpoint" },
+        { "logicalId": "SsmMessagesEndpoint", "type": "AWS::EC2::VPCEndpoint" },
+        { "logicalId": "Ec2MessagesEndpoint", "type": "AWS::EC2::VPCEndpoint" },
+        { "logicalId": "ServerRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "ServerProfile", "type": "AWS::IAM::InstanceProfile" },
+        { "logicalId": "TicketServer", "type": "AWS::EC2::Instance" },
+        { "logicalId": "WeeklyPatch", "type": "AWS::SSM::Association" },
+        { "logicalId": "SessionLogs", "type": "AWS::Logs::LogGroup" }
+      ],
+      "outputs": ["InstanceId", "SessionLogGroup"],
+      "costNote": "Not free: the instance and each of the three endpoints bill by the hour. Session Manager and Patch Manager add no charge. Delete the stack when you finish."
+    },
+    {
+      "id": "config-autofix",
+      "title": "Put the block back automatically",
+      "serviceIds": ["s3", "config", "systemsmanager", "sqs", "eventbridge"],
+      "summary": "An AWS Config rule checks the photo bucket's public access block each time it changes. A Systems Manager runbook switches the block back on automatically, and an EventBridge rule drops each change into an SQS queue so the team can look up who did it. Needs AWS Config recording in this Region.",
+      "resources": [
+        { "logicalId": "PhotoBucket", "type": "AWS::S3::Bucket" },
+        { "logicalId": "BlockRule", "type": "AWS::Config::ConfigRule" },
+        { "logicalId": "FixRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "AutoFix", "type": "AWS::Config::RemediationConfiguration" },
+        { "logicalId": "AlertQueue", "type": "AWS::SQS::Queue" },
+        { "logicalId": "AlertQueuePolicy", "type": "AWS::SQS::QueuePolicy" },
+        { "logicalId": "BucketOpened", "type": "AWS::Events::Rule" }
+      ],
+      "outputs": ["BucketName", "QueueUrl"],
+      "costNote": "Pennies: AWS Config bills per rule evaluation, and the runbook, queue and bucket cost almost nothing. Delete the stack when you finish."
+    },
+    {
+      "id": "account-baseline",
+      "title": "The same audit trail in every account",
+      "serviceIds": ["organizations", "cloudwatch", "s3"],
+      "summary": "Deploy in the organization's management account. One organization trail records every account, including each new one, into a private central bucket that only accepts its logs over HTTPS, and a service control policy on the root stops any team stopping or changing it.",
+      "resources": [
+        { "logicalId": "LogBucket", "type": "AWS::S3::Bucket" },
+        { "logicalId": "LogBucketPolicy", "type": "AWS::S3::BucketPolicy" },
+        { "logicalId": "CityAuditTrail", "type": "AWS::CloudTrail::Trail" },
+        { "logicalId": "KeepTheRecord", "type": "AWS::Organizations::Policy" }
+      ],
+      "outputs": ["BucketName", "TrailArn"],
+      "costNote": "The first copy of management events in each account is free; the bucket bills for storage. Deleting the stack removes the trail and the policy; empty the bucket first."
+    },
+    {
+      "id": "live-scores",
+      "title": "Live scores from the judges' phones",
+      "serviceIds": ["cognito", "appsync", "dynamodb"],
+      "summary": "Judges sign in with a Cognito user pool that only the organisers can add them to, and post scores through an AppSync GraphQL API into DynamoDB. The results board reads with an API key, and every subscribed phone gets each new score at once.",
+      "resources": [
+        { "logicalId": "JudgesPool", "type": "AWS::Cognito::UserPool" },
+        { "logicalId": "JudgesApp", "type": "AWS::Cognito::UserPoolClient" },
+        { "logicalId": "ScoresTable", "type": "AWS::DynamoDB::Table" },
+        { "logicalId": "ScoresApi", "type": "AWS::AppSync::GraphQLApi" },
+        { "logicalId": "ScoresSchema", "type": "AWS::AppSync::GraphQLSchema" },
+        { "logicalId": "BoardKey", "type": "AWS::AppSync::ApiKey" },
+        { "logicalId": "TableRole", "type": "AWS::IAM::Role" },
+        { "logicalId": "ScoresSource", "type": "AWS::AppSync::DataSource" },
+        { "logicalId": "PostScoreResolver", "type": "AWS::AppSync::Resolver" },
+        { "logicalId": "ScoresResolver", "type": "AWS::AppSync::Resolver" }
+      ],
+      "outputs": ["GraphQLUrl", "UserPoolId", "BoardApiKey"],
+      "costNote": "Pennies for one sports day: AppSync bills per query, update and real-time minute, DynamoDB per request. Delete the stack when you finish."
     }
   ]
 }

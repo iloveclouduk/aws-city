@@ -10,10 +10,13 @@ which part of AWS lives there:
   networking  purple, a radio mast with a red aircraft light and a dish
   security    red, battlements and a shield crest
   aiml        teal glass, a glowing pyramid crown
+  management  pink, a glazed operations deck under a flat cap with a cog sign and an aerial
 
 1x1 footprint like the flats, so a tower fits any street-facing lot. Windows light up at night (@lights).
 Called from generate_tiles.main as towers_art.build(add).
 """
+import math
+
 from generate_tiles import (CON_D, CON_L, CON_M, GLASS, GLASS_D, NAVY, NAVY_D, ORANGE, WHITE,  # noqa: F401
                             A, Canvas, seeded, shade)
 
@@ -25,6 +28,7 @@ DISTRICT = {
     "networking": (140, 79, 255),
     "security": (221, 52, 76),
     "aiml": (1, 168, 141),
+    "management": (231, 21, 123),
 }
 # Wall bodies: a quiet concrete or glass so the accent (bands, crown) carries the colour, as real towers do.
 BODY = {
@@ -34,6 +38,7 @@ BODY = {
     "networking": (188, 186, 214),
     "security": (150, 140, 148),
     "aiml": (120, 186, 196),
+    "management": (214, 204, 212),
 }
 # (shaft height, setback height) for mid-rise, tower and skyscraper. A walker is about 44 px tall (36 in a crowd).
 HEIGHTS = {"mid": (52, 0), "tall": (110, 16), "sky": (150, 28)}
@@ -93,6 +98,24 @@ def crown(c, d, accent, z, key):
         x, y = c.P(0.5, 0.88, z - 14)
         c.d.polygon([(x - 5, y - 6), (x + 5, y - 6), (x + 5, y), (x, y + 5), (x - 5, y)], fill=A(accent))
         c.d.line([(x, y - 5), (x, y + 3)], fill=A(WHITE))
+    elif d == "management":
+        # An operations deck: a glazed cab lit at night under an overhanging cap, a cog sign and an aerial.
+        c.box(0.3, 0.3, 0.7, 0.7, z, z + 2, shade(accent, 0.8))
+        c.box(0.28, 0.28, 0.72, 0.72, z + 2, z + 10, GLASS_D)
+        c.lface(0.72, 0.3, 0.7, z + 3, z + 9, GLASS, light=True)
+        c.box(0.22, 0.22, 0.78, 0.78, z + 10, z + 13, accent)
+        x, y = c.P(m, m, z + 13)
+        c.d.line([(x, y), (x, y - 14)], fill=A(CON_L))
+        c.d.rectangle((x - 1, y - 15, x, y - 14), fill=A((230, 40, 40)))
+        c.ld.rectangle((x - 1, y - 15, x, y - 14), fill=A((255, 80, 60)))
+        gx, gy = c.P(0.5, 0.88, z - 10)  # the cog sign on the street face
+        for k in range(8):
+            a = k * math.pi / 4
+            px, py = gx + round(3.6 * math.cos(a)), gy + round(3.6 * math.sin(a))
+            c.d.rectangle((px - 1, py - 1, px, py), fill=A(accent))
+        c.d.ellipse((gx - 3, gy - 3, gx + 2, gy + 2), fill=A(accent))
+        c.d.rectangle((gx - 1, gy - 1, gx, gy), fill=A(WHITE))
+        c.ld.rectangle((gx - 1, gy - 1, gx, gy), fill=A(WHITE))
     else:  # aiml
         # A glowing glass pyramid.
         c.pyramid(0.2, 0.2, 0.8, 0.8, z, 20, shade(accent, 1.2))

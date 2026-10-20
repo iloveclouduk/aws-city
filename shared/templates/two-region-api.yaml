@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the primary half of a two-Region API. A DynamoDB global table keeps a replica in a second Region, an HTTP API invokes a Lambda function, and a Route 53 health check watches the API. Run the same API in the second Region and add Route 53 failover records on your own domain to finish the design.
+
+Parameters:
+  SecondRegion:
+    Type: String
+    Default: us-west-2
+    AllowedPattern: '^[a-z]{2}(-[a-z]+)+-\d$'
+    Description: Where the table's replica lives (not this stack's Region)
+
+Resources:
+  BookingsTable:
+    Type: AWS::DynamoDB::GlobalTable
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      SSESpecification:
+        SSEEnabled: true
+      Replicas:
+        - Region: !Ref AWS::Region
+          PointInTimeRecoverySpecification:
+            PointInTimeRecoveryEnabled: true
+          Tags:
+            - Key: managed-by
+              Value: aws-city
+        - Region: !Ref SecondRegion
+          PointInTimeRecoverySpecification:
+            PointInTimeRecoveryEnabled: true
+          Tags:
+            - Key: managed-by
+              Value: aws-city
+
+  BookingsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: this-table-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                Resource: !GetAtt BookingsTable.Arn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  BookingsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Role: !GetAtt BookingsRole.Arn
+      MemorySize: 128
+      Timeout: 5
+      Environment:
+        Variables:
+          TABLE: !Ref BookingsTable
+      Code:
+        ZipFile: |
+          // GET /health is what the Route 53 health check calls.
+          exports.handler = async (event) => ({
+            statusCode: 200,
+            body: JSON.stringify({ ok: true, region: process.env.AWS_REGION, path: event.rawPath }),
+          });
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  BookingsApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-api'
+      ProtocolType: HTTP
+      Target: !GetAtt BookingsFunction.Arn
+      Tags:
+        managed-by: aws-city
+
+  BookingsPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref BookingsFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${BookingsApi}/*'
+
+  ApiHealthCheck:
+    Type: AWS::Route53::HealthCheck
+    Properties:
+      HealthCheckConfig:
+        Type: HTTPS
+        FullyQualifiedDomainName: !Select [2, !Split ['/', !GetAtt BookingsApi.ApiEndpoint]]
+        ResourcePath: /health
+        RequestInterval: 30
+        FailureThreshold: 3
+      HealthCheckTags:
+        - Key: managed-by
+          Value: aws-city
+
+Outputs:
+  ApiUrl:
+    Description: This Region's API
+    Value: !GetAtt BookingsApi.ApiEndpoint
+  HealthCheckId:
+    Description: Attach to the PRIMARY failover record on your domain
+    Value: !Ref ApiHealthCheck
+  TableName:
+    Description: The global table (the same name in both Regions)
+    Value: !Ref BookingsTable

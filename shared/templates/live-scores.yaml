@@ -1,0 +1,191 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - sports day live. Signed-in judges post scores through an AppSync GraphQL API into DynamoDB, and every watching phone gets each new score at once through a subscription.
+
+Resources:
+  JudgesPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${AWS::StackName}-judges'
+      # Only the organisers add judges: nobody can sign themselves up.
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      UserPoolTags:
+        managed-by: aws-city
+
+  JudgesApp:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref JudgesPool
+      ClientName: judges-phone-app
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+
+  ScoresTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ScoresApi:
+    Type: AWS::AppSync::GraphQLApi
+    Properties:
+      Name: !Sub '${AWS::StackName}-scores'
+      # Judges sign in with the user pool; the results board reads with an API key.
+      AuthenticationType: AMAZON_COGNITO_USER_POOLS
+      UserPoolConfig:
+        UserPoolId: !Ref JudgesPool
+        AwsRegion: !Ref AWS::Region
+        DefaultAction: ALLOW
+      AdditionalAuthenticationProviders:
+        - AuthenticationType: API_KEY
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ScoresSchema:
+    Type: AWS::AppSync::GraphQLSchema
+    Properties:
+      ApiId: !GetAtt ScoresApi.ApiId
+      Definition: |
+        type Score @aws_cognito_user_pools @aws_api_key {
+          id: ID!
+          event: String!
+          team: String!
+          points: Int!
+        }
+
+        type Query {
+          scores: [Score] @aws_cognito_user_pools @aws_api_key
+        }
+
+        type Mutation {
+          postScore(event: String!, team: String!, points: Int!): Score @aws_cognito_user_pools
+        }
+
+        type Subscription {
+          onScore: Score @aws_subscribe(mutations: ["postScore"]) @aws_cognito_user_pools @aws_api_key
+        }
+
+  BoardKey:
+    Type: AWS::AppSync::ApiKey
+    Properties:
+      ApiId: !GetAtt ScoresApi.ApiId
+      Description: Read-only key for the public results board (expires after 7 days)
+
+  TableRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: appsync.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: scores-table-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:Scan
+                Resource: !GetAtt ScoresTable.Arn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ScoresSource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt ScoresApi.ApiId
+      Name: ScoresTable
+      Type: AMAZON_DYNAMODB
+      ServiceRoleArn: !GetAtt TableRole.Arn
+      DynamoDBConfig:
+        TableName: !Ref ScoresTable
+        AwsRegion: !Ref AWS::Region
+
+  PostScoreResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: ScoresSchema
+    Properties:
+      ApiId: !GetAtt ScoresApi.ApiId
+      TypeName: Mutation
+      FieldName: postScore
+      DataSourceName: !GetAtt ScoresSource.Name
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      Code: |
+        import { util } from '@aws-appsync/utils';
+        export function request(ctx) {
+          return {
+            operation: 'PutItem',
+            key: util.dynamodb.toMapValues({ id: util.autoId() }),
+            attributeValues: util.dynamodb.toMapValues(ctx.args),
+          };
+        }
+        export function response(ctx) {
+          return ctx.result;
+        }
+
+  ScoresResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: ScoresSchema
+    Properties:
+      ApiId: !GetAtt ScoresApi.ApiId
+      TypeName: Query
+      FieldName: scores
+      DataSourceName: !GetAtt ScoresSource.Name
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      Code: |
+        export function request() {
+          return { operation: 'Scan', limit: 100 };
+        }
+        export function response(ctx) {
+          return ctx.result.items;
+        }
+
+Outputs:
+  GraphQLUrl:
+    Description: The API's GraphQL endpoint
+    Value: !GetAtt ScoresApi.GraphQLUrl
+  UserPoolId:
+    Description: Add each judge here (Cognito console, Create user)
+    Value: !Ref JudgesPool
+  BoardApiKey:
+    Description: The results board's read-only key
+    Value: !GetAtt BoardKey.ApiKey

@@ -1,0 +1,262 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - product search. The catalogue stays in DynamoDB; an OpenSearch Ingestion pipeline (the zero-ETL integration) copies the table and then every change into an OpenSearch Serverless collection, and an HTTP API's function finds products by any words.
+
+Resources:
+  CatalogueTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: sku
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sku
+          KeyType: HASH
+      # The pipeline needs point-in-time recovery (for the first full copy) and a stream (for every change after).
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ExportBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      LifecycleConfiguration:
+        Rules:
+          - Id: drop-old-exports
+            Status: Enabled
+            ExpirationInDays: 7
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  PipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: osis-pipelines.amazonaws.com
+            Action: sts:AssumeRole
+      # The permissions from "Using an OpenSearch Ingestion pipeline with Amazon DynamoDB" and the collection sink page.
+      Policies:
+        - PolicyName: table-to-collection
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DescribeTable
+                  - dynamodb:DescribeContinuousBackups
+                  - dynamodb:ExportTableToPointInTime
+                Resource: !GetAtt CatalogueTable.Arn
+              - Effect: Allow
+                Action: dynamodb:DescribeExport
+                Resource: !Sub '${CatalogueTable.Arn}/export/*'
+              - Effect: Allow
+                Action:
+                  - dynamodb:DescribeStream
+                  - dynamodb:GetRecords
+                  - dynamodb:GetShardIterator
+                Resource: !Sub '${CatalogueTable.Arn}/stream/*'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:AbortMultipartUpload
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                Resource: !Sub '${ExportBucket.Arn}/export/*'
+              - Effect: Allow
+                Action:
+                  - aoss:APIAccessAll
+                  - aoss:BatchGetCollection
+                Resource: !GetAtt SearchCollection.Arn
+              - Effect: Allow
+                Action:
+                  - aoss:CreateSecurityPolicy
+                  - aoss:GetSecurityPolicy
+                  - aoss:UpdateSecurityPolicy
+                Resource: '*'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  SearchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: search-this-collection-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: aoss:APIAccessAll
+                Resource: !GetAtt SearchCollection.Arn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  CollectionEncryption:
+    Type: AWS::OpenSearchServerless::SecurityPolicy
+    Properties:
+      Name: city-market-encryption
+      Type: encryption
+      Policy: '{"Rules":[{"ResourceType":"collection","Resource":["collection/city-market"]}],"AWSOwnedKey":true}'
+
+  # Reachable over HTTPS from AWS services and the internet, but every request must still be signed by a role the
+  # data access policy below names.
+  CollectionNetwork:
+    Type: AWS::OpenSearchServerless::SecurityPolicy
+    Properties:
+      Name: city-market-network
+      Type: network
+      Policy: '[{"Rules":[{"ResourceType":"collection","Resource":["collection/city-market"]}],"AllowFromPublic":true}]'
+
+  CollectionAccess:
+    Type: AWS::OpenSearchServerless::AccessPolicy
+    Properties:
+      Name: city-market-access
+      Type: data
+      Policy: !Sub
+        - '[{"Description":"Pipeline writes, the search function reads","Rules":[{"ResourceType":"index","Resource":["index/city-market/*"],"Permission":["aoss:CreateIndex","aoss:UpdateIndex","aoss:DescribeIndex","aoss:WriteDocument"]}],"Principal":["${Pipeline}"]},{"Rules":[{"ResourceType":"index","Resource":["index/city-market/*"],"Permission":["aoss:ReadDocument","aoss:DescribeIndex"]}],"Principal":["${Search}"]}]'
+        - Pipeline: !GetAtt PipelineRole.Arn
+          Search: !GetAtt SearchRole.Arn
+
+  SearchCollection:
+    Type: AWS::OpenSearchServerless::Collection
+    DependsOn:
+      - CollectionEncryption
+      - CollectionNetwork
+    Properties:
+      Name: city-market
+      Type: SEARCH
+      StandbyReplicas: DISABLED
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  CataloguePipeline:
+    Type: AWS::OSIS::Pipeline
+    DependsOn: CollectionAccess
+    Properties:
+      PipelineName: city-market
+      MinUnits: 1
+      MaxUnits: 2
+      PipelineConfigurationBody: !Sub |
+        version: "2"
+        catalogue-pipeline:
+          source:
+            dynamodb:
+              acknowledgments: true
+              tables:
+                - table_arn: "${CatalogueTable.Arn}"
+                  export:
+                    s3_bucket: "${ExportBucket}"
+                    s3_prefix: "export/"
+                  stream:
+                    start_position: "LATEST"
+              aws:
+                sts_role_arn: "${PipelineRole.Arn}"
+                region: "${AWS::Region}"
+          sink:
+            - opensearch:
+                hosts: ["${SearchCollection.CollectionEndpoint}"]
+                index: "products"
+                index_type: custom
+                document_id: "${!getMetadata(\"primary_key\")}"
+                action: "${!getMetadata(\"opensearch_action\")}"
+                document_version: "${!getMetadata(\"document_version\")}"
+                document_version_type: "external"
+                aws:
+                  sts_role_arn: "${PipelineRole.Arn}"
+                  region: "${AWS::Region}"
+                  serverless: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  SearchFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Role: !GetAtt SearchRole.Arn
+      MemorySize: 256
+      Timeout: 10
+      Environment:
+        Variables:
+          ENDPOINT: !GetAtt SearchCollection.CollectionEndpoint
+      Code:
+        ZipFile: |
+          // Signs each search with the function's role (service "aoss"), using the SDK packages the runtime ships.
+          const { SignatureV4 } = require('@smithy/signature-v4');
+          const { Sha256 } = require('@aws-crypto/sha256-js');
+          const { createHash } = require('node:crypto');
+          exports.handler = async (event) => {
+            const q = (event.queryStringParameters?.q ?? '').slice(0, 200);
+            const url = new URL('/products/_search', process.env.ENDPOINT);
+            const body = JSON.stringify({ size: 10, query: { multi_match: { query: q, fields: ['*'] } } });
+            const signer = new SignatureV4({ service: 'aoss', region: process.env.AWS_REGION, sha256: Sha256, credentials: {
+              accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY, sessionToken: process.env.AWS_SESSION_TOKEN } });
+            const req = await signer.sign({ method: 'POST', protocol: 'https:', hostname: url.hostname, path: url.pathname,
+              headers: { host: url.hostname, 'content-type': 'application/json', 'x-amz-content-sha256': createHash('sha256').update(body).digest('hex') }, body });
+            const res = await fetch(url, { method: 'POST', headers: req.headers, body });
+            const hits = (await res.json()).hits?.hits ?? [];
+            return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify(hits.map((h) => h._source)) };
+          };
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  SearchApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-search'
+      ProtocolType: HTTP
+      Target: !GetAtt SearchFunction.Arn
+      Tags:
+        managed-by: aws-city
+
+  ApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SearchFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${SearchApi}/*'
+
+Outputs:
+  TableName:
+    Description: Put catalogue items here (sku is the key); they show up in search within seconds
+    Value: !Ref CatalogueTable
+  SearchUrl:
+    Description: Add ?q=red wool scarf
+    Value: !GetAtt SearchApi.ApiEndpoint

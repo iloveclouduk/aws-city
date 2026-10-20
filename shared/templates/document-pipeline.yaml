@@ -1,0 +1,177 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the claims desk. Uploads land in a private S3 bucket; an EventBridge rule sends each Object Created event to a Lambda function that checks images with Rekognition, reads forms with Textract and saves the results in DynamoDB.
+
+Resources:
+  InboxBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+            BucketKeyEnabled: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      # Uploads are kept for 30 days; the results live on in DynamoDB.
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-uploads
+            Status: Enabled
+            ExpirationInDays: 30
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ClaimsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: claimKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: claimKey
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  WorkerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: read-uploads-check-and-save
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub '${InboxBucket.Arn}/*'
+              # AnalyzeDocument has no resource type to narrow it to, and the built-in moderation model has no ARN.
+              - Effect: Allow
+                Action:
+                  - rekognition:DetectModerationLabels
+                  - textract:AnalyzeDocument
+                Resource: '*'
+              - Effect: Allow
+                Action: dynamodb:PutItem
+                Resource: !GetAtt ClaimsTable.Arn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  WorkerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.13
+      Handler: index.handler
+      Role: !GetAtt WorkerRole.Arn
+      MemorySize: 256
+      Timeout: 60
+      Environment:
+        Variables:
+          TABLE: !Ref ClaimsTable
+      Code:
+        ZipFile: |
+          import json, os, boto3
+          rek, tex, db = boto3.client('rekognition'), boto3.client('textract'), boto3.client('dynamodb')
+
+          def handler(event, context):
+              bucket, key = event['detail']['bucket']['name'], event['detail']['object']['key']
+              obj = {'S3Object': {'Bucket': bucket, 'Name': key}}
+              item = {'claimKey': {'S': key}}
+              if key.lower().endswith(('.jpg', '.jpeg', '.png')):
+                  labels = rek.detect_moderation_labels(Image=obj, MinConfidence=80)['ModerationLabels']
+                  item['flags'] = {'S': json.dumps([l['Name'] for l in labels])}
+              # Single-page forms; multipage PDFs need the asynchronous StartDocumentAnalysis.
+              doc = tex.analyze_document(Document=obj, FeatureTypes=['FORMS', 'TABLES'])
+              item['blocks'] = {'N': str(len(doc['Blocks']))}
+              db.put_item(TableName=os.environ['TABLE'], Item=item)
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  RuleDeadLetters:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  UploadRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: New uploads in the claims inbox
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - !Ref InboxBucket
+      Targets:
+        - Id: worker
+          Arn: !GetAtt WorkerFunction.Arn
+          RetryPolicy:
+            MaximumRetryAttempts: 4
+          DeadLetterConfig:
+            Arn: !GetAtt RuleDeadLetters.Arn
+
+  RuleDeadLettersPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref RuleDeadLetters
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt RuleDeadLetters.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt UploadRule.Arn
+
+  WorkerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WorkerFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt UploadRule.Arn
+
+Outputs:
+  InboxBucketName:
+    Description: Upload a scanned form (PNG or JPEG) here
+    Value: !Ref InboxBucket
+  TableName:
+    Description: The results appear here
+    Value: !Ref ClaimsTable

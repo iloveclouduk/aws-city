@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw
 
 from generate_tiles import (A, ASPHALT, CLEAR, CON_D, CON_L, CON_M, GLASS, GLASS_D, GRASS, GRASS_D, HH, HW, NAVY, NAVY_D,  # noqa: F401
                             ORANGE, ORANGE_D, WHITE, WOOD, WOOD_D, Canvas, ground, seeded, shade, specks)
-from landmarks_aws_a import cyl
+from shapes import cyl
 
 # The sea: deeper than the city's lake water. src/game/palette.ts SEA_COLOR must match SEA.
 SEA = (46, 120, 188)

@@ -1,0 +1,1016 @@
+{
+  "asOf": "2026-10-17",
+  "note": "Hands-on workshops (src/ui/Workshop.tsx): step by step in the practice terminal (src/learning/terminal.ts, simulated, nothing touches AWS) or for real in AWS CloudShell, where the server checks each step with a read-only look at the account (server/src/workshops/checks.ts). Text copied from an AWS workshop only when its repo's licence allows it (`licenses`), with `source` crediting it; otherwise the steps are ours and `source` links the full workshop.",
+  "licenses": ["MIT-0", "MIT", "Apache-2.0", "CC-BY-SA-4.0"],
+  "workshops": [
+    {
+      "id": "dynamodb-first-table",
+      "title": "Your first DynamoDB table",
+      "serviceId": "dynamodb",
+      "level": 100,
+      "minutes": 15,
+      "simple": "Make a table, put one item in it, read it back by its key, then tidy up.",
+      "costNote": "On-demand tables cost nothing while idle; a few reads and writes are well inside the free tier.",
+      "imported": false,
+      "source": { "title": "Amazon DynamoDB Immersion Day", "url": "https://catalog.workshops.aws/dynamodb-labs/en-US" },
+      "steps": [
+        {
+          "id": "whoami",
+          "title": "Check who you are",
+          "body": "First, ask AWS which account and identity your commands will run as.",
+          "cli": "aws sts get-caller-identity",
+          "output": "{\n    \"UserId\": \"AIDAEXAMPLE\",\n    \"Account\": \"111122223333\",\n    \"Arn\": \"arn:aws:iam::111122223333:user/learner\"\n}",
+          "errors": [
+            { "code": "Unable to locate credentials", "message": "Unable to locate credentials. You can configure credentials by running \"aws configure\".", "explain": "The CLI found no keys. CloudShell signs you in automatically; a laptop needs a profile.", "fix": "Use AWS CloudShell, or run aws configure (or aws sso login) on your own machine." }
+          ],
+          "verify": { "manual": true }
+        },
+        {
+          "id": "create",
+          "title": "Create the table",
+          "body": "Every item needs a partition key. We'll call ours pk, a string. On-demand billing means no capacity to plan.",
+          "cli": "aws dynamodb create-table --table-name <table> --attribute-definitions AttributeName=pk,AttributeType=S --key-schema AttributeName=pk,KeyType=HASH --billing-mode PAY_PER_REQUEST [--region <region>]",
+          "output": "{\n    \"TableDescription\": {\n        \"TableName\": \"{{table}}\",\n        \"TableStatus\": \"CREATING\",\n        \"BillingModeSummary\": { \"BillingMode\": \"PAY_PER_REQUEST\" }\n    }\n}",
+          "errors": [
+            { "code": "ValidationException", "message": "An error occurred (ValidationException) when calling the CreateTable operation: No provisioned throughput specified for the table", "when": { "missing": "--billing-mode" }, "explain": "Without a billing mode the table is provisioned, and provisioned tables need read and write capacity numbers.", "fix": "Add --billing-mode PAY_PER_REQUEST." },
+            { "code": "ResourceInUseException", "message": "An error occurred (ResourceInUseException) when calling the CreateTable operation: Table already exists: city-demo", "when": { "flag": "--table-name", "value": "^city-demo$" }, "explain": "A table name is unique in each Region of your account.", "fix": "Pick another name, or delete the old table first." },
+            { "code": "AccessDeniedException", "message": "An error occurred (AccessDeniedException) when calling the CreateTable operation: User is not authorized to perform: dynamodb:CreateTable", "explain": "Your identity isn't allowed to create tables.", "fix": "Ask your account admin for dynamodb:CreateTable, or use a sandbox account." }
+          ],
+          "verify": { "check": "table-exists", "value": "table" }
+        },
+        {
+          "id": "wait",
+          "title": "Wait until it's active",
+          "body": "A new table takes a few seconds. The waiter returns, printing nothing, once the table is ACTIVE.",
+          "cli": "aws dynamodb wait table-exists --table-name <table>",
+          "output": "",
+          "verify": { "check": "table-active", "value": "table" }
+        },
+        {
+          "id": "put",
+          "title": "Put an item",
+          "body": "Items are JSON with a type on every value: S for string, N for number (sent as a string).",
+          "cli": "aws dynamodb put-item --table-name <table> --item '{\"pk\":{\"S\":\"order#1\"},\"total\":{\"N\":\"42\"}}'",
+          "output": "",
+          "errors": [
+            { "code": "One or more parameter values were invalid", "message": "An error occurred (ValidationException) when calling the PutItem operation: One or more parameter values were invalid: Missing the key pk in the item", "when": { "flag": "--item", "value": "^(?!.*\"pk\")" }, "explain": "Every item must carry the table's partition key.", "fix": "Include \"pk\":{\"S\":\"...\"} in the item." }
+          ],
+          "verify": { "manual": true }
+        },
+        {
+          "id": "get",
+          "title": "Read it back by its key",
+          "body": "A get by key is the fastest read DynamoDB has: it goes straight to the item.",
+          "cli": "aws dynamodb get-item --table-name <table> --key '{\"pk\":{\"S\":\"order#1\"}}'",
+          "output": "{\n    \"Item\": {\n        \"pk\": { \"S\": \"order#1\" },\n        \"total\": { \"N\": \"42\" }\n    }\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "cleanup",
+          "title": "Tidy up",
+          "body": "Delete the table so nothing is left behind.",
+          "cli": "aws dynamodb delete-table --table-name <table>",
+          "output": "{\n    \"TableDescription\": {\n        \"TableName\": \"{{table}}\",\n        \"TableStatus\": \"DELETING\"\n    }\n}",
+          "cleanup": true,
+          "verify": { "check": "table-gone", "value": "table" }
+        }
+      ]
+    },
+    {
+      "id": "s3-first-bucket",
+      "title": "Your first S3 bucket",
+      "serviceId": "s3",
+      "level": 100,
+      "minutes": 15,
+      "simple": "Make a bucket, keep every version of a file, lock out the public, then tidy up.",
+      "costNote": "A tiny file and a handful of requests cost almost nothing, and the clean-up leaves nothing stored.",
+      "imported": true,
+      "source": { "title": "Getting started with Amazon S3 using the AWS CLI (AWS Developer Tutorials)", "url": "https://github.com/aws-samples/sample-developer-tutorials/tree/main/tuts/003-s3-gettingstarted", "repo": "https://github.com/aws-samples/sample-developer-tutorials", "license": "Apache-2.0", "attribution": "Amazon.com, Inc. or its affiliates" },
+      "steps": [
+        {
+          "id": "create",
+          "title": "Create the bucket",
+          "body": "Each bucket must have a globally unique name across all of AWS, such as amzn-s3-demo- plus random letters. In us-east-1 leave the location constraint out; in every other Region, name your Region in it.",
+          "cli": "aws s3api create-bucket --bucket <bucket> [--create-bucket-configuration LocationConstraint=<region>]",
+          "output": "{\n    \"Location\": \"http://{{bucket}}.s3.amazonaws.com/\"\n}",
+          "errors": [
+            { "code": "BucketAlreadyExists", "message": "An error occurred (BucketAlreadyExists) when calling the CreateBucket operation: The requested bucket name is not available. The bucket namespace is shared by all users of the system. Please select a different name and try again.", "when": { "flag": "--bucket", "value": "^(test|my-bucket|amzn-s3-demo-bucket)$" }, "explain": "Bucket names are shared by every AWS account in the world, and someone already has this one.", "fix": "Add something random to the name, like amzn-s3-demo-4f9c2a." },
+            { "code": "InvalidLocationConstraint", "message": "An error occurred (InvalidLocationConstraint) when calling the CreateBucket operation: The specified location constraint is not valid", "when": { "flag": "--create-bucket-configuration", "value": "LocationConstraint=us-east-1$" }, "explain": "us-east-1 is where buckets go by default, so it takes no location constraint.", "fix": "In us-east-1, leave out --create-bucket-configuration." },
+            { "code": "IllegalLocationConstraintException", "message": "An error occurred (IllegalLocationConstraintException) when calling the CreateBucket operation: The unspecified location constraint is incompatible for the region specific endpoint this request was sent to.", "explain": "Outside us-east-1, S3 needs to be told the bucket's Region.", "fix": "Add --create-bucket-configuration LocationConstraint= followed by your Region, for example eu-west-1." }
+          ],
+          "verify": { "check": "bucket-exists", "value": "bucket" }
+        },
+        {
+          "id": "versioning",
+          "title": "Turn on versioning",
+          "body": "With versioning on, S3 keeps every version of an object, so an overwrite or a delete can be undone. Turn it on before you upload.",
+          "cli": "aws s3api put-bucket-versioning --bucket <bucket> --versioning-configuration Status=Enabled",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "upload",
+          "title": "Upload a file",
+          "body": "Make a small file first (echo \"Hello, S3\" > sample.txt). S3 is a flat object store: a key with slashes only looks like a folder. Note the VersionId in the answer.",
+          "cli": "aws s3api put-object --bucket <bucket> --key sample.txt --body sample.txt",
+          "output": "{\n    \"ETag\": \"\\\"5d41402abc4b2a76b9719d911017c592\\\"\",\n    \"VersionId\": \"3HL4kqtJlcpXroDTDmJ.rmSpXd3dIbrHY\"\n}",
+          "errors": [
+            { "code": "NoSuchBucket", "message": "An error occurred (NoSuchBucket) when calling the PutObject operation: The specified bucket does not exist", "explain": "The bucket name doesn't match one you own, or it was made in another Region.", "fix": "Copy the exact name from the first step." }
+          ],
+          "verify": { "manual": true }
+        },
+        {
+          "id": "download",
+          "title": "Download it again",
+          "body": "get-object saves the object to the file you name at the end.",
+          "cli": "aws s3api get-object --bucket <bucket> --key sample.txt downloaded-sample.txt",
+          "output": "{\n    \"AcceptRanges\": \"bytes\",\n    \"ContentLength\": 10,\n    \"ETag\": \"\\\"5d41402abc4b2a76b9719d911017c592\\\"\",\n    \"VersionId\": \"3HL4kqtJlcpXroDTDmJ.rmSpXd3dIbrHY\",\n    \"ContentType\": \"binary/octet-stream\"\n}",
+          "errors": [
+            { "code": "NoSuchKey", "message": "An error occurred (NoSuchKey) when calling the GetObject operation: The specified key does not exist.", "when": { "flag": "--key", "value": "^(?!sample\\.txt$)" }, "explain": "There's no object under that key. Keys are exact, including capitals.", "fix": "Use the key you uploaded: sample.txt." }
+          ],
+          "verify": { "manual": true }
+        },
+        {
+          "id": "block",
+          "title": "Block public access",
+          "body": "Turn on all four Block Public Access settings, so no policy or access list can ever make this bucket public.",
+          "cli": "aws s3api put-public-access-block --bucket <bucket> --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "delete-version",
+          "title": "Delete the file's version",
+          "body": "In a versioned bucket a plain delete only adds a delete marker; the old version stays. Delete the version itself by its id (from the upload, or aws s3api list-object-versions).",
+          "cli": "aws s3api delete-object --bucket <bucket> --key sample.txt --version-id <version>",
+          "output": "{\n    \"VersionId\": \"{{version}}\"\n}",
+          "cleanup": true,
+          "verify": { "manual": true }
+        },
+        {
+          "id": "cleanup",
+          "title": "Delete the bucket",
+          "body": "A bucket can only be deleted once every object version and delete marker is gone.",
+          "cli": "aws s3api delete-bucket --bucket <bucket>",
+          "output": "",
+          "errors": [
+            { "code": "BucketNotEmpty", "message": "An error occurred (BucketNotEmpty) when calling the DeleteBucket operation: The bucket you tried to delete is not empty. You must delete all versions in the bucket.", "explain": "Something is still inside: an object, an old version or a delete marker.", "fix": "List what's left with aws s3api list-object-versions, delete each with --version-id, then try again." }
+          ],
+          "cleanup": true,
+          "verify": { "check": "bucket-gone", "value": "bucket" }
+        }
+      ]
+    },
+    {
+      "id": "ec2-first-instance",
+      "title": "Your first EC2 instance",
+      "serviceId": "ec2",
+      "level": 100,
+      "minutes": 25,
+      "simple": "Launch a small, locked-down server, give it a name, stop it, then delete it for good.",
+      "costNote": "About $0.01 to $0.02 if you finish within the hour (t2.micro is Free Tier eligible). Terminate it at the end so nothing keeps running.",
+      "imported": true,
+      "source": { "title": "Getting started with Amazon EC2 using the AWS CLI (AWS Developer Tutorials)", "url": "https://github.com/aws-samples/sample-developer-tutorials/tree/main/tuts/013-ec2-basics", "repo": "https://github.com/aws-samples/sample-developer-tutorials", "license": "Apache-2.0", "attribution": "Amazon.com, Inc. or its affiliates" },
+      "steps": [
+        {
+          "id": "key",
+          "title": "Create a key pair",
+          "body": "AWS shows the private key only once, so save it to a file. SSH requires that private key files are not readable by others: run chmod 400 on it afterwards.",
+          "cli": "aws ec2 create-key-pair --key-name <key> --query KeyMaterial --output text > <key>.pem",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "sg",
+          "title": "Create a security group",
+          "body": "A security group is the instance's firewall. A new one lets nothing in. Note the group id it prints.",
+          "cli": "aws ec2 create-security-group --group-name <group-name> --description <description> --query GroupId --output text",
+          "output": "sg-0abcd1234example",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "ssh",
+          "title": "Let in SSH from your address only",
+          "body": "Find your public address (curl -s http://checkip.amazonaws.com), then allow port 22 from it alone: /32 means exactly one address.",
+          "cli": "aws ec2 authorize-security-group-ingress --group-id <group> --protocol tcp --port 22 --cidr <my-ip>/32",
+          "output": "{\n    \"Return\": true,\n    \"SecurityGroupRules\": [\n        {\n            \"IpProtocol\": \"tcp\",\n            \"FromPort\": 22,\n            \"ToPort\": 22,\n            \"CidrIpv4\": \"{{my-ip}}/32\"\n        }\n    ]\n}",
+          "errors": [
+            { "code": "0.0.0.0/0", "message": "Practice terminal: stopped. 0.0.0.0/0 would let anyone on the internet try to sign in over SSH.", "when": { "flag": "--cidr", "value": "^0\\.0\\.0\\.0/0$" }, "explain": "A /0 range means every address there is. SSH open to the world is one of the first things attackers look for.", "fix": "Use your own address with /32." }
+          ],
+          "verify": { "manual": true }
+        },
+        {
+          "id": "ami",
+          "title": "Find the latest Amazon Linux image",
+          "body": "AWS publishes the newest Amazon Linux 2023 image id as a public Systems Manager parameter, so you never hard-code an image id that goes stale.",
+          "cli": "aws ssm get-parameter --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 --query Parameter.Value --output text",
+          "output": "ami-0abcdef1234567890",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "launch",
+          "title": "Launch it, locked down",
+          "body": "HttpTokens=required enforces IMDSv2, which protects against SSRF attacks; Encrypted=true encrypts its disk. Note the InstanceId, then wait with aws ec2 wait instance-running.",
+          "cli": "aws ec2 run-instances --image-id <ami> --instance-type t2.micro --key-name <key> --security-group-ids <group> --metadata-options HttpTokens=required,HttpEndpoint=enabled --block-device-mappings \"DeviceName=/dev/xvda,Ebs={Encrypted=true}\" --count 1",
+          "output": "{\n    \"Instances\": [\n        {\n            \"InstanceId\": \"i-0abcd1234example\",\n            \"InstanceType\": \"t2.micro\",\n            \"State\": { \"Code\": 0, \"Name\": \"pending\" },\n            \"MetadataOptions\": { \"HttpTokens\": \"required\", \"HttpEndpoint\": \"enabled\" }\n        }\n    ]\n}",
+          "errors": [
+            { "code": "HttpTokens=optional", "message": "Practice terminal: stopped. HttpTokens=optional still allows the older IMDSv1.", "when": { "flag": "--metadata-options", "value": "HttpTokens=optional" }, "explain": "HttpTokens=required enforces IMDSv2, which provides additional protection against SSRF attacks.", "fix": "Use --metadata-options HttpTokens=required,HttpEndpoint=enabled." },
+            { "code": "UnauthorizedOperation", "message": "An error occurred (UnauthorizedOperation) when calling the RunInstances operation: You are not authorized to perform this operation.", "explain": "Your identity isn't allowed to launch instances, or not this type or image.", "fix": "Ask your account admin for ec2:RunInstances, or use a sandbox account." }
+          ],
+          "verify": { "manual": true }
+        },
+        {
+          "id": "name",
+          "title": "Give it a name",
+          "body": "A Name tag is how you, and the city, find the instance later. Use the InstanceId from the last step.",
+          "cli": "aws ec2 create-tags --resources <instance> --tags Key=Name,Value=<name>",
+          "output": "",
+          "verify": { "check": "instance-running", "value": "name" }
+        },
+        {
+          "id": "stop",
+          "title": "Stop it",
+          "body": "A stopped instance stays in your account without compute charges (its disk still costs a little). Started again, it gets a new public address.",
+          "cli": "aws ec2 stop-instances --instance-ids <instance>",
+          "output": "{\n    \"StoppingInstances\": [\n        {\n            \"InstanceId\": \"{{instance}}\",\n            \"CurrentState\": { \"Code\": 64, \"Name\": \"stopping\" },\n            \"PreviousState\": { \"Code\": 16, \"Name\": \"running\" }\n        }\n    ]\n}",
+          "verify": { "check": "instance-stopped", "value": "instance" }
+        },
+        {
+          "id": "cleanup",
+          "title": "Terminate and tidy up",
+          "body": "Terminating deletes the instance for good. Once aws ec2 wait instance-terminated returns, delete the group (aws ec2 delete-security-group --group-id ...) and the key pair (aws ec2 delete-key-pair --key-name ...).",
+          "cli": "aws ec2 terminate-instances --instance-ids <instance>",
+          "output": "{\n    \"TerminatingInstances\": [\n        {\n            \"InstanceId\": \"{{instance}}\",\n            \"CurrentState\": { \"Code\": 32, \"Name\": \"shutting-down\" },\n            \"PreviousState\": { \"Code\": 80, \"Name\": \"stopped\" }\n        }\n    ]\n}",
+          "cleanup": true,
+          "verify": { "check": "instance-gone", "value": "instance" }
+        }
+      ]
+    },
+    {
+      "id": "durable-first-function",
+      "title": "Your first durable function",
+      "serviceId": "lambda",
+      "level": 200,
+      "minutes": 25,
+      "talk": "durable-functions",
+      "simple": "Build a Lambda function that saves its progress, sleeps without paying, and picks up where it left off.",
+      "costNote": "A few short runs cost a fraction of a cent, and the wait itself uses no compute. It needs iam:CreateRole, which some sandbox accounts deny.",
+      "imported": true,
+      "source": { "title": "Lambda durable functions quickstart (AWS Durable Execution docs)", "url": "https://github.com/aws/aws-durable-execution-docs/blob/main/docs/getting-started/quickstart.md", "repo": "https://github.com/aws/aws-durable-execution-docs", "license": "Apache-2.0", "attribution": "Amazon.com, Inc. or its affiliates" },
+      "steps": [
+        {
+          "id": "role",
+          "title": "Give the function a role",
+          "body": "Create durable-function-role with a trust policy for lambda.amazonaws.com (aws iam create-role), then attach the managed policy that lets it save checkpoints and read its own state.",
+          "cli": "aws iam attach-role-policy --role-name <role> --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicDurableExecutionRolePolicy",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "code",
+          "title": "Write the function",
+          "body": "In lambda_function.py, a @durable_step returns a greeting. The handler runs it with context.step(), then context.wait() pauses for 10 seconds without using compute. It could as easily be 10 days. Zip it with the SDK as function.zip.",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "create",
+          "title": "Create it as durable",
+          "body": "Durable execution can only be turned on when a function is created, never added later. ExecutionTimeout caps the whole run; RetentionPeriodInDays is how long its history is kept afterwards.",
+          "cli": "aws lambda create-function --function-name <function> --runtime python3.14 --role <role-arn> --handler lambda_function.lambda_handler --zip-file fileb://function.zip --durable-config '{\"ExecutionTimeout\": 900, \"RetentionPeriodInDays\": 1}'",
+          "output": "{\n    \"FunctionName\": \"{{function}}\",\n    \"Runtime\": \"python3.14\",\n    \"State\": \"Pending\",\n    \"DurableConfig\": { \"ExecutionTimeout\": 900, \"RetentionPeriodInDays\": 1 }\n}",
+          "errors": [
+            { "code": "InvalidParameterValueException", "message": "An error occurred (InvalidParameterValueException) when calling the CreateFunction operation", "when": { "flag": "--durable-config", "value": "^(?![\\s\\S]*ExecutionTimeout)" }, "explain": "A durable configuration must say how long a run may last: ExecutionTimeout is required.", "fix": "Add \"ExecutionTimeout\": 900 to --durable-config." }
+          ],
+          "verify": { "check": "function-exists", "value": "function" }
+        },
+        {
+          "id": "publish",
+          "title": "Publish a version",
+          "body": "Invoke durable functions through a version or alias, so a replay always runs the same code that started the execution.",
+          "cli": "aws lambda publish-version --function-name <function>",
+          "output": "{\n    \"FunctionName\": \"{{function}}\",\n    \"Version\": \"1\"\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "invoke",
+          "title": "Run it",
+          "body": "The function runs its step, pauses 10 seconds, resumes and returns. A synchronous call waits for the result (up to 15 minutes). Add --durable-execution-name to make the run safe to retry.",
+          "cli": "aws lambda invoke --function-name <function>:1 --cli-binary-format raw-in-base64-out --payload '{}' [--durable-execution-name <execution>] response.json",
+          "output": "{\n    \"StatusCode\": 200,\n    \"ExecutedVersion\": \"1\"\n}",
+          "errors": [
+            { "code": "qualified", "message": "Practice terminal: stopped. A durable function must be invoked with a version, an alias or $LATEST, for example my-function:1.", "when": { "flag": "--function-name", "value": "^[^:]+$" }, "explain": "An execution is pinned to the version that started it. Without a qualifier Lambda can't tell which code to replay.", "fix": "Add :1, the version you just published, to the function name." },
+            { "code": "DurableExecutionAlreadyStartedException", "message": "An error occurred (DurableExecutionAlreadyStartedException) when calling the Invoke operation", "explain": "Execution names are idempotency keys. This name was already used with a different payload.", "fix": "Reuse a name only with the same payload (you get the existing run back), or pick a new name." }
+          ],
+          "verify": { "manual": true }
+        },
+        {
+          "id": "list",
+          "title": "See its executions",
+          "body": "Each run is a durable execution with its own ARN and status. aws lambda get-durable-execution-history --durable-execution-arn ... shows every step it took.",
+          "cli": "aws lambda list-durable-executions-by-function --function-name <function>",
+          "output": "{\n    \"DurableExecutions\": [\n        {\n            \"DurableExecutionArn\": \"arn:aws:lambda:us-east-2:111122223333:function:{{function}}:1/durable-execution/demo/1a2b3c4d\",\n            \"DurableExecutionName\": \"demo\",\n            \"Status\": \"SUCCEEDED\"\n        }\n    ]\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "cleanup",
+          "title": "Tidy up",
+          "body": "Delete the function, then detach the policy (aws iam detach-role-policy) and delete the role (aws iam delete-role --role-name durable-function-role).",
+          "cli": "aws lambda delete-function --function-name <function>",
+          "output": "",
+          "cleanup": true,
+          "verify": { "check": "function-gone", "value": "function" }
+        }
+      ]
+    },
+    {
+      "id": "lmi-capacity-provider",
+      "title": "Lambda on Managed Instances",
+      "serviceId": "lambda",
+      "level": 300,
+      "minutes": 30,
+      "talk": "lambda-managed-instances",
+      "simple": "Give Lambda a fleet of EC2 servers in your own network, run a function on them, then take it all down.",
+      "costNote": "Not free: publishing a version starts 3 EC2 instances and 3 execution environments, billed at the EC2 price plus a 15% fee for as long as the version is active. Clean up straight after.",
+      "imported": false,
+      "source": { "title": "Getting started with Lambda Managed Instances (AWS Lambda Developer Guide)", "url": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances-getting-started.html" },
+      "steps": [
+        {
+          "id": "provider",
+          "title": "Create a capacity provider",
+          "body": "It needs two or more private subnets in your VPC and an operator role with the AWSLambdaManagedEC2ResourceOperator policy, which Lambda uses to run the instances. The capacity provider is the security boundary.",
+          "cli": "aws lambda create-capacity-provider --capacity-provider-name <provider> --vpc-config SubnetIds=<subnet-a>,<subnet-b>,SecurityGroupIds=<group> --permissions-config CapacityProviderOperatorRoleArn=<operator-role-arn> --instance-requirements Architectures=x86_64 --capacity-provider-scaling-config MaxVCpuCount=30",
+          "output": "{\n    \"CapacityProvider\": {\n        \"CapacityProviderArn\": \"arn:aws:lambda:us-east-1:111122223333:capacity-provider:{{provider}}\",\n        \"State\": \"Pending\"\n    }\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "function",
+          "title": "Create a function on it",
+          "body": "A Managed Instances function needs at least 2 GB (2,048 MB) and 1 vCPU. One execution environment then serves many requests at once.",
+          "cli": "aws lambda create-function --function-name <function> --runtime python3.13 --handler lambda_function.lambda_handler --zip-file fileb://function.zip --role <role-arn> --architectures x86_64 --memory-size 2048 --capacity-provider-config LambdaManagedInstancesCapacityProviderConfig={CapacityProviderArn=<provider-arn>}",
+          "output": "{\n    \"FunctionName\": \"{{function}}\",\n    \"MemorySize\": 2048,\n    \"State\": \"Pending\"\n}",
+          "errors": [
+            { "code": "MemorySize", "message": "Practice terminal: stopped. A Managed Instances function needs at least 2,048 MB of memory.", "when": { "flag": "--memory-size", "value": "^([0-9]{1,3}|1[0-9]{3}|20[0-3][0-9]|204[0-7])$"}, "explain": "The smallest execution environment on Managed Instances is 2 GB with 1 vCPU.", "fix": "Use --memory-size 2048 or more." }
+          ],
+          "verify": { "check": "function-exists", "value": "function" }
+        },
+        {
+          "id": "publish",
+          "title": "Publish a version",
+          "body": "Publishing is what starts the fleet: 3 instances and 3 execution environments, spread across Availability Zones. From here on you're paying, and there are no cold starts.",
+          "cli": "aws lambda publish-version --function-name <function>",
+          "output": "{\n    \"FunctionName\": \"{{function}}\",\n    \"Version\": \"1\",\n    \"State\": \"Pending\"\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "scaling",
+          "title": "Set how far it scales",
+          "body": "It scales on CPU use, in the background, between a minimum and a maximum number of execution environments. It never scales to zero, so keep the minimum low while you learn.",
+          "cli": "aws lambda put-function-scaling-config --function-name <function> --qualifier '$LATEST.PUBLISHED' --function-scaling-config MinExecutionEnvironments=3,MaxExecutionEnvironments=6",
+          "output": "{\n    \"FunctionState\": \"Active\"\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "cleanup-function",
+          "title": "Delete the function",
+          "body": "Deleting the function removes its versions, which stops the instances working for it.",
+          "cli": "aws lambda delete-function --function-name <function>",
+          "output": "",
+          "cleanup": true,
+          "verify": { "check": "function-gone", "value": "function" }
+        },
+        {
+          "id": "cleanup-provider",
+          "title": "Delete the capacity provider",
+          "body": "A capacity provider can't be deleted while function versions are attached, which is why the function goes first.",
+          "cli": "aws lambda delete-capacity-provider --capacity-provider-name <provider>",
+          "output": "{\n    \"CapacityProvider\": {\n        \"CapacityProviderArn\": \"arn:aws:lambda:us-east-1:111122223333:capacity-provider:{{provider}}\",\n        \"State\": \"Deleting\"\n    }\n}",
+          "cleanup": true,
+          "verify": { "manual": true }
+        }
+      ]
+    },
+    {
+      "id": "saas-tenant-isolation",
+      "title": "Keep tenants apart",
+      "serviceId": "iam",
+      "level": 300,
+      "minutes": 25,
+      "talk": "multi-tenant-saas",
+      "simple": "Put two customers in one table, then prove one customer's keys can't open the other's rows.",
+      "costNote": "An on-demand table and a few requests cost almost nothing. You need an existing role you may assume that can read the table: this workshop creates no roles.",
+      "imported": false,
+      "source": { "title": "AWS Serverless SaaS Workshop", "url": "https://catalog.us-east-1.prod.workshops.aws/v2/workshops/b0c6ad36-0a4b-45d8-856b-8a64f0ac76bb/en-US" },
+      "steps": [
+        {
+          "id": "table",
+          "title": "Make one pooled table",
+          "body": "In the pool model every tenant shares one table, so the tenant id leads every key: tenantId is the partition key and sk the sort key. Wait for it with aws dynamodb wait table-exists.",
+          "cli": "aws dynamodb create-table --table-name <table> --attribute-definitions AttributeName=tenantId,AttributeType=S AttributeName=sk,AttributeType=S --key-schema AttributeName=tenantId,KeyType=HASH AttributeName=sk,KeyType=RANGE --billing-mode PAY_PER_REQUEST",
+          "output": "{\n    \"TableDescription\": {\n        \"TableName\": \"{{table}}\",\n        \"TableStatus\": \"CREATING\",\n        \"BillingModeSummary\": { \"BillingMode\": \"PAY_PER_REQUEST\" }\n    }\n}",
+          "errors": [
+            { "code": "ValidationException", "message": "An error occurred (ValidationException) when calling the CreateTable operation: No provisioned throughput specified for the table", "when": { "missing": "--billing-mode" }, "explain": "Without a billing mode the table is provisioned, and provisioned tables need read and write capacity numbers.", "fix": "Add --billing-mode PAY_PER_REQUEST." }
+          ],
+          "verify": { "check": "table-exists", "value": "table" }
+        },
+        {
+          "id": "tenant-a",
+          "title": "Add tenant A's invoice",
+          "body": "Every item carries its tenant in the key.",
+          "cli": "aws dynamodb put-item --table-name <table> --item '{\"tenantId\":{\"S\":\"tenant-a\"},\"sk\":{\"S\":\"invoice#1\"},\"total\":{\"N\":\"40\"}}'",
+          "output": "",
+          "errors": [
+            { "code": "One or more parameter values were invalid", "message": "An error occurred (ValidationException) when calling the PutItem operation: One or more parameter values were invalid: Missing the key tenantId in the item", "when": { "flag": "--item", "value": "^(?!.*\"tenantId\")" }, "explain": "In a pooled table every item must carry the tenant id, its partition key.", "fix": "Include \"tenantId\":{\"S\":\"tenant-a\"} in the item." }
+          ],
+          "verify": { "manual": true }
+        },
+        {
+          "id": "tenant-b",
+          "title": "Add tenant B's invoice",
+          "body": "Same table, same shape, different tenant.",
+          "cli": "aws dynamodb put-item --table-name <table> --item '{\"tenantId\":{\"S\":\"tenant-b\"},\"sk\":{\"S\":\"invoice#1\"},\"total\":{\"N\":\"95\"}}'",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "policy",
+          "title": "Write tenant A's session policy",
+          "body": "Save tenant-a.json: allow dynamodb:GetItem and dynamodb:Query on the table, with a ForAllValues:StringEquals condition on dynamodb:LeadingKeys set to tenant-a. A session policy can only narrow a role, never widen it.",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "assume",
+          "title": "Borrow a role as tenant A",
+          "body": "Use a role you may assume that can read the table. The session gets only what both the role and your policy allow. Put the three returned values in AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_SESSION_TOKEN.",
+          "cli": "aws sts assume-role --role-arn <role-arn> --role-session-name <session> --policy file://tenant-a.json",
+          "output": "{\n    \"Credentials\": {\n        \"AccessKeyId\": \"ASIAIOSFODNN7EXAMPLE\",\n        \"SecretAccessKey\": \"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\",\n        \"SessionToken\": \"IQoJb3JpZ2luX2VjEXAMPLE\",\n        \"Expiration\": \"2026-10-17T13:00:00Z\"\n    },\n    \"AssumedRoleUser\": {\n        \"Arn\": \"arn:aws:sts::111122223333:assumed-role/TenantRole/{{session}}\"\n    }\n}",
+          "errors": [
+            { "code": "AccessDenied", "message": "An error occurred (AccessDenied) when calling the AssumeRole operation: User: arn:aws:iam::111122223333:user/learner is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::111122223333:role/TenantRole", "explain": "The role's trust policy doesn't name you, or you lack sts:AssumeRole for it.", "fix": "Pick a role that trusts your identity, or ask your account admin." }
+          ],
+          "verify": { "manual": true }
+        },
+        {
+          "id": "read",
+          "title": "Read yours, then try theirs",
+          "body": "As tenant A, read tenant A's invoice: it works. Now change tenant-a to tenant-b in the key and run it again. The code asked; IAM said no.",
+          "cli": "aws dynamodb get-item --table-name <table> --key '{\"tenantId\":{\"S\":\"tenant-a\"},\"sk\":{\"S\":\"invoice#1\"}}'",
+          "output": "{\n    \"Item\": {\n        \"tenantId\": { \"S\": \"tenant-a\" },\n        \"sk\": { \"S\": \"invoice#1\" },\n        \"total\": { \"N\": \"40\" }\n    }\n}",
+          "errors": [
+            { "code": "AccessDeniedException", "message": "An error occurred (AccessDeniedException) when calling the GetItem operation: User: arn:aws:sts::111122223333:assumed-role/TenantRole/tenant-a-session is not authorized to perform: dynamodb:GetItem on resource: arn:aws:dynamodb:us-east-1:111122223333:table/city-tenants because no session policy allows the dynamodb:GetItem action", "when": { "flag": "--key", "value": "tenant-b" }, "explain": "The session policy only allows keys that start with tenant-a. Even if a bug asks for tenant B's row, IAM refuses.", "fix": "Nothing to fix: this is tenant isolation working. Each request runs with its own tenant's credentials." }
+          ],
+          "verify": { "manual": true }
+        },
+        {
+          "id": "cleanup",
+          "title": "Tidy up",
+          "body": "Unset the three variables to go back to your own identity, then delete the table.",
+          "cli": "aws dynamodb delete-table --table-name <table>",
+          "output": "{\n    \"TableDescription\": {\n        \"TableName\": \"{{table}}\",\n        \"TableStatus\": \"DELETING\"\n    }\n}",
+          "cleanup": true,
+          "verify": { "check": "table-gone", "value": "table" }
+        }
+      ]
+    },
+    {
+      "id": "security-agent-pentest",
+      "title": "A safe first pen test",
+      "serviceId": "securityagent",
+      "level": 200,
+      "minutes": 30,
+      "simple": "Set up a fair, safe practice attack on an app you own, then read what the agent found.",
+      "costNote": "Pen testing costs $50 per task-hour, metered by the second; an average test is about 24 task-hours (about $1,200). It runs in a limited set of Regions. Only ever test apps you own.",
+      "imported": true,
+      "source": { "title": "AWS Security Services Best Practices: AWS Security Agent", "url": "https://github.com/aws/aws-security-services-best-practices/blob/main/docs/en/guides/security-agent/index.md", "repo": "https://github.com/aws/aws-security-services-best-practices", "license": "MIT-0", "attribution": "Amazon.com, Inc. or its affiliates" },
+      "steps": [
+        {
+          "id": "space",
+          "title": "Create an agent space",
+          "body": "An agent space is a dedicated workspace for securing one application or project: its reviews, pen test settings, results and findings. Create one agent space per application or project, named by application and environment.",
+          "consolePath": "securityagent/home",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "list-spaces",
+          "title": "Find it from the CLI",
+          "body": "A read-only look at your agent spaces. Note the agentSpaceId: scripts and schedules use it.",
+          "cli": "aws securityagent list-agent-spaces",
+          "output": "{\n    \"agentSpaceSummaries\": [\n        {\n            \"agentSpaceId\": \"a1b2c3d4-5678-90ab-cdef-EXAMPLE11111\",\n            \"name\": \"shop-preprod\"\n        }\n    ]\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "domain",
+          "title": "Prove you own the domain",
+          "body": "AWS Security Agent will only test domains you have proven you own. Add the DNS TXT record it gives you (one click if the domain is in Route 53 in the same account) or expose an HTTP route. Sub-domains are covered.",
+          "consolePath": "securityagent/home",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "scope",
+          "title": "Set target and accessible URLs",
+          "body": "Target URLs are the verified domains the agent may test. Accessible URLs are ones it must reach to sign in or navigate, but must not test. List every domain in the sign-in redirect chain, or the test stalls.",
+          "consolePath": "securityagent/home",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "exclude",
+          "title": "Keep destructive paths out",
+          "body": "Exclude URLs that trigger destructive or irreversible operations: bulk deletes, payment capture, email or SMS sends, password resets, email or username changes. Everything nested under an excluded path is skipped too.",
+          "consolePath": "securityagent/home",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "run",
+          "title": "Run it against pre-production",
+          "body": "Run tests against a pre-production environment that closely mirrors production, signed in with least-privilege test credentials. Runs are non-deterministic, so run more than once and combine the findings.",
+          "consolePath": "securityagent/home",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "list-tests",
+          "title": "List your tests",
+          "body": "Another read-only look: the pen tests in your agent space.",
+          "cli": "aws securityagent list-pentests --agent-space-id <space>",
+          "output": "{\n    \"pentestSummaries\": [\n        {\n            \"pentestId\": \"f0e1d2c3-b4a5-6789-0abc-EXAMPLE22222\",\n            \"agentSpaceId\": \"{{space}}\",\n            \"title\": \"shop-preprod first test\"\n        }\n    ]\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "findings",
+          "title": "Read the findings",
+          "body": "Each finding is confirmed by exploiting it and comes with a CVSS score, an application-specific severity, reproduction steps and the impact. Prioritise by severity and impact, fix at the source, then retest.",
+          "consolePath": "securityagent/home",
+          "verify": { "manual": true }
+        }
+      ]
+    },
+    {
+      "id": "rds-first-database",
+      "title": "Your first RDS database",
+      "serviceId": "rds",
+      "level": 100,
+      "minutes": 25,
+      "simple": "Start a small private PostgreSQL database, find its address, then delete it so it stops billing.",
+      "costNote": "Not free while it runs: db.t4g.micro bills by the hour with its 20 GB of storage. Free Tier accounts from before July 15, 2025 get 750 single-AZ hours a month; newer accounts spend Free Tier credits. Delete it at the end.",
+      "imported": false,
+      "source": { "title": "Creating your first Amazon RDS DB instance (Amazon RDS Getting Started Guide)", "url": "https://docs.aws.amazon.com/AmazonRDS/latest/gettingstartedguide/create-instance-overview.html" },
+      "steps": [
+        {
+          "id": "create",
+          "title": "Create the database",
+          "body": "A small PostgreSQL instance with 20 GB of storage. RDS keeps the password in Secrets Manager for you, encrypts the storage, and --no-publicly-accessible gives it no public address.",
+          "cli": "aws rds create-db-instance --db-instance-identifier <db> --engine postgres --db-instance-class db.t4g.micro --allocated-storage 20 --master-username <user> --manage-master-user-password --storage-encrypted --no-publicly-accessible --backup-retention-period 1",
+          "consolePath": "rds/home",
+          "output": "{\n    \"DBInstance\": {\n        \"DBInstanceIdentifier\": \"{{db}}\",\n        \"DBInstanceClass\": \"db.t4g.micro\",\n        \"Engine\": \"postgres\",\n        \"DBInstanceStatus\": \"creating\",\n        \"MasterUsername\": \"{{user}}\",\n        \"PubliclyAccessible\": false,\n        \"StorageEncrypted\": true\n    }\n}",
+          "errors": [
+            { "code": "PubliclyAccessible", "message": "Practice terminal: stopped. Add --no-publicly-accessible so the database gets no public address.", "when": { "missing": "--no-publicly-accessible" }, "explain": "A database with a public address can be reached from the internet whenever its security group allows it.", "fix": "Add --no-publicly-accessible, and connect from inside the VPC (or through CloudShell in the VPC)." }
+          ],
+          "verify": { "manual": true }
+        },
+        {
+          "id": "wait",
+          "title": "Wait until it is available",
+          "body": "Creating a database takes several minutes. The waiter checks for you and returns, printing nothing, once the status is available.",
+          "cli": "aws rds wait db-instance-available --db-instance-identifier <db>",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "describe",
+          "title": "Find its address",
+          "body": "Look for Endpoint.Address and Port: that's what an app connects to. MasterUserSecret names the Secrets Manager secret that holds the password.",
+          "cli": "aws rds describe-db-instances --db-instance-identifier <db>",
+          "consolePath": "rds/home",
+          "output": "{\n    \"DBInstances\": [\n        {\n            \"DBInstanceIdentifier\": \"{{db}}\",\n            \"DBInstanceStatus\": \"available\",\n            \"Endpoint\": { \"Address\": \"{{db}}.abcdefghijkl.us-east-1.rds.amazonaws.com\", \"Port\": 5432 },\n            \"MasterUserSecret\": { \"SecretStatus\": \"active\" }\n        }\n    ]\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "backups",
+          "title": "Keep a week of backups",
+          "body": "Automated backups let you restore to any second inside the retention window. Seven days is a common choice; --apply-immediately makes the change now instead of in the next maintenance window.",
+          "cli": "aws rds modify-db-instance --db-instance-identifier <db> --backup-retention-period 7 --apply-immediately",
+          "output": "{\n    \"DBInstance\": {\n        \"DBInstanceIdentifier\": \"{{db}}\",\n        \"BackupRetentionPeriod\": 7,\n        \"DBInstanceStatus\": \"modifying\"\n    }\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "delete",
+          "title": "Delete the database",
+          "body": "For practice we skip the final snapshot and remove the automated backups too. For real data, give --final-db-snapshot-identifier instead, so a last backup is kept.",
+          "cli": "aws rds delete-db-instance --db-instance-identifier <db> --skip-final-snapshot --delete-automated-backups",
+          "consolePath": "rds/home",
+          "output": "{\n    \"DBInstance\": {\n        \"DBInstanceIdentifier\": \"{{db}}\",\n        \"DBInstanceStatus\": \"deleting\"\n    }\n}",
+          "errors": [
+            { "code": "SkipFinalSnapshot", "message": "Practice terminal: stopped. Without --skip-final-snapshot, RDS needs --final-db-snapshot-identifier to name a last backup.", "when": { "missing": "--skip-final-snapshot" }, "explain": "Deleting a database either keeps a final snapshot, which you name, or skips it on purpose.", "fix": "Add --skip-final-snapshot for this practice database." }
+          ],
+          "cleanup": true,
+          "verify": { "manual": true }
+        },
+        {
+          "id": "gone",
+          "title": "Check it is gone",
+          "body": "The waiter returns once the database is fully deleted. From then on it costs nothing.",
+          "cli": "aws rds wait db-instance-deleted --db-instance-identifier <db>",
+          "output": "",
+          "cleanup": true,
+          "verify": { "manual": true }
+        }
+      ]
+    },
+    {
+      "id": "cloudfront-s3-oac",
+      "title": "A private bucket behind CloudFront",
+      "serviceId": "cloudfront",
+      "level": 200,
+      "minutes": 30,
+      "simple": "Keep files in a private bucket that only your CloudFront distribution can read, using Origin Access Control.",
+      "costNote": "A few test requests on pay-as-you-go pricing cost pennies at most, and one small file in S3 a fraction of a cent. Disable and delete the distribution at the end.",
+      "imported": false,
+      "source": { "title": "Restrict access to an Amazon S3 origin (Amazon CloudFront Developer Guide)", "url": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html" },
+      "steps": [
+        {
+          "id": "bucket",
+          "title": "Create a private bucket",
+          "body": "New buckets block public access by default, and that stays on: visitors will never read the bucket directly. Bucket names are unique across all of AWS.",
+          "cli": "aws s3api create-bucket --bucket <bucket> --region us-east-1",
+          "consolePath": "s3/home",
+          "output": "{\n    \"Location\": \"/{{bucket}}\"\n}",
+          "verify": { "check": "bucket-exists", "value": "bucket" }
+        },
+        {
+          "id": "upload",
+          "title": "Upload a page",
+          "body": "Make a one-line index.html first (echo \"<h1>Hello</h1>\" > index.html), then copy it into the bucket.",
+          "cli": "aws s3 cp index.html s3://<bucket>/index.html",
+          "output": "upload: ./index.html to s3://{{bucket}}/index.html",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "oac",
+          "title": "Create the origin access control",
+          "body": "The origin access control makes CloudFront sign every request it sends to S3 (SigV4), so the bucket can tell CloudFront apart from everyone else. Note the Id it returns.",
+          "cli": "aws cloudfront create-origin-access-control --origin-access-control-config Name=<oac-name>,SigningProtocol=sigv4,SigningBehavior=always,OriginAccessControlOriginType=s3",
+          "consolePath": "cloudfront/v4/home",
+          "output": "{\n    \"OriginAccessControl\": {\n        \"Id\": \"E2QWRUHEXAMPLE\",\n        \"OriginAccessControlConfig\": {\n            \"Name\": \"{{oac-name}}\",\n            \"SigningProtocol\": \"sigv4\",\n            \"SigningBehavior\": \"always\",\n            \"OriginAccessControlOriginType\": \"s3\"\n        }\n    }\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "distribution",
+          "title": "Create the distribution",
+          "body": "distribution.json names the bucket's REST endpoint (your-bucket.s3.us-east-1.amazonaws.com) as the origin, with the OAC Id in OriginAccessControlId, index.html as the default root object and redirect-to-https. Note the Id and ARN.",
+          "cli": "aws cloudfront create-distribution --distribution-config file://distribution.json",
+          "consolePath": "cloudfront/v4/home",
+          "output": "{\n    \"Distribution\": {\n        \"Id\": \"EDFDVBD6EXAMPLE\",\n        \"ARN\": \"arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE\",\n        \"Status\": \"InProgress\",\n        \"DomainName\": \"d111111abcdef8.cloudfront.net\"\n    }\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "policy",
+          "title": "Let only your distribution read",
+          "body": "policy.json allows the cloudfront.amazonaws.com service principal s3:GetObject on the bucket, only when AWS:SourceArn is your distribution ARN. No other distribution and no visitor can read it.",
+          "cli": "aws s3api put-bucket-policy --bucket <bucket> --policy file://policy.json",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "deployed",
+          "title": "Wait for it to deploy",
+          "body": "A new distribution takes a few minutes to reach the edge. When the waiter returns, open https:// and the DomainName in a browser: the page loads through CloudFront, while the bucket URL itself is still denied.",
+          "cli": "aws cloudfront wait distribution-deployed --id <distribution-id>",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "delete",
+          "title": "Delete the distribution",
+          "body": "A distribution must be disabled before it can be deleted: disable it in the console (or with update-distribution) and wait until it is deployed again. Then delete it with the ETag from get-distribution.",
+          "cli": "aws cloudfront delete-distribution --id <distribution-id> --if-match <etag>",
+          "consolePath": "cloudfront/v4/home",
+          "output": "",
+          "cleanup": true,
+          "verify": { "manual": true }
+        },
+        {
+          "id": "cleanup",
+          "title": "Delete the bucket",
+          "body": "--force deletes the objects first, then the bucket. You can delete the origin access control in the CloudFront console too.",
+          "cli": "aws s3 rb s3://<bucket> --force",
+          "output": "delete: s3://{{bucket}}/index.html\nremove_bucket: {{bucket}}",
+          "cleanup": true,
+          "verify": { "check": "bucket-gone", "value": "bucket" }
+        }
+      ]
+    },
+    {
+      "id": "sqs-dlq",
+      "title": "A queue with a dead-letter queue",
+      "serviceId": "sqs",
+      "level": 100,
+      "minutes": 15,
+      "simple": "Make a queue that sets aside messages that keep failing, then send, receive and delete one.",
+      "costNote": "The Free Tier covers 1 million SQS requests a month, far more than this workshop sends. Empty queues cost nothing.",
+      "imported": false,
+      "source": { "title": "Using dead-letter queues in Amazon SQS (Amazon SQS Developer Guide)", "url": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html" },
+      "steps": [
+        {
+          "id": "dlq",
+          "title": "Create the dead-letter queue",
+          "body": "A dead-letter queue is an ordinary queue. Create it first: it must be in the same account and Region as the queue that sends to it. Note its QueueUrl.",
+          "cli": "aws sqs create-queue --queue-name <dlq-name>",
+          "consolePath": "sqs/v3/home",
+          "output": "{\n    \"QueueUrl\": \"https://sqs.us-east-1.amazonaws.com/111122223333/{{dlq-name}}\"\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "dlq-arn",
+          "title": "Find its ARN",
+          "body": "The redrive policy points at the dead-letter queue by its ARN, not its URL.",
+          "cli": "aws sqs get-queue-attributes --queue-url <dlq-url> --attribute-names QueueArn",
+          "output": "{\n    \"Attributes\": {\n        \"QueueArn\": \"arn:aws:sqs:us-east-1:111122223333:orders-dlq\"\n    }\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "queue",
+          "title": "Create the work queue",
+          "body": "This is the queue your app sends orders to. Note its QueueUrl.",
+          "cli": "aws sqs create-queue --queue-name <queue-name>",
+          "consolePath": "sqs/v3/home",
+          "output": "{\n    \"QueueUrl\": \"https://sqs.us-east-1.amazonaws.com/111122223333/{{queue-name}}\"\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "redrive",
+          "title": "Attach the redrive policy",
+          "body": "redrive.json holds one attribute, RedrivePolicy: a JSON string with deadLetterTargetArn (the ARN above) and maxReceiveCount. After that many receives without a delete, SQS moves the message to the dead-letter queue.",
+          "cli": "aws sqs set-queue-attributes --queue-url <queue-url> --attributes file://redrive.json",
+          "consolePath": "sqs/v3/home",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "send",
+          "title": "Send a message",
+          "body": "Producers send and move on; nothing has to be listening yet.",
+          "cli": "aws sqs send-message --queue-url <queue-url> --message-body \"order 1\"",
+          "output": "{\n    \"MD5OfMessageBody\": \"4e1c03bd0bd8a1bd0d0bd2a5c3a6e3a1\",\n    \"MessageId\": \"5fea7756-0ea4-451a-a703-a558bEXAMPLE\"\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "receive",
+          "title": "Receive it with long polling",
+          "body": "Waiting up to 20 seconds (the most allowed) means fewer empty answers. The message is now hidden for the visibility timeout; if you never delete it, it comes back, and after maxReceiveCount tries it moves to the dead-letter queue.",
+          "cli": "aws sqs receive-message --queue-url <queue-url> --wait-time-seconds 20",
+          "output": "{\n    \"Messages\": [\n        {\n            \"MessageId\": \"5fea7756-0ea4-451a-a703-a558bEXAMPLE\",\n            \"ReceiptHandle\": \"AQEBzbVv...EXAMPLE==\",\n            \"Body\": \"order 1\"\n        }\n    ]\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "delete-message",
+          "title": "Delete it once it is done",
+          "body": "Deleting with the ReceiptHandle from the receive is how a worker says \"processed\". Standard queues can deliver a message more than once, so processing should be safe to repeat.",
+          "cli": "aws sqs delete-message --queue-url <queue-url> --receipt-handle <receipt-handle>",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "cleanup",
+          "title": "Delete the queues",
+          "body": "Delete the work queue, then run the same command with the dead-letter queue URL.",
+          "cli": "aws sqs delete-queue --queue-url <queue-url>",
+          "consolePath": "sqs/v3/home",
+          "output": "",
+          "cleanup": true,
+          "verify": { "manual": true }
+        }
+      ]
+    },
+    {
+      "id": "eventbridge-rule",
+      "title": "An EventBridge rule that fills a queue",
+      "serviceId": "eventbridge",
+      "level": 200,
+      "minutes": 20,
+      "simple": "Write a rule that matches your own OrderPlaced events and delivers them to an SQS queue.",
+      "costNote": "Custom events cost about $1 per million and SQS requests are inside the Free Tier, so this workshop costs well under a cent.",
+      "imported": false,
+      "source": { "title": "Using resource-based policies for Amazon EventBridge (Amazon EventBridge User Guide)", "url": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-use-resource-based.html" },
+      "steps": [
+        {
+          "id": "queue",
+          "title": "Create the target queue",
+          "body": "The rule will deliver matching events here. Note the QueueUrl, then get its QueueArn with aws sqs get-queue-attributes --attribute-names QueueArn.",
+          "cli": "aws sqs create-queue --queue-name <queue-name>",
+          "consolePath": "sqs/v3/home",
+          "output": "{\n    \"QueueUrl\": \"https://sqs.us-east-1.amazonaws.com/111122223333/{{queue-name}}\"\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "rule",
+          "title": "Create the rule",
+          "body": "pattern.json matches source city.shop and detail-type OrderPlaced. A rule on the default event bus sees every event sent to it and passes on only the matches. Note the RuleArn.",
+          "cli": "aws events put-rule --name <rule> --event-pattern file://pattern.json",
+          "consolePath": "events/home",
+          "output": "{\n    \"RuleArn\": \"arn:aws:events:us-east-1:111122223333:rule/{{rule}}\"\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "allow",
+          "title": "Let the rule send to the queue",
+          "body": "queue-policy.json sets the Policy attribute: events.amazonaws.com may sqs:SendMessage to this queue only when aws:SourceArn is your rule ARN. A new queue has an empty policy.",
+          "cli": "aws sqs set-queue-attributes --queue-url <queue-url> --attributes file://queue-policy.json",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "target",
+          "title": "Point the rule at the queue",
+          "body": "Each target has an Id you choose and the ARN of the resource that receives the event.",
+          "cli": "aws events put-targets --rule <rule> --targets Id=orders-queue,Arn=<queue-arn>",
+          "consolePath": "events/home",
+          "output": "{\n    \"FailedEntryCount\": 0,\n    \"FailedEntries\": []\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "send",
+          "title": "Send an event",
+          "body": "events.json is a list with one entry: Source city.shop, DetailType OrderPlaced and Detail, a JSON string such as {\"orderId\":\"1\"}.",
+          "cli": "aws events put-events --entries file://events.json",
+          "output": "{\n    \"FailedEntryCount\": 0,\n    \"Entries\": [\n        { \"EventId\": \"11710aed-b79e-4468-a20b-bb3c0EXAMPLE\" }\n    ]\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "receive",
+          "title": "See it arrive",
+          "body": "The message body is the whole event envelope: id, source, detail-type, time and your detail.",
+          "cli": "aws sqs receive-message --queue-url <queue-url> --wait-time-seconds 20",
+          "output": "{\n    \"Messages\": [\n        {\n            \"Body\": \"{\\\"source\\\":\\\"city.shop\\\",\\\"detail-type\\\":\\\"OrderPlaced\\\",\\\"detail\\\":{\\\"orderId\\\":\\\"1\\\"}}\"\n        }\n    ]\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "untarget",
+          "title": "Remove the target",
+          "body": "A rule with targets attached cannot be deleted, so remove them first.",
+          "cli": "aws events remove-targets --rule <rule> --ids orders-queue",
+          "output": "{\n    \"FailedEntryCount\": 0,\n    \"FailedEntries\": []\n}",
+          "cleanup": true,
+          "verify": { "manual": true }
+        },
+        {
+          "id": "cleanup",
+          "title": "Delete the rule",
+          "body": "Then delete the queue with aws sqs delete-queue --queue-url and its URL.",
+          "cli": "aws events delete-rule --name <rule>",
+          "consolePath": "events/home",
+          "output": "",
+          "cleanup": true,
+          "verify": { "manual": true }
+        }
+      ]
+    },
+    {
+      "id": "cloudwatch-alarm",
+      "title": "A CloudWatch alarm that emails you",
+      "serviceId": "cloudwatch",
+      "level": 100,
+      "minutes": 15,
+      "simple": "Publish a metric, alarm when it climbs, email yourself through SNS, test the alarm, then tidy up.",
+      "costNote": "CloudWatch's free tier includes 10 standard alarm metrics, and SNS email for a test costs nothing noticeable. One custom metric is billed while you keep sending it.",
+      "imported": false,
+      "source": { "title": "Notifying users on alarm changes (Amazon CloudWatch User Guide)", "url": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Notify_Users_Alarm_Changes.html" },
+      "steps": [
+        {
+          "id": "topic",
+          "title": "Create a topic",
+          "body": "The alarm tells an SNS topic, and the topic tells everyone subscribed. Note the TopicArn.",
+          "cli": "aws sns create-topic --name <topic>",
+          "consolePath": "sns/v3/home",
+          "output": "{\n    \"TopicArn\": \"arn:aws:sns:us-east-1:111122223333:{{topic}}\"\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "subscribe",
+          "title": "Subscribe your email",
+          "body": "The subscription stays \"pending confirmation\" until you click the link in the email SNS sends you.",
+          "cli": "aws sns subscribe --topic-arn <topic-arn> --protocol email --notification-endpoint <email>",
+          "output": "{\n    \"SubscriptionArn\": \"pending confirmation\"\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "metric",
+          "title": "Publish a custom metric",
+          "body": "Your app would send this; here you send one data point by hand. Custom metrics live in a namespace you choose.",
+          "cli": "aws cloudwatch put-metric-data --namespace CityShop --metric-name Errors --value 1 --unit Count",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "alarm",
+          "title": "Create the alarm",
+          "body": "It sums Errors over 5 minutes and goes to ALARM at 5 or more. notBreaching treats missing data as fine, so a quiet shop stays OK. The alarm description tells whoever is paged what to check first.",
+          "cli": "aws cloudwatch put-metric-alarm --alarm-name <alarm> --alarm-description \"Shop errors are climbing. Check the latest logs first.\" --namespace CityShop --metric-name Errors --statistic Sum --period 300 --evaluation-periods 1 --threshold 5 --comparison-operator GreaterThanOrEqualToThreshold --treat-missing-data notBreaching --alarm-actions <topic-arn>",
+          "consolePath": "cloudwatch/home",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "describe",
+          "title": "Look at it",
+          "body": "StateValue starts as INSUFFICIENT_DATA and settles on OK once CloudWatch has evaluated it.",
+          "cli": "aws cloudwatch describe-alarms --alarm-names <alarm>",
+          "output": "{\n    \"MetricAlarms\": [\n        {\n            \"AlarmName\": \"{{alarm}}\",\n            \"StateValue\": \"OK\",\n            \"Threshold\": 5.0,\n            \"ComparisonOperator\": \"GreaterThanOrEqualToThreshold\"\n        }\n    ]\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "test",
+          "title": "Test it without breaking anything",
+          "body": "set-alarm-state flips the alarm to ALARM for a moment, so you can check the email arrives. At the next evaluation it goes back to the state the data says.",
+          "cli": "aws cloudwatch set-alarm-state --alarm-name <alarm> --state-value ALARM --state-reason \"Testing the alarm\"",
+          "consolePath": "cloudwatch/home",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "delete-alarm",
+          "title": "Delete the alarm",
+          "body": "Alarms bill monthly while they exist, so remove practice ones.",
+          "cli": "aws cloudwatch delete-alarms --alarm-names <alarm>",
+          "output": "",
+          "cleanup": true,
+          "verify": { "manual": true }
+        },
+        {
+          "id": "cleanup",
+          "title": "Delete the topic",
+          "body": "Deleting the topic removes its subscriptions too.",
+          "cli": "aws sns delete-topic --topic-arn <topic-arn>",
+          "consolePath": "sns/v3/home",
+          "output": "",
+          "cleanup": true,
+          "verify": { "manual": true }
+        }
+      ]
+    },
+    {
+      "id": "kms-envelope",
+      "title": "Envelope encryption with KMS",
+      "serviceId": "kms",
+      "level": 200,
+      "minutes": 15,
+      "simple": "Make your own KMS key, encrypt a secret, get a data key for big files, then schedule the key for deletion.",
+      "costNote": "A customer managed key costs $1 a month, prorated by the hour, and the first 20,000 requests a month are free. Scheduling deletion (7 days at least) is how you stop it for good.",
+      "imported": false,
+      "source": { "title": "AWS KMS cryptography essentials: envelope encryption (AWS KMS Developer Guide)", "url": "https://docs.aws.amazon.com/kms/latest/developerguide/kms-cryptography.html" },
+      "steps": [
+        {
+          "id": "key",
+          "title": "Create a key",
+          "body": "With no options this is a symmetric encryption key with the default key policy. The key material never leaves AWS KMS. Note the KeyId.",
+          "cli": "aws kms create-key --description \"AWS City practice key\"",
+          "consolePath": "kms/home",
+          "output": "{\n    \"KeyMetadata\": {\n        \"KeyId\": \"1234abcd-12ab-34cd-56ef-1234567890ab\",\n        \"KeySpec\": \"SYMMETRIC_DEFAULT\",\n        \"KeyUsage\": \"ENCRYPT_DECRYPT\",\n        \"KeyState\": \"Enabled\"\n    }\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "alias",
+          "title": "Give it a friendly name",
+          "body": "An alias must start with alias/. Names starting with alias/aws are reserved for AWS managed keys, so pick your own, like alias/city-practice.",
+          "cli": "aws kms create-alias --alias-name alias/<alias> --target-key-id <key-id>",
+          "consolePath": "kms/home",
+          "output": "",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "encrypt",
+          "title": "Encrypt a small secret",
+          "body": "fileb:// sends the file as raw bytes. The answer is base64 text: in a real shell, pipe it through base64 --decode into secret.enc to keep the ciphertext.",
+          "cli": "aws kms encrypt --key-id alias/<alias> --plaintext fileb://secret.txt --output text --query CiphertextBlob",
+          "output": "AQICAHhJ3pS1EXAMPLEyQb0jvF0w8Zr...EXAMPLE==",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "data-key",
+          "title": "Get a data key for a big file",
+          "body": "Envelope encryption: KMS returns a data key twice, in plaintext and encrypted under your key. Encrypt the file locally with the plaintext key, forget it, and store the encrypted copy next to the file.",
+          "cli": "aws kms generate-data-key --key-id alias/<alias> --key-spec AES_256",
+          "output": "{\n    \"Plaintext\": \"VdzKNHGzUAzJeRBVY+uUmofUGGiDzyB3+i9fVkh3piw=\",\n    \"KeyId\": \"arn:aws:kms:us-east-1:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab\",\n    \"CiphertextBlob\": \"AQEDAHjRYf5WytIc0C857tFSnBaPn2F8DgfmThbJlGfR8P3WlwAAAH4wfAYJKoZIhvcNAQcGoG8w...EXAMPLE=\"\n}",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "decrypt",
+          "title": "Unwrap the data key later",
+          "body": "Save CiphertextBlob as binary (base64 --decode) in data-key.enc. To read the file again, KMS decrypts the data key; only someone allowed to use your key can.",
+          "cli": "aws kms decrypt --ciphertext-blob fileb://data-key.enc --output text --query Plaintext",
+          "output": "VdzKNHGzUAzJeRBVY+uUmofUGGiDzyB3+i9fVkh3piw=",
+          "verify": { "manual": true }
+        },
+        {
+          "id": "cleanup",
+          "title": "Schedule the key for deletion",
+          "body": "Deleting a key is permanent and makes everything it encrypted unreadable, so KMS waits 7 to 30 days first (30 by default). This practice key uses the shortest wait. Its alias goes with it.",
+          "cli": "aws kms schedule-key-deletion --key-id <key-id> --pending-window-in-days 7",
+          "consolePath": "kms/home",
+          "output": "{\n    \"KeyId\": \"arn:aws:kms:us-east-1:111122223333:key/{{key-id}}\",\n    \"KeyState\": \"PendingDeletion\",\n    \"PendingWindowInDays\": 7\n}",
+          "errors": [
+            { "code": "PendingWindowInDays", "message": "Practice terminal: stopped. Without --pending-window-in-days, KMS waits the default 30 days. This workshop uses the 7-day minimum.", "when": { "missing": "--pending-window-in-days" }, "explain": "The waiting period is 7 to 30 days, 30 if you leave it out. A key pending deletion cannot be used, so you can still cancel if something breaks.", "fix": "Add --pending-window-in-days 7." }
+          ],
+          "cleanup": true,
+          "verify": { "manual": true }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,159 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - voice of the people. Each comment saved under comments/ in a private bucket wakes a Lambda function that asks Comprehend for its mood and hides personal details, keeps the result in DynamoDB, and has Polly read the positive ones into audio/.
+
+Resources:
+  CommentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      # S3 sends its events to EventBridge, so the rule below can pick comments/ only.
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: key
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ReaderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: comments-in-audio-out
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub '${CommentsBucket.Arn}/comments/*'
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub '${CommentsBucket.Arn}/audio/*'
+              - Effect: Allow
+                Action: dynamodb:PutItem
+                Resource: !GetAtt ResultsTable.Arn
+              # These Comprehend and Polly calls act on the text sent, not on a resource, so they take no ARN.
+              - Effect: Allow
+                Action:
+                  - comprehend:DetectSentiment
+                  - comprehend:DetectPiiEntities
+                  - polly:SynthesizeSpeech
+                Resource: '*'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ReaderFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Role: !GetAtt ReaderRole.Arn
+      MemorySize: 256
+      Timeout: 30
+      Environment:
+        Variables:
+          TABLE: !Ref ResultsTable
+      Code:
+        ZipFile: |
+          const { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
+          const { ComprehendClient, DetectSentimentCommand, DetectPiiEntitiesCommand } = require('@aws-sdk/client-comprehend');
+          const { PollyClient, SynthesizeSpeechCommand } = require('@aws-sdk/client-polly');
+          const { DynamoDBClient, PutItemCommand } = require('@aws-sdk/client-dynamodb');
+          const s3 = new S3Client({}), nlp = new ComprehendClient({}), polly = new PollyClient({}), db = new DynamoDBClient({});
+          exports.handler = async (event) => {
+            const bucket = event.detail.bucket.name, key = event.detail.object.key;
+            const obj = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+            const text = (await obj.Body.transformToString()).slice(0, 4000);
+            const [mood, pii] = await Promise.all([
+              nlp.send(new DetectSentimentCommand({ Text: text, LanguageCode: 'en' })),
+              nlp.send(new DetectPiiEntitiesCommand({ Text: text, LanguageCode: 'en' })),
+            ]);
+            // Replace each personal detail with its type, from the end so the offsets stay right.
+            let safe = text;
+            for (const e of [...pii.Entities].sort((a, b) => b.BeginOffset - a.BeginOffset)) safe = safe.slice(0, e.BeginOffset) + `[${e.Type}]` + safe.slice(e.EndOffset);
+            await db.send(new PutItemCommand({ TableName: process.env.TABLE, Item: { key: { S: key }, mood: { S: mood.Sentiment }, text: { S: safe } } }));
+            if (mood.Sentiment === 'POSITIVE') {
+              const speech = await polly.send(new SynthesizeSpeechCommand({ Text: safe, OutputFormat: 'mp3', VoiceId: 'Joanna', Engine: 'neural' }));
+              await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key.replace(/^comments\//, 'audio/') + '.mp3', Body: await speech.AudioStream.transformToByteArray(), ContentType: 'audio/mpeg' }));
+            }
+            return { key, mood: mood.Sentiment, hidden: pii.Entities.length };
+          };
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  NewComment:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: A comment saved under comments/ in the comments bucket
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - !Ref CommentsBucket
+          object:
+            key:
+              - prefix: comments/
+      Targets:
+        - Id: reader
+          Arn: !GetAtt ReaderFunction.Arn
+          RetryPolicy:
+            MaximumRetryAttempts: 3
+
+  RulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ReaderFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt NewComment.Arn
+
+Outputs:
+  BucketName:
+    Description: Put comments (plain text, English) under comments/; the positive ones come back as audio/*.mp3
+    Value: !Ref CommentsBucket
+  TableName:
+    Description: Each comment's mood, with personal details hidden
+    Value: !Ref ResultsTable

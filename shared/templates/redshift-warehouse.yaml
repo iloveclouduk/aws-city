@@ -1,0 +1,144 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - a warehouse that reads the lake. Redshift Serverless holds this year's tables; a Glue crawler records the old receipts' tables in the Data Catalog, and a role that reads only that bucket and catalog lets Redshift query the files in place (CREATE EXTERNAL SCHEMA ... FROM DATA CATALOG).
+
+Resources:
+  ReceiptsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ReceiptsDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: old_receipts
+        Description: Tables the crawler finds in the receipts bucket
+
+  CrawlerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSGlueServiceRole'
+      Policies:
+        - PolicyName: read-receipts-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt ReceiptsBucket.Arn
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub '${ReceiptsBucket.Arn}/*'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ReceiptsCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Role: !GetAtt CrawlerRole.Arn
+      DatabaseName: !Ref ReceiptsDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://${ReceiptsBucket}/receipts/'
+      Tags:
+        managed-by: aws-city
+
+  WarehouseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - redshift.amazonaws.com
+                - redshift-serverless.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: read-the-lake-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource: !GetAtt ReceiptsBucket.Arn
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub '${ReceiptsBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetDatabases
+                  - glue:GetTable
+                  - glue:GetTables
+                  - glue:GetPartition
+                  - glue:GetPartitions
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+                  - !Sub 'arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${ReceiptsDatabase}'
+                  - !Sub 'arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${ReceiptsDatabase}/*'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  LedgerNamespace:
+    Type: AWS::RedshiftServerless::Namespace
+    Properties:
+      NamespaceName: !Sub '${AWS::StackName}-ledger'
+      DbName: ledger
+      AdminUsername: treasurer
+      # Redshift keeps the admin password in Secrets Manager.
+      ManageAdminPassword: true
+      IamRoles:
+        - !GetAtt WarehouseRole.Arn
+      DefaultIamRoleArn: !GetAtt WarehouseRole.Arn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  LedgerWorkgroup:
+    Type: AWS::RedshiftServerless::Workgroup
+    Properties:
+      WorkgroupName: !Sub '${AWS::StackName}-ledger'
+      NamespaceName: !Ref LedgerNamespace
+      # A small base capacity keeps a light workload cheap; it still scales up for big queries.
+      BaseCapacity: 8
+      PubliclyAccessible: false
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+Outputs:
+  ReceiptsBucketName:
+    Description: Upload old receipt files under receipts/ here, then run the crawler
+    Value: !Ref ReceiptsBucket
+  WorkgroupName:
+    Description: Open it in Query Editor v2 and create an external schema on the old_receipts database
+    Value: !Ref LedgerWorkgroup

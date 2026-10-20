@@ -1,0 +1,161 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - a Beanstalk app with its own database. Elastic Beanstalk runs the app on two or more EC2 servers behind a load balancer; a Multi-AZ RDS PostgreSQL database lives outside the environment, so rebuilding the app never touches the data.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC for the app and the database
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Two or more subnets in different Availability Zones
+  SolutionStackName:
+    Type: String
+    Description: A current platform, for example from aws elasticbeanstalk list-available-solution-stacks
+
+Resources:
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AWSElasticBeanstalkWebTier'
+      Policies:
+        - PolicyName: read-db-secret-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !GetAtt MembersDb.MasterUserSecret.SecretArn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref InstanceRole
+
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: The app servers (Beanstalk adds its own load balancer rules)
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: The database, reachable only from the app servers
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  DbSubnets:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnets for the members database
+      SubnetIds: !Ref SubnetIds
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  MembersDb:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      Engine: postgres
+      DBInstanceClass: db.t4g.micro
+      AllocatedStorage: '20'
+      StorageType: gp3
+      StorageEncrypted: true
+      MultiAZ: true
+      MasterUsername: garden
+      # RDS keeps the password in Secrets Manager; the app servers may read only that secret.
+      ManageMasterUserPassword: true
+      BackupRetentionPeriod: 7
+      PubliclyAccessible: false
+      DBSubnetGroupName: !Ref DbSubnets
+      VPCSecurityGroups:
+        - !Ref DbSecurityGroup
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  GardenApp:
+    Type: AWS::ElasticBeanstalk::Application
+    Properties:
+      Description: The garden club's sign-up app
+
+  GardenEnvironment:
+    Type: AWS::ElasticBeanstalk::Environment
+    Properties:
+      ApplicationName: !Ref GardenApp
+      SolutionStackName: !Ref SolutionStackName
+      OptionSettings:
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: EnvironmentType
+          Value: LoadBalanced
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: LoadBalancerType
+          Value: application
+        - Namespace: aws:ec2:vpc
+          OptionName: VPCId
+          Value: !Ref VpcId
+        - Namespace: aws:ec2:vpc
+          OptionName: Subnets
+          Value: !Join [',', !Ref SubnetIds]
+        - Namespace: aws:ec2:vpc
+          OptionName: ELBSubnets
+          Value: !Join [',', !Ref SubnetIds]
+        - Namespace: aws:autoscaling:asg
+          OptionName: MinSize
+          Value: '2'
+        - Namespace: aws:autoscaling:asg
+          OptionName: MaxSize
+          Value: '4'
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: IamInstanceProfile
+          Value: !Ref InstanceProfile
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: SecurityGroups
+          Value: !Ref AppSecurityGroup
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: DisableIMDSv1
+          Value: 'true'
+        - Namespace: aws:elasticbeanstalk:command
+          OptionName: DeploymentPolicy
+          Value: Rolling
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: DB_HOST
+          Value: !GetAtt MembersDb.Endpoint.Address
+        - Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: DB_SECRET_ARN
+          Value: !GetAtt MembersDb.MasterUserSecret.SecretArn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+Outputs:
+  AppUrl:
+    Description: The app's address (Beanstalk's sample app until you deploy your own code)
+    Value: !Sub 'http://${GardenEnvironment.EndpointURL}'
+  DbEndpoint:
+    Description: The members database, outside the environment
+    Value: !GetAtt MembersDb.Endpoint.Address

@@ -1,0 +1,149 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the clinic's model lab. A customer managed KMS key encrypts the records bucket and the SageMaker Studio domain's storage; training jobs and endpoints run under an execution role that may use only that bucket and that key. The domain is VPC-only, so your private subnets need VPC endpoints (or a NAT gateway) for SageMaker and S3.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC for SageMaker Studio
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Private subnets for Studio, in different Availability Zones
+
+Resources:
+  ClinicKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: The clinic's key for records, models and Studio storage
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          # The account's IAM policies decide who may use the key (the execution role, below).
+          - Sid: AccountAdmin
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+            Action: kms:*
+            Resource: '*'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ClinicKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/${AWS::StackName}-clinic'
+      TargetKeyId: !Ref ClinicKey
+
+  RecordsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !GetAtt ClinicKey.Arn
+            BucketKeyEnabled: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sagemaker.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: this-bucket-this-key
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt RecordsBucket.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub '${RecordsBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                  - kms:CreateGrant
+                  - kms:DescribeKey
+                Resource: !GetAtt ClinicKey.Arn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/sagemaker/*'
+              # Metrics and the container registry token have no resource ARN to narrow to.
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                  - ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                Resource: !Sub 'arn:${AWS::Partition}:ecr:${AWS::Region}:*:repository/*'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  StudioDomain:
+    Type: AWS::SageMaker::Domain
+    Properties:
+      DomainName: !Sub '${AWS::StackName}-clinic'
+      AuthMode: IAM
+      VpcId: !Ref VpcId
+      SubnetIds: !Ref PrivateSubnetIds
+      AppNetworkAccessType: VpcOnly
+      KmsKeyId: !GetAtt ClinicKey.Arn
+      DefaultUserSettings:
+        ExecutionRole: !GetAtt ExecutionRole.Arn
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ScientistProfile:
+    Type: AWS::SageMaker::UserProfile
+    Properties:
+      DomainId: !GetAtt StudioDomain.DomainId
+      UserProfileName: data-scientist
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+Outputs:
+  RecordsBucketName:
+    Description: Put training data here; pass the same key as the job's output and volume key
+    Value: !Ref RecordsBucket
+  KeyArn:
+    Description: The clinic's key
+    Value: !GetAtt ClinicKey.Arn
+  ExecutionRoleArn:
+    Description: Training jobs and endpoints run as this role
+    Value: !GetAtt ExecutionRole.Arn
+  DomainId:
+    Description: Open Studio for the data-scientist profile in the SageMaker console
+    Value: !GetAtt StudioDomain.DomainId

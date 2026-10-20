@@ -1,0 +1,166 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - alarms in the team chat. A CloudWatch alarm on the shop function's errors publishes to an encrypted SNS topic, and Amazon Q Developer in chat applications posts it in your Slack channel, where the team can ask @Amazon Q about their resources. Read-only guardrails cap what anyone can do from chat. Authorize your Slack workspace in the Amazon Q Developer in chat applications console first.
+
+Parameters:
+  SlackWorkspaceId:
+    Type: String
+    Description: The workspace id shown in the Amazon Q Developer in chat applications console after you authorize Slack
+  SlackChannelId:
+    Type: String
+    Description: The channel id (in Slack, open the channel details; it starts with C)
+
+Resources:
+  ShopRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ShopFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Role: !GetAtt ShopRole.Arn
+      MemorySize: 128
+      Timeout: 5
+      Code:
+        ZipFile: |
+          // Call it with {"fail": true} a few times to watch the alarm reach the chat.
+          exports.handler = async (event) => {
+            if (event && event.fail) throw new Error('Practice failure');
+            return { ok: true };
+          };
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AlarmKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Encrypts the alarm topic (CloudWatch alarms need a customer managed key for this)
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AccountAdmin
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+            Action: kms:*
+            Resource: '*'
+          - Sid: CloudWatchAlarmsPublish
+            Effect: Allow
+            Principal:
+              Service: cloudwatch.amazonaws.com
+            Action:
+              - kms:Decrypt
+              - kms:GenerateDataKey*
+            Resource: '*'
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Shop alarms
+      KmsMasterKeyId: !Ref AlarmKey
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AlarmTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref AlarmTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CloudWatchAlarmsPublish
+            Effect: Allow
+            Principal:
+              Service: cloudwatch.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref AlarmTopic
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
+  ErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The shop function is failing. Check its latest logs in CloudWatch Logs first.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ShopFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopic
+      OKActions:
+        - !Ref AlarmTopic
+
+  ChannelRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: chatbot.amazonaws.com
+            Action: sts:AssumeRole
+      # Read alarms and metrics, and chat with Amazon Q; nothing that changes resources.
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/CloudWatchReadOnlyAccess'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonQDeveloperAccess'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  TeamChannel:
+    Type: AWS::Chatbot::SlackChannelConfiguration
+    Properties:
+      ConfigurationName: !Sub '${AWS::StackName}-night-team'
+      SlackWorkspaceId: !Ref SlackWorkspaceId
+      SlackChannelId: !Ref SlackChannelId
+      IamRoleArn: !GetAtt ChannelRole.Arn
+      SnsTopicArns:
+        - !Ref AlarmTopic
+      # The most anyone in the channel can do, whatever role they pick.
+      GuardrailPolicies:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/ReadOnlyAccess'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonQDeveloperAccess'
+      LoggingLevel: ERROR
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+Outputs:
+  FunctionName:
+    Description: Invoke it with {"fail":true} three times to trip the alarm
+    Value: !Ref ShopFunction
+  AlarmTopicArn:
+    Description: Map more alarms (or AWS Budgets alerts) to this topic
+    Value: !Ref AlarmTopic

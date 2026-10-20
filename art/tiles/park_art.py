@@ -5,9 +5,12 @@ Construction: crane1x1 (a tower crane whose jib overhangs its neighbours) and sc
 re:Play Park: park:arch (2×1), park:booth, park:fenceX/Y, and six rides on 2×2 footprints, each themed on a
 service by shape and colour only (no logos): park:coaster (Lambda: λ cars), park:flume0..2 (S3: bucket boats),
 park:carousel0..2 (Route 53: purple canopy), park:wheel0..2 (EventBridge: magenta wheel, the showpiece),
-park:teacups0..2 (SQS: cups queued round a teapot) and park:droptower (CloudFront: a mast with a globe on top).
+park:teacups0..2 (SQS: cups queued round a teapot), park:droptower (CloudFront: a mast with a globe on top),
+park:maze (Step Functions: a pink hedge maze with states as cards), park:rapids0..2 (Kinesis: rafts on a purple ring
+channel that splits into lanes) and park:robots0..2 (AgentCore: two small robots sparring in a teal ring).
 Every ride also has park:<ride>:locked: the ride's own silhouette under a tarp behind hoarding, unlit.
-Pocket parks: park:gazebo, park:amphitheatre (2×2 band shell) and park:playground.
+Pocket parks: park:gazebo, park:pocket:0..3 (fountain, picnic, flower garden, duck pond), park:amphitheatre (2×2 band
+shell) and park:playground.
 
 Animated sets share one canvas size and anchor per set, like windTurbine0..2.
 Called from generate_tiles.main as park_art.build(add).
@@ -18,8 +21,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 from generate_tiles import (A, CLEAR, CON_D, CON_L, CON_M, GLASS, GLASS_D, GRASS, GRASS_D, HH, HW, NAVY, NAVY_D,  # noqa: F401
                             ORANGE, ORANGE_D, WATER, WHITE, WOOD, WOOD_D, Canvas, seeded, shade)
-from landmarks_aws_a import bucket, cyl
-from landmarks_aws_b import globe
+from shapes import bucket, cyl, globe
 
 LIT = (255, 214, 120)
 BULB = (255, 236, 150)
@@ -34,6 +36,7 @@ SKY = (59, 130, 246)
 CREAM = (246, 236, 210)
 SAND = (230, 212, 164)
 TARP = (64, 112, 168)
+STONE_C = (160, 156, 148)
 CANDY = [PINK, ORANGE, PURPLE, TEAL, SKY, YELLOW]
 
 # 3×5 pixel glyphs for the arch's sign.
@@ -827,34 +830,141 @@ def droptower():
 # ── pocket parks ──────────────────────────────────────────────────────────────
 
 def gazebo():
-    """A white gazebo: a round stone step, six slim posts, a green conical roof with a finial and a bulb
-    string under the eaves."""
-    c = Canvas(1, 1, 46)
-    cx, cy = c.P(0.5, 0.5, 0)
-    top = disc(c, cx, cy, 13, 6, 3, (206, 200, 188), top=(232, 226, 214))
-    posts = [(math.sin(k * math.pi / 3 + 0.5), k) for k in range(6)]
-    for s, k in sorted(posts):
-        a = k * math.pi / 3 + 0.5
+    """A pocket park's gazebo: a low hexagonal stone floor on the lawn, white posts with a lattice rail, a green
+    roof with a lit lantern under its eaves, a bench inside and a flower bed at its foot."""
+    from services.kit import Kit, drum, drum_shadow
+    c = Kit(1, 1, 46)
+    leaf = (78, 168, 76)
+    drum_shadow(c, 0.5, 0.5, 0.42, 60)
+    drum(c, 0.5, 0.5, 0, 3, 0.36, (150, 120, 88), capcol=(184, 150, 108))
+    cx, top = c.P(0.5, 0.5, 3)
+    for k in range(-2, 3):  # deck boards
+        c.d.line([(cx - 11 + abs(k) * 2, top + k * 2), (cx + 11 - abs(k) * 2, top + k * 2)], fill=A((164, 132, 94)))
+    posts = [(k * math.pi / 3 + 0.5) for k in range(6)]
+    back = [a for a in posts if math.sin(a) < 0]
+    front = [a for a in posts if math.sin(a) >= 0]
+    for a in back:
         x, y = cx + round(math.cos(a) * 10), top + round(math.sin(a) * 5)
-        if s < 0:
-            c.d.line([(x, y), (x, y - 15)], fill=A(shade(WHITE, 0.8)))
-    c.d.rectangle((cx - 4, top - 4, cx + 4, top - 2), fill=A(WOOD))  # a bench inside
-    for s, k in sorted(posts):
-        a = k * math.pi / 3 + 0.5
+        c.d.line([(x, y), (x, y - 15)], fill=A(shade(WHITE, 0.78)))
+    c.d.rectangle((cx - 4, top - 4, cx + 4, top - 2), fill=A(WOOD))
+    c.d.line([(cx - 4, top - 5), (cx + 4, top - 5)], fill=A(WOOD_D))
+    for a in front:
         x, y = cx + round(math.cos(a) * 10), top + round(math.sin(a) * 5)
-        if s >= 0:
-            c.d.line([(x, y), (x, y - 15)], fill=A(WHITE))
+        c.d.line([(x, y), (x, y - 15)], fill=A(WHITE))
+    # a lattice rail round the front half
+    c.d.arc((cx - 10, top - 10, cx + 10, top), 0, 180, fill=A(WHITE))
+    c.d.arc((cx - 10, top - 8, cx + 10, top + 2), 0, 180, fill=A(shade(WHITE, 0.85)))
+    for k in range(9):
+        a = k * math.pi / 8
+        x = cx + round(math.cos(a) * 10)
+        y = top - 5 + round(math.sin(a) * 5)
+        c.d.point([(x, y + 1)], fill=A(shade(WHITE, 0.8)))
+    # the roof: six facets, lit on the left, a ridge highlight and a finial
     ry = top - 15
-    ell(c, cx, ry, 14, 6, shade(GRASS_D, 0.9))
-    c.d.polygon([(cx - 14, ry), (cx + 14, ry), (cx, ry - 13)], fill=A(GRASS_D))
-    c.d.polygon([(cx - 14, ry), (cx - 2, ry), (cx, ry - 13)], fill=A(GRASS))
-    c.d.chord((cx - 14, ry - 6, cx + 14, ry + 6), 0, 180, fill=A(shade(GRASS_D, 0.8)))
-    c.d.line([(cx - 14, ry), (cx + 14, ry)], fill=A(WHITE))
-    for k in range(7):
-        a = k * math.pi / 6
-        bulb(c, cx + round(math.cos(a) * 13), ry + 1 + round(math.sin(a) * 5), BULB, glow=False)
-    c.d.line([(cx, ry - 13), (cx, ry - 17)], fill=A(WHITE))
-    px(c, cx, ry - 18, YELLOW)
+    c.d.ellipse((cx - 14, ry - 5, cx + 14, ry + 5), fill=A(shade(GRASS_D, 0.75)))
+    c.d.polygon([(cx - 14, ry), (cx + 14, ry), (cx, ry - 12)], fill=A(GRASS_D))
+    c.d.polygon([(cx - 14, ry), (cx - 3, ry + 2), (cx, ry - 12)], fill=A(GRASS))
+    c.d.polygon([(cx - 3, ry + 2), (cx + 6, ry + 2), (cx, ry - 12)], fill=A(shade(GRASS, 0.88)))
+    c.d.line([(cx - 14, ry), (cx - 3, ry + 2), (cx + 6, ry + 2), (cx + 14, ry)], fill=A(WHITE))
+    c.d.line([(cx, ry - 12), (cx, ry - 16)], fill=A(WHITE))
+    px(c, cx, ry - 17, YELLOW)
+    # a lantern under the eaves
+    c.d.line([(cx, ry + 3), (cx, ry + 5)], fill=A(NAVY_D))
+    c.d.rectangle((cx - 1, ry + 5, cx + 1, ry + 8), fill=A(BULB))
+    c.ld.ellipse((cx - 6, ry + 1, cx + 6, ry + 12), fill=A(BULB, 90))
+    c.ld.rectangle((cx - 1, ry + 5, cx + 1, ry + 8), fill=A(BULB))
+    # flowers at its foot
+    r = seeded("gazebo-flowers")
+    for k in range(8):
+        x, y = cx - 12 + k * 3 + r(2), top + 7 + (k % 2)
+        c.d.point([(x, y), (x, y - 1)], fill=A(shade(leaf, 0.8)))
+        c.d.point([(x, y - 2)], fill=A([(255, 110, 150), (255, 204, 60), (250, 250, 250), (170, 120, 250)][r(4)]))
+    return c
+
+
+# Pocket-park variants (1x1), so a city's open lots differ (src/game/decor.ts picks one per lot by a tile hash):
+#   park:pocket:0  a round fountain on paving with two benches and a lamp
+#   park:pocket:1  a shade tree over a picnic table and a blanket
+#   park:pocket:2  a flower garden in a low hedge with a birdbath and a bench
+#   park:pocket:3  a duck pond with reeds, a jetty and a bench
+
+def _pocket_base(c, key):
+    from combos_art import lawn
+    lawn(c, 0.04, 0.04, 0.96, 0.96, key)
+
+
+def pocket(k):
+    from combos_art import bench, ell as cell, lamp, paving
+    from services.kit import Kit, drum, drum_shadow, ellipse, prism
+    from builder_art import ball, trunk
+    c = Kit(1, 1, 48)
+    leaf = (78, 168, 76)
+    if k == 0:
+        paving(c, 0.08, 0.08, 0.92, 0.92, key="pocket0", h=1)
+        drum_shadow(c, 0.5, 0.5, 0.3, 50)
+        drum(c, 0.5, 0.5, 1, 5, 0.28, (206, 198, 184))
+        ellipse(c, 0.5, 0.5, 5, 0.22, (96, 172, 228), light=(140, 200, 255, 60))
+        drum(c, 0.5, 0.5, 5, 12, 0.05, (226, 218, 204))
+        x, y = c.P(0.5, 0.5, 12)
+        for a in range(5):
+            ang = a * 2 * math.pi / 5
+            c.d.line([(x, y - 2), (x + round(math.cos(ang) * 6), y + 5 + round(math.sin(ang) * 2))], fill=A((210, 236, 255)))
+        c.d.rectangle((x, y - 5, x, y - 1), fill=A((236, 248, 255)))
+        bench(c, 0.5, 0.12, along_u=True)
+        bench(c, 0.12, 0.5, along_u=False)
+        lamp(c, 0.86, 0.86, 22)
+    elif k == 1:
+        _pocket_base(c, "pocket1")
+        # a blanket with a basket
+        c.poly([(0.52, 0.56, 0), (0.86, 0.56, 0), (0.86, 0.86, 0), (0.52, 0.86, 0)], (226, 64, 56))
+        for t in range(3):
+            u = 0.56 + t * 0.1
+            c.line((u, 0.56, 0), (u, 0.86, 0), WHITE)
+        prism(c, 0.64, 0.64, 0.74, 0.74, 0, 4, WOOD)
+        # a picnic table
+        prism(c, 0.18, 0.5, 0.48, 0.58, 0, 6, WOOD, rim=0)
+        prism(c, 0.14, 0.62, 0.52, 0.68, 0, 3, WOOD_D, rim=0)
+        drum_shadow(c, 0.32, 0.3, 0.3, 60)
+        x, y = c.P(0.32, 0.3)
+        trunk(c, x, y - 1, 14, 1)
+        for dx, dy, rr in ((-6, -18, 6), (6, -17, 6), (0, -24, 8), (-3, -19, 6)):
+            ball(c, x + dx, y + dy, rr, leaf, f"pk1{dx}{dy}", spots=3)
+    elif k == 2:
+        _pocket_base(c, "pocket2")
+        c.poly([(0.36, 0.36, 0), (0.64, 0.36, 0), (0.64, 0.64, 0), (0.36, 0.64, 0)], (196, 188, 174))
+        hedge = (52, 128, 66)
+        prism(c, 0.08, 0.08, 0.92, 0.18, 0, 6, hedge, rim=0)
+        prism(c, 0.08, 0.18, 0.18, 0.92, 0, 6, hedge, rim=0)
+        r = seeded("pocket2")
+        for _ in range(26):
+            u, v = 0.22 + r(70) / 100, 0.22 + r(70) / 100
+            if 0.34 < u < 0.66 and 0.34 < v < 0.66:
+                continue
+            x, y = c.P(u, v)
+            c.d.point([(x, y), (x, y - 1)], fill=A(shade(leaf, 0.8)))
+            c.d.point([(x, y - 2)], fill=A([(255, 110, 150), (255, 204, 60), (250, 250, 250), (170, 120, 250), (255, 150, 60)][r(5)]))
+        drum(c, 0.5, 0.5, 0, 8, 0.05, (226, 218, 204))
+        drum(c, 0.5, 0.5, 8, 10, 0.14, (226, 218, 204), capcol=(120, 190, 236))
+        x, y = c.P(0.5, 0.5, 10)
+        c.d.point([(x + 2, y - 3), (x + 3, y - 3)], fill=A((120, 84, 60)))
+        bench(c, 0.86, 0.5, along_u=False)
+    else:
+        _pocket_base(c, "pocket3")
+        ellipse(c, 0.48, 0.48, 0, 0.36, (150, 140, 126), rim=False)
+        ellipse(c, 0.48, 0.48, 0, 0.32, (86, 170, 226), light=(90, 150, 220, 40))
+        x, y = c.P(0.48, 0.48)
+        for dx, dy in ((-6, -1), (3, 2)):
+            cell(c, x + dx, y + dy, 2, 1, WHITE)
+            c.d.point([(x + dx - 2, y + dy - 2), (x + dx - 2, y + dy - 1)], fill=A(WHITE))
+            c.d.point([(x + dx - 3, y + dy - 2)], fill=A(ORANGE))
+        c.d.line([(x + 6, y - 4), (x + 9, y - 4)], fill=A((170, 220, 245)))
+        for k2 in range(5):
+            rx, ry = x - 12 + k2 * 2, y + 1 - (k2 % 2)
+            c.d.line([(rx, ry), (rx, ry - 6 - k2 % 3)], fill=A((96, 140, 60)))
+            c.d.point([(rx, ry - 7 - k2 % 3)], fill=A((120, 84, 50)))
+        prism(c, 0.78, 0.4, 0.96, 0.56, 0, 2, WOOD, rim=0)
+        bench(c, 0.5, 0.9, along_u=True)
+        lamp(c, 0.12, 0.88, 20)
     return c
 
 
@@ -941,6 +1051,245 @@ def playground():
     return c
 
 
+# ── newer rides: Step Functions maze, Kinesis rapids, AgentCore robot arena ────
+
+KINESIS = (140, 79, 255)    # AWS analytics (Kinesis)
+AIML = (1, 168, 141)        # AWS AI/ML (AgentCore)
+HEDGE = PINK                # AWS application integration (Step Functions)
+
+
+def maze_walls(n=5, key="sfn-maze"):
+    """A perfect maze on an n×n grid (recursive backtracker, seeded): returns the set of standing walls as
+    ("h", i, j) = wall on the v-side of row j at column i (j in 0..n), ("v", i, j) = wall on the u-side."""
+    r = seeded(key)
+    walls = {("h", i, j) for i in range(n) for j in range(n + 1)} | {("v", i, j) for i in range(n + 1) for j in range(n)}
+    seen, stack = {(0, 0)}, [(0, 0)]
+    while stack:
+        i, j = stack[-1]
+        nxt = [(i + di, j + dj) for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)) if 0 <= i + di < n and 0 <= j + dj < n and (i + di, j + dj) not in seen]
+        if not nxt:
+            stack.pop()
+            continue
+        a, b = nxt[r(len(nxt))]
+        if a != i:
+            walls.discard(("v", max(a, i), j))
+        else:
+            walls.discard(("h", i, max(b, j)))
+        seen.add((a, b))
+        stack.append((a, b))
+    walls.discard(("h", 0, n))          # the way in, on the front-left edge
+    walls.discard(("v", n, n - 1))      # and the way out, on the front-right edge
+    return walls
+
+
+def state_box(c, x, y, col, lit=True):
+    """A Step Functions state on a post: a small rounded white card with a coloured rim."""
+    c.d.line([(x, y), (x, y - 6)], fill=A(CON_D))
+    c.d.rounded_rectangle((x - 5, y - 11, x + 5, y - 6), radius=2, fill=A(WHITE), outline=A(col))
+    c.d.line([(x - 2, y - 9), (x + 2, y - 9)], fill=A(col))
+    if lit:
+        c.ld.rounded_rectangle((x - 5, y - 11, x + 5, y - 6), radius=2, fill=A(BULB, 150))
+
+
+def maze():
+    """Step Functions Maze: a pink hedge maze; states stand as white cards at the junctions, a green start circle at
+    the way in and a navy end circle at the way out, lanterns lit at night."""
+    c = Canvas(2, 2, 40)
+    c.box(0.04, 0.04, 1.96, 1.96, 0, 1, CON_L, top=(226, 214, 186))
+    n, o, s = 4, 0.14, 0.43
+    walls = maze_walls(n)
+    c.poly([(o, o, 1), (o + n * s, o, 1), (o + n * s, o + n * s, 1), (o, o + n * s, 1)], (238, 228, 204))
+    r = seeded("maze-leaf")
+    items = []
+    for kind, i, j in sorted(walls):
+        if kind == "h":
+            u0, u1, v0, v1 = o + i * s - 0.035, o + (i + 1) * s + 0.035, o + j * s - 0.035, o + j * s + 0.035
+        else:
+            u0, u1, v0, v1 = o + i * s - 0.035, o + i * s + 0.035, o + j * s - 0.035, o + (j + 1) * s + 0.035
+        items.append(((u0 + u1) / 2 + (v0 + v1) / 2, "wall", (u0, v0, u1, v1)))
+    for (ci, cj, col) in ((1, 0, PINK), (2, 2, PURPLE), (0, 2, PINK), (3, 1, TEAL)):
+        items.append((o + (ci + 0.5) * s + o + (cj + 0.5) * s + 0.01, "state", (o + (ci + 0.5) * s, o + (cj + 0.5) * s, col)))
+    for (pu, pv, col) in ((o + 0.5 * s + 0.05, o + 3.5 * s, (232, 190, 150)), (o + 1.5 * s, o + 1.4 * s, (232, 190, 150))):
+        items.append((pu + pv, "person", (pu, pv, col)))
+    for _, kind, a in sorted(items, key=lambda t: t[0]):
+        if kind == "wall":
+            u0, v0, u1, v1 = a
+            c.box(u0, v0, u1, v1, 1, 6, shade(HEDGE, 0.78), top=shade(HEDGE, 1.1))
+            for _ in range(2):
+                x, y = c.P(u0 + (u1 - u0) * r(100) / 100, v0 + (v1 - v0) * r(100) / 100, 6)
+                c.d.point([(x, y)], fill=A((255, 150, 200)))
+        elif kind == "state":
+            u, v, col = a
+            x, y = c.P(u, v, 1)
+            state_box(c, x, y, col)
+        else:
+            u, v, col = a
+            x, y = c.P(u, v, 1)
+            c.d.rectangle((x - 1, y - 5, x, y - 2), fill=A(SKY))
+            c.d.point([(x, y - 6), (x - 1, y - 6)], fill=A(col))
+    # start and end circles outside the way in and the way out
+    for (u, v, col) in ((o + 0.5 * s, 1.93, (60, 190, 90)), (1.93, o + 3.5 * s, NAVY)):
+        x, y = c.P(u, v, 1)
+        ell(c, x, y, 4, 2, col)
+        ell(c, x, y, 2, 1, WHITE)
+    # lanterns at the back corners
+    for (u, v) in ((0.84, 0.18), (0.18, 0.84)):
+        bx, by = c.P(u, v, 1)
+        c.d.line([(bx, by), (bx, by - 14)], fill=A(WOOD_D))
+        bulb(c, bx, by - 15, BULB)
+    return c
+
+
+def rapids(f):
+    """Kinesis Rapids: a ring channel of purple water round a rocky island; the stream splits into two lanes past
+    the island's point (shards), round rafts ride it (frames move them on), foam churns, and lamps
+    stand at the corners."""
+    c = Canvas(2, 2, 48)
+    c.box(0.04, 0.04, 1.96, 1.96, 0, 1, CON_L, top=(212, 206, 192))
+    cx, cy = c.P(1, 1, 1)
+    rx, ry = 27, 13
+    top = disc(c, cx, cy, rx + 2, ry + 1, 3, STONE_C, top=(196, 190, 180))
+    ell(c, cx, top, rx, ry, shade(KINESIS, 0.8))
+    ell(c, cx, top - 1, rx - 1, ry - 1, shade(KINESIS, 1.12))
+    # the island, with a lane divider (shards) as a low wall across the front part of the ring
+    ell(c, cx, top, 15, 7, shade(KINESIS, 0.6))
+    itop = disc(c, cx, top, 14, 7, 3, (150, 140, 128), top=GRASS)
+    # foam streaks, churning by frame
+    rr = seeded("rapids-foam")
+    for k in range(16):
+        th = (k / 16) * 2 * math.pi + f * 0.13 + rr(20) / 100
+        rad = 0.72 + rr(20) / 100
+        x, y = cx + round(math.cos(th) * (21 * rad + 4)), top + round(math.sin(th) * (10.5 * rad + 2))
+        c.d.line([(x, y), (x + 2, y)], fill=A(WHITE if (k + f) % 3 else (214, 200, 255)))
+    # rocks in the stream
+    for th in (0.3, 2.2, 3.9):
+        x, y = cx + round(math.cos(th) * 21), top + round(math.sin(th) * 10)
+        ell(c, x, y, 2, 1, CON_M)
+        c.d.point([(x - 1, y - 1)], fill=A(CON_L))
+    # shard divider: two short walls splitting the front of the ring into lanes
+    for th in (0.9, 2.25):
+        x0, y0 = cx + round(math.cos(th) * 16), top + round(math.sin(th) * 8)
+        x1, y1 = cx + round(math.cos(th) * 26), top + round(math.sin(th) * 12.5)
+        c.d.line([(x0, y0), (x1, y1)], fill=A(STONE_C), width=2)
+    # rafts: back half first, then the island's tree, then the front half
+    rafts = []
+    for k in range(4):
+        th = k * 2 * math.pi / 4 + f * (2 * math.pi / 4) / 3 + 0.4
+        rafts.append((math.sin(th), cx + round(math.cos(th) * 21), top + round(math.sin(th) * 10), CANDY[k]))
+
+    def raft(x, y, col):
+        ell(c, x, y + 1, 5, 2, shade(col, 0.6))
+        ell(c, x, y, 5, 2, col)
+        ell(c, x, y - 1, 3, 1, shade(col, 0.5))
+        for dx in (-2, 1):
+            c.d.rectangle((x + dx, y - 4, x + dx + 1, y - 3), fill=A((232, 190, 150)))
+            c.d.point([(x + dx, y - 2)], fill=A(YELLOW))
+    for s_, x, y, col in sorted(rafts):
+        if s_ < 0:
+            raft(x, y, col)
+    # the island: a rock cairn with a purple flag and a little lamp
+    ell(c, cx - 3, itop - 1, 4, 3, (150, 140, 128))
+    ell(c, cx - 4, itop - 3, 2, 2, (184, 176, 164))
+    c.d.line([(cx + 3, itop), (cx + 3, itop - 13)], fill=A(CON_L))
+    c.d.polygon([(cx + 4, itop - 13), (cx + 10, itop - 11), (cx + 4, itop - 8)], fill=A(KINESIS))
+    bulb(c, cx + 3, itop - 14, (210, 180, 255))
+    for s_, x, y, col in sorted(rafts):
+        if s_ >= 0:
+            raft(x, y, col)
+    # lamp posts at the left and right corners, lit at night
+    for (u, v) in ((0.12, 1.88), (1.88, 0.12)):
+        x, y = c.P(u, v, 1)
+        c.d.line([(x, y), (x, y - 18)], fill=A(NAVY))
+        bulb(c, x, y - 19, (210, 180, 255))
+    return c
+
+
+def robot(c, x, y, body, trim, pose, face_right, lit_eye):
+    """A small boxy robot at screen (x, y) = between its feet. pose 0 guard, 1 jab (front arm out)."""
+    s = 1 if face_right else -1
+    c.d.rectangle((x - 3, y - 4, x - 2, y), fill=A(NAVY_D))     # legs
+    c.d.rectangle((x + 1, y - 4, x + 2, y), fill=A(NAVY_D))
+    c.d.rectangle((x - 4, y - 12, x + 3, y - 5), fill=A(body))  # body
+    c.d.rectangle((x - 4, y - 12, x - 3, y - 5), fill=A(shade(body, 1.15)))
+    c.d.rectangle((x - 2, y - 10, x + 1, y - 8), fill=A(trim))  # chest panel
+    c.d.rectangle((x - 3, y - 18, x + 2, y - 13), fill=A(shade(body, 1.08)))  # head
+    ex = x + (1 if face_right else -2)
+    c.d.rectangle((ex - 1, y - 16, ex + 1, y - 15), fill=A(lit_eye))  # visor
+    c.ld.rectangle((ex - 1, y - 16, ex + 1, y - 15), fill=A(lit_eye))
+    c.d.line([(x, y - 19), (x, y - 21)], fill=A(CON_L))  # antenna
+    c.d.point([(x, y - 22)], fill=A(RED))
+    c.ld.point([(x, y - 22)], fill=A(RED))
+    # arms: the back arm guards, the front arm guards or jabs; padded mitts
+    bx = x - 4 * s if face_right else x + 3
+    fx = x + 3 if face_right else x - 4
+    c.d.line([(bx, y - 11), (bx + 2 * s, y - 14)], fill=A(CON_M))
+    ell(c, bx + 2 * s, y - 14, 1, 1, trim)
+    if pose == 1:
+        c.d.line([(fx, y - 11), (fx + 7 * s, y - 12)], fill=A(CON_M))
+        ell(c, fx + 7 * s, y - 12, 2, 2, trim)
+    else:
+        c.d.line([(fx, y - 11), (fx + 3 * s, y - 15)], fill=A(CON_M))
+        ell(c, fx + 3 * s, y - 15, 1, 1, trim)
+
+
+def robots(f):
+    """AgentCore Robot Arena: a teal ring on a platform with corner posts and ropes; two small robots spar with
+    padded mitts (frames swap guard and jab), bleachers of spectators behind and floodlights at the corners."""
+    c = Canvas(2, 2, 56)
+    c.box(0.04, 0.04, 1.96, 1.96, 0, 1, CON_L, top=(212, 206, 192))
+    # bleachers at the back corner
+    for k in range(3):
+        c.box(0.08 + k * 0.1, 0.08, 0.2 + k * 0.1, 1.2, 1, 9 - k * 3, CON_M)
+        c.box(0.08, 0.08 + k * 0.1, 1.2, 0.2 + k * 0.1, 1, 9 - k * 3, CON_M)
+    rr = seeded("arena-fans")
+    for k in range(10):
+        t = 0.2 + k * 0.1
+        for (u, v, z) in ((0.14, t, 9), (t, 0.14, 9)):
+            x, y = c.P(u, v, z)
+            c.d.point([(x, y - 1)], fill=A(CANDY[rr(len(CANDY))]))
+            c.d.point([(x, y - 2)], fill=A((232, 190, 150)))
+    a0, a1, z = 0.4, 1.7, 6
+    c.box(a0, a0, a1, a1, 1, z, shade(AIML, 0.8))
+    c.poly([(a0, a0, z), (a1, a0, z), (a1, a1, z), (a0, a1, z)], (214, 240, 234))
+    c.poly([(a0 + 0.1, a0 + 0.1, z), (a1 - 0.1, a0 + 0.1, z), (a1 - 0.1, a1 - 0.1, z), (a0 + 0.1, a1 - 0.1, z)], (232, 248, 244))
+    c.lface(a1, a0, a1, 2, 4, WHITE)
+    c.rface(a1, a0, a1, 2, 4, shade(WHITE, 0.85))
+    corners = [(a0 + 0.05, a0 + 0.05), (a1 - 0.05, a0 + 0.05), (a0 + 0.05, a1 - 0.05), (a1 - 0.05, a1 - 0.05)]
+
+    def ropes(pairs):
+        for (p, q) in pairs:
+            for zz, col in ((z + 5, WHITE), (z + 9, AIML)):
+                c.line((*p, zz), (*q, zz), col)
+    for (u, v) in corners[:3]:
+        post(c, u, v, z, z + 11, AIML, w=0.035)
+    ropes([(corners[0], corners[1]), (corners[0], corners[2])])
+    # the robots: they bob and take turns to jab
+    xa, ya = c.P(1.0, 1.42, z)
+    xb, yb = c.P(1.42, 1.0, z)
+    ba, bb = [0, 1, 0][f], [1, 0, 0][f]
+    robot(c, xa, ya - ba, ORANGE, NAVY, 1 if f == 0 else 0, True, (120, 255, 220))
+    robot(c, xb, yb - bb, WHITE, AIML, 1 if f == 2 else 0, False, (255, 200, 90))
+    if f in (0, 2):  # a little "pop" star where the mitt lands
+        sx = (xa + xb) // 2 + (2 if f == 0 else -2)
+        sy = (ya + yb) // 2 - 13
+        for dx, dy in ((0, -2), (0, 2), (-2, 0), (2, 0)):
+            c.d.point([(sx + dx, sy + dy)], fill=A(YELLOW))
+        c.d.point([(sx, sy)], fill=A(WHITE))
+    post(c, *corners[3], z, z + 11, AIML, w=0.035)
+    ropes([(corners[1], corners[3]), (corners[2], corners[3])])
+    for (u, v) in corners:
+        x, y = c.P(u, v, z + 11)
+        bulb(c, x, y - 1, (140, 255, 230), glow=False)
+    # floodlights on two poles
+    for (u, v) in ((1.9, 0.12), (0.12, 1.9)):
+        x, y = c.P(u, v, 1)
+        c.d.line([(x, y), (x, y - 34)], fill=A(NAVY))
+        c.d.rectangle((x - 2, y - 37, x + 2, y - 34), fill=A(CON_D))
+        c.ld.rectangle((x - 1, y - 36, x + 1, y - 35), fill=A((255, 244, 210)))
+        c.ld.polygon([(x, y - 35), (x - 10 if u > 1 else x + 10, y - 10), (x - 2 if u > 1 else x + 2, y - 8)], fill=A((255, 244, 210), 40))
+    return c
+
+
 # ── build ─────────────────────────────────────────────────────────────────────
 
 RIDES = {
@@ -951,6 +1300,9 @@ RIDES = {
     "wheel": (wheel, 3, (2, 2), 104, 8, 13),
     "teacups": (teacups, 3, (2, 2), 50, 2, 5),
     "droptower": (droptower, 0, (2, 2), 132, 2, 7),
+    "maze": (maze, 0, (2, 2), 40, 2, 5),
+    "rapids": (rapids, 3, (2, 2), 48, 2, 5),
+    "robots": (robots, 3, (2, 2), 56, 2, 7),
 }
 
 
@@ -973,5 +1325,7 @@ def build(add):
             add(f"park:{name}", first)
         add(f"park:{name}:locked", locked(first, fw, fh, zmax, pad, close), lights=False)
     add("park:gazebo", gazebo())
+    for k in range(4):
+        add(f"park:pocket:{k}", pocket(k))
     add("park:amphitheatre", amphitheatre())
     add("park:playground", playground())

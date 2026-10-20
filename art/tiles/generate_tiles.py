@@ -25,7 +25,7 @@ PACK = os.path.join(ROOT, "art", "pack")
 OUT = os.path.join(ROOT, "public", "assets", "city")
 CACHE = os.path.join(ROOT, ".cache", "art")
 
-# Bespoke landmark modules (landmarks_aws*.py, culture_art.py) import this module by name; when it runs
+# The art modules (services/, culture_art.py, …) import this module by name; when it runs
 # as a script, make that name resolve to *this* copy so they share SPRITES/PACKIMG.
 if __name__ == "__main__":
     sys.modules.setdefault("generate_tiles", sys.modules["__main__"])
@@ -464,199 +464,112 @@ def stripe_block(c, u0, v0, u1, v1, z1, col, key, fans=0, frame=0, wall=CON_L, l
 
 
 def construction(fw, fh):
-    c = Canvas(fw, fh, 60)
-    for u in (0.3, fw - 0.3):
-        for v in (0.3, fh - 0.3):
-            c.box(u - 0.04, v - 0.04, u + 0.04, v + 0.04, 0, 30, CON_M)
-    for z in (15, 30):
-        c.box(0.26, fh - 0.34, fw - 0.26, fh - 0.26, z, z + 2, CON_M)
-        c.box(fw - 0.34, 0.26, fw - 0.26, fh - 0.26, z, z + 2, CON_M)
-    c.box(0.5, 0.5, fw - 0.5, fh - 0.5, 0, 12, CON_L)
-    c.box(0.1, 0.1, 0.22, 0.22, 0, 52, ORANGE)
-    x0, y0 = c.P(0.16, 0.16, 52)
-    x1, y1 = c.P(fw * 0.8, 0.16, 52)
-    c.d.line([(x0, y0), (x1, y1)], fill=A(ORANGE))
-    c.d.line([(x1, y1), (x1, y1 + 18)], fill=A(NAVY_D))
-    c.d.rectangle((x1 - 2, y1 + 18, x1 + 2, y1 + 21), fill=A(WOOD))
-    for k in range(fw * 2 + 1):
-        u = k / 2
-        c.box(max(0, u - 0.03), fh - 0.05, min(fw, u + 0.03), fh, 0, 6, ORANGE)
-    c.box(0.05, fh - 0.05, fw - 0.05, fh, 3, 5, NAVY_D)
-    return c
-
-
-def k_building(fw, fh, tier, col, key):
-    ins = 0.3 - 0.05 * tier
-    z1 = 18 + 8 * tier
-    c = Canvas(fw, fh, z1 + 30)
-    stripe_block(c, ins, ins, fw - ins, fh - ins, z1, col, key, fans=min(3, tier))
-    if tier >= 3:
-        c.box(fw - ins - 0.9, ins + 0.2, fw - ins - 0.3, ins + 0.8, z1, z1 + 6, CON_M)
-    if tier >= 4:
-        c.poly([(ins + 0.2, fh - ins - 0.9, z1), (ins + 1.0, fh - ins - 0.9, z1), (ins + 1.0, fh - ins - 0.2, z1), (ins + 0.2, fh - ins - 0.2, z1)], GRASS)
-    return c
-
-
-def k_factory(fw, fh, tier, col, key):
-    z1 = 16 + 5 * tier
-    c = Canvas(fw, fh, z1 + 50)
-    stripe_block(c, 0.25, 0.4, fw - 0.25, fh - 0.25, z1, col, key, wall=(196, 170, 150))
-    for k in range(min(tier, 3)):
-        u = 0.4 + k * 0.45
-        c.box(u, 0.1, u + 0.25, 0.35, 0, z1 + 18 + k * 4, CON_D)
-        c.box(u - 0.02, 0.08, u + 0.27, 0.37, z1 + 18 + k * 4, z1 + 20 + k * 4, col)
-    return c
-
-
-def k_warehouse(fw, fh, tier, col, key):
-    z1 = 14 + 4 * tier
-    c = Canvas(fw, fh, z1 + 26)
-    c.box(0.2, 0.3, fw - 0.2, fh - 0.3, 0, z1, CON_L)
-    c.louvres(0.2, 0.3, fw - 0.2, fh - 0.3, 0, z1, CON_L)
-    for k in range(min(tier + 1, 3)):
-        a = 0.45 + k * 0.8
-        c.lface(fh - 0.3, a, a + 0.5, 0, 10, shade(col, 0.9))
-        for z in range(2, 10, 2):
-            c.lface(fh - 0.3, a, a + 0.5, z, z + 1, shade(col, 0.65))
-    c.gable(0.15, 0.25, fw - 0.15, fh - 0.25, z1, 9, col)
-    return c
-
-
-def k_tower(fw, fh, tier, col, key):
-    h = 34 + 12 * tier
-    c = Canvas(fw, fh, h + 30)
-    cu, cv, s = fw / 2, fh / 2, 0.5 + 0.06 * tier
-    if tier >= 2:
-        stripe_block(c, 0.35, cv, fw - 0.35, fh - 0.35, 14, col, key + "b")
-    c.box(cu - s, cv - s, cu + s, cv + s, 0, h, CON_L)
-    c.windows(cu - s, cv - s, cu + s, cv + s, 6, h - 4, key, every=0.4, size=0.2, fh=7)
-    c.lface(cv + s, cu - s, cu + s, h - 5, h - 2, col)
-    c.rface(cu + s, cv - s, cv + s, h - 5, h - 2, shade(col, 0.8))
-    c.door(cu - s, cu + s, cv + s)
-    c.pyramid(cu - s - 0.05, cv - s - 0.05, cu + s + 0.05, cv + s + 0.05, h, 14 + 2 * tier, col)
-    if tier >= 4:
-        x, y = c.P(cu, cv, h + 24)
-        c.d.line([(x, y), (x, y - 8)], fill=A(CON_L))
-        c.d.point([(x, y - 9)], fill=(255, 80, 80, 255))
-    return c
-
-
-def k_dome(fw, fh, tier, col, key):
-    base = 10 + 3 * tier
-    c = Canvas(fw, fh, base + 40)
-    ins = 0.35 - 0.04 * tier
-    stripe_block(c, ins, ins, fw - ins, fh - ins, base, col, key, lit=False)
-    x, y = c.P(fw / 2, fh / 2, base)
-    rad = round((fw / 2 - ins) * HW * 0.85)
-    c.d.pieslice((x - rad, y - rad, x + rad, y + rad // 2), 180, 360, fill=A(shade(col, 1.05)))
-    c.d.chord((x - rad, y - rad // 4, x + rad, y + rad // 4), 0, 180, fill=A(shade(col, 0.85)))
-    c.d.ellipse((x - rad // 2, y - rad + 3, x - rad // 5, y - rad + 7), fill=A(shade(col, 1.4)))
-    if tier >= 3:
-        c.d.line([(x + 1, y - rad + 2), (x + rad - 1, y - rad - 7)], fill=A(NAVY), width=2)
-    return c
-
-
-def k_lake(fw, fh, tier, col, key):
-    c = Canvas(fw, fh, 40)
-    c.box(0.3, fh - 0.7, fw - 0.2, fh - 0.35, 1, 3, WOOD, top=shade(WOOD, 1.08))
-    for u in (0.5, 1.5, 2.5):
-        if u < fw:
-            c.box(u, fh - 0.4, u + 0.08, fh - 0.32, -3, 3, WOOD_D)
-    for i in range(tier):
-        u = 0.5 + i * 0.6
-        c.box(u, fh - 0.66, u + 0.28, fh - 0.4, 3, 9, [GRASS, (58, 111, 216), CON_M, ORANGE][i])
-    if tier >= 3:
-        c.box(fw - 1.0, 0.2, fw - 0.2, 1.0, 0, 16, WOOD)
-        c.gable(fw - 1.05, 0.15, fw - 0.15, 1.05, 16, 8, col)
-    if tier >= 2:
-        c.box(1.1, 0.8, 1.8, 1.15, 0, 3, (230, 80, 70))
-    return c
-
-
-def k_wall(fw, fh, tier, col, key):
-    h = 18 + 5 * tier
-    c = Canvas(fw, fh, h + 20)
-    v0, v1 = fh / 2 - 0.25, fh / 2 + 0.25
-    c.box(0, v0, fw, v1, 0, h, CON_M)
-    c.louvres(0, v0, fw, v1, 0, h, CON_M, step=4)
-    for k in range(fw * 3):
-        if k % 2 == 0:
-            c.box(k / 3, v0, k / 3 + 1 / 3, v1, h, h + 4, CON_M)
-    x, y = c.P(fw / 2, v1, h / 2 + 2)
-    c.d.polygon([(x - 6, y - 6), (x + 6, y - 1), (x + 6, y + 4), (x, y + 7), (x - 6, y + 2)], fill=A(col))
-    c.d.rectangle((x, y - 2, x, y + 4), fill=A(WHITE))
-    if tier >= 3:
-        for u in (0, fw - 0.7):
-            c.box(u, v0 - 0.1, u + 0.7, v1 + 0.1, 0, h + 10, CON_D)
-            c.pyramid(u, v0 - 0.1, u + 0.7, v1 + 0.1, h + 10, 8, col)
-    return c
-
-
-def k_garden(fw, fh, tier, col, key):
-    c = Canvas(fw, fh, 70)
-    hedge = (60, 140, 64)
-    c.box(0, 0, fw, 0.22, 0, 7, hedge)
-    c.box(0, 0, 0.22, fh, 0, 7, hedge)
-    c.box(fw - 0.22, 0, fw, fh, 0, 7, hedge)
-    c.box(0, fh - 0.22, fw * 0.4, fh, 0, 7, hedge)
-    c.box(fw * 0.6, fh - 0.22, fw, fh, 0, 7, hedge)
-    tree, anchor, _, _ = PACKIMG["tree"]
-    for i in range(tier + 1):
-        c.stamp(tree, 0.9 + (i % 2) * 1.2, 0.9 + (i // 2) * 0.9, anchor)
-    x, y = c.P(fw / 2, fh - 0.1)
-    c.d.rectangle((x - 1, y - 14, x, y), fill=A(col))
-    c.d.rectangle((x - 5, y - 17, x + 5, y - 13), fill=A(col))
-    return c
-
-
-def k_stall(fw, fh, tier, col, key):
-    c = Canvas(fw, fh, 40)
-    u0, v0, u1, v1 = 0.4, fh / 2 - 0.2, fw - 0.4, fh - 0.4
-    c.box(u0, v0, u1, v1, 0, 10, WOOD)
-    c.box(u0, v1 - 0.08, u1, v1 + 0.08, 7, 9, WHITE)
-    for pu in (u0, u1 - 0.06):
-        c.box(pu, v1 - 0.06, pu + 0.06, v1, 10, 22, WOOD_D)
-    for k in range(8):
-        a = u0 - 0.1 + k * (u1 - u0 + 0.2) / 8
-        b = a + (u1 - u0 + 0.2) / 8
-        c.poly([(a, v0 - 0.2, 24), (b, v0 - 0.2, 24), (b, v1 + 0.3, 20), (a, v1 + 0.3, 20)], col if k % 2 else WHITE)
-    if tier >= 2:
-        for u in (0.6, fw - 0.9):
-            c.box(u, 0.3, u + 0.35, 0.65, 0, 5, WHITE)
-            x, y = c.P(u + 0.18, 0.48, 5)
-            c.d.line([(x, y), (x, y - 9)], fill=A(CON_D))
-            c.d.polygon([(x - 6, y - 8), (x + 6, y - 8), (x, y - 13)], fill=A(col if tier >= 3 else ORANGE))
-    return c
-
-
-def k_dock(fw, fh, tier, col, key):
-    c = Canvas(fw, fh, 44)
-    c.box(0, fh - 1, fw, fh - 0.2, 0, 3, WOOD, top=shade(WOOD, 1.08))
-    cols = [(239, 68, 68), (59, 130, 246), (34, 197, 94), ORANGE, (139, 92, 246), (20, 184, 166), (236, 72, 153), CON_M]
-    for i in range(tier * 2):
-        u = 0.2 + (i % 3) * 0.95
-        v = 0.3 + (i // 3 % 2) * 0.75
-        z = (i // 6) * 9
-        c.box(u, v, u + 0.85, v + 0.5, z, z + 9, cols[i % len(cols)])
+    """A building site on an fw x fh lot (a landmark at tier 0, a business before level 1): a foundation slab with
+    rebar and the first columns, a site cabin with lit windows, sand, pipes, pallets of bricks and steel beams, a
+    tower crane on the bigger lots (park_art.crane, red beacons at night), and friendly hoarding along the two front
+    edges with a gate left open. Deterministic per footprint."""
+    import park_art
+    big = fw >= 3 and fh >= 3
+    c = Canvas(fw, fh, 104 if fw >= 2 else 40, pad=20 if fw >= 2 else 2)
+    r = seeded(f"site{fw}x{fh}")
+    YEL = (255, 196, 40)
+    BRICK = (176, 86, 64)
+    SAND = (214, 180, 120)
+    # tower crane in the back corner (its jib overhangs the lot, as on a real site)
+    if fw >= 2:
+        img, (ax, ay), lit = park_art.crane().finish()
+        x, y = c.P(0, 0)
+        c.img.alpha_composite(img, (x - ax, y - ay))
+        if lit is not None:
+            c.lights.alpha_composite(lit, (x - ax, y - ay))
+    # the site cabin (stacked on a big lot) along the back-right edge
+    if fw >= 2:
+        u0, u1 = fw - 1.25, fw - 0.15
+        for k, z in enumerate((0, 12) if big else (0,)):
+            c.box(u0, 0.15, u1, 0.6, z, z + 11, (236, 238, 242), top=(214, 218, 226))
+            c.lface(0.6, u0, u1, z + 1, z + 2, (60, 110, 200))
+            for t in range(3):
+                a = u0 + 0.12 + t * 0.32
+                c.lface(0.6, a, a + 0.18, z + 4, z + 8, GLASS, light=(t + k) % 2 == 0)
+            c.rface(u1, 0.25, 0.5, z + 4, z + 8, GLASS_D, light=k == 0)
+        if big:  # its stair
+            for z in range(1, 12, 2):
+                c.line((u0 - 0.05 - z * 0.012, 0.62, z), (u0 - 0.05 - z * 0.012, 0.62, z + 1), CON_D)
+    # foundation slab, rebar and the first columns
+    s0u, s0v = (0.75, 0.85) if fw >= 2 else (0.18, 0.18)
+    s1u, s1v = (fw - 0.55, fh - 0.75) if fw >= 2 else (0.62, 0.62)
+    c.box(s0u, s0v, s1u, s1v, 0, 3, CON_M, top=(170, 176, 186))
+    for k in range(1, int((s1u - s0u) * 2)):  # formwork joints
+        c.line((s0u + k * 0.5, s0v + 0.02, 3), (s0u + k * 0.5, s1v - 0.02, 3), (150, 156, 166))
+    for k in range(int((s1u - s0u) * 6)):
+        u = s0u + 0.1 + k / 6
+        x, y = c.P(u, s0v + 0.1, 3)
+        c.d.line([(x, y), (x, y - 4)], fill=A((150, 90, 60)))
+    if fw >= 2:
+        for (u, v) in ((s0u + 0.1, s0v + 0.1), (s1u - 0.1, s0v + 0.1), (s0u + 0.1, s1v - 0.1), (s1u - 0.1, s1v - 0.1)):
+            c.box(u - 0.06, v - 0.06, u + 0.06, v + 0.06, 3, 22 if big else 16, CON_M, top=CON_L)
+        zt = 22 if big else 16
+        c.box(s0u + 0.04, s1v - 0.16, s1u - 0.04, s1v - 0.04, zt, zt + 3, CON_M, top=CON_L)
+        c.box(s1u - 0.16, s0v + 0.04, s1u - 0.04, s1v - 0.04, zt, zt + 3, CON_M, top=CON_L)
+        x, y = c.P(s1u - 0.1, s1v - 0.1, zt + 3)
+        c.d.point([(x, y - 1)], fill=A(ORANGE))
+        c.ld.rectangle((x - 1, y - 2, x + 1, y), fill=A(ORANGE))
+    # piles: a sand mound, pipes, a pallet of bricks, steel beams
+    def mound(u, v, rr):
+        x, y = c.P(u, v)
+        for k in range(5):
+            w, h = rr - k * rr // 5, max(1, (rr - k * rr // 5) // 2)
+            c.d.ellipse((x - w, y - h - k * 2, x + w, y + h - k * 2), fill=A(shade(SAND, 0.82 + k * 0.06)))
+    def pipes(u, v):
+        for k, (dx, dy) in enumerate(((0, 0), (5, 0), (2, -4))):
+            x, y = c.P(u, v)
+            c.d.ellipse((x + dx - 3, y + dy - 6, x + dx + 2, y + dy - 1), fill=A(CON_M))
+            c.d.ellipse((x + dx - 2, y + dy - 5, x + dx + 1, y + dy - 2), fill=A(CON_D))
+    def bricks(u, v):
+        c.box(u - 0.14, v - 0.14, u + 0.14, v + 0.14, 0, 2, WOOD)
+        c.box(u - 0.12, v - 0.12, u + 0.12, v + 0.12, 2, 8, BRICK)
+        for z in (4, 6):
+            c.line((u - 0.12, v + 0.12, z), (u + 0.12, v + 0.12, z), shade(BRICK, 0.75))
+    def beams(u, v):
         for k in range(3):
-            c.lface(v + 0.5, u + 0.12 + k * 0.25, u + 0.15 + k * 0.25, z + 1, z + 8, shade(cols[i % len(cols)], 0.72))
-    c.box(fw - 0.45, 0.1, fw - 0.3, 0.25, 0, 36, ORANGE)
-    c.line((fw - 0.38, 0.18, 36), (fw - 0.38, fh - 0.6, 36), ORANGE)
+            c.box(u - 0.3, v - 0.04 + k * 0.0, u + 0.3, v + 0.04, k * 2, k * 2 + 2, ORANGE_D, top=ORANGE)
+    if fw >= 2:
+        mound(0.45, fh - 0.4, 9 if big else 7)
+        pipes(fw - 0.5, fh - 0.55 if not big else 1.3)
+        bricks(fw - 0.4, fh * 0.5 + 0.3)
+        if big:
+            beams(1.5, fh - 0.35)
+            bricks(0.45, 1.25)
+    else:
+        mound(0.78, 0.72, 5)
+        bricks(0.3, 0.78)
+    # hoarding along the two front edges, a gate left open in the middle of the left one
+    gate = (fw / 2 - 0.3, fw / 2 + 0.3) if fw >= 2 else (2, 2)
+    for k in range(int(fw * 3)):
+        a, b = k / 3 + 0.02, (k + 1) / 3 - 0.02
+        if gate[0] < (a + b) / 2 < gate[1]:
+            continue
+        c.box(a, fh - 0.06, b, fh - 0.01, 0, 9, WHITE)
+        c.lface(fh - 0.01, a, b, 3, 5, ORANGE if k % 2 == 0 else WHITE)
+    for k in range(int(fh * 3)):
+        a, b = k / 3 + 0.02, (k + 1) / 3 - 0.02
+        c.box(fw - 0.06, a, fw - 0.01, b, 0, 9, WHITE)
+        c.rface(fw - 0.01, a, b, 3, 5, ORANGE_D if k % 2 == 0 else shade(WHITE, 0.85))
+    for t in range(int(fw) + 1):
+        u = min(t, fw - 0.04)
+        c.box(u - 0.03, fh - 0.07, u + 0.03, fh - 0.01, 0, 11, WOOD)
+    for t in range(int(fh)):
+        c.box(fw - 0.07, t + 0.02, fw - 0.01, t + 0.08, 0, 11, WOOD)
+    # a warning lamp on the gate posts, and a cone in the gateway
+    if fw >= 2:
+        for u in gate:
+            x, y = c.P(u, fh - 0.03, 11)
+            c.d.rectangle((x - 1, y - 2, x, y), fill=A(ORANGE))
+            c.ld.rectangle((x - 2, y - 3, x + 1, y + 1), fill=A(ORANGE, 160))
+        x, y = c.P(fw / 2, fh - 0.25)
+        c.d.polygon([(x - 3, y), (x + 3, y), (x, y - 8)], fill=A(ORANGE))
+        c.d.line([(x - 2, y - 3), (x + 2, y - 3)], fill=A(WHITE))
     return c
-
-
-def k_station(fw, fh, tier, col, key):
-    c = Canvas(fw, fh, 44)
-    c.box(0.1, 0.8, fw - 0.1, fh - 0.3, 0, 3, CON_L)
-    for u in (0.3, fw / 2, fw - 0.4):
-        c.box(u, fh - 0.5, u + 0.08, fh - 0.42, 3, 20, NAVY)
-    c.poly([(0, 0.7, 22), (fw, 0.7, 22), (fw, fh - 0.2, 19), (0, fh - 0.2, 19)], col)
-    stripe_block(c, 0.3, 0.2, fw - 0.3, 0.9, 16 + 3 * tier, col, key)
-    return c
-
-
-KINDS = dict(building=k_building, tower=k_tower, dome=k_dome, lake=k_lake, wall=k_wall, garden=k_garden, stall=k_stall,
-             dock=k_dock, factory=k_factory, warehouse=k_warehouse, station=k_station)
 
 
 # Metric frame for ray-cast curves: one tile side is TILE_M units, a z pixel is 1/Z_PX units, and the eye looks down
@@ -879,104 +792,11 @@ def spheres():
 
 
 def hq(col, key):
-    """A district's headquarters: a stone podium with a glass lobby and an orange canopy, a set-back glass-and-navy
-    tower (seeded lit windows between navy mullions, a corner fin and a crown band in the district colour), and a
-    rooftop that says which part of AWS lives there (the skyline's crowns, towers_art.py, at HQ scale):
-    compute fans, a storage water tank, a database disk stack, a networking mast, security battlements and crest,
-    an AI glass pyramid. key is the district id."""
-    from landmarks_aws_a import cyl
-    H = 62
-    c = Canvas(2, 2, H + 40)
-    pave = (204, 198, 186)
-    c.box(0.04, 0.04, 1.96, 1.96, 0, 2, CON_M, top=pave)
-    # podium + lobby
-    c.box(0.14, 0.14, 1.86, 1.86, 2, 15, CON_L)
-    c.lface(1.86, 0.26, 1.74, 3, 12, GLASS, light=True)
-    c.rface(1.86, 0.26, 1.74, 3, 12, GLASS_D, light=True)
-    for k in range(7):
-        t = 0.26 + k * 0.245
-        c.line((t, 1.86, 3), (t, 1.86, 12), NAVY_D)
-        c.line((1.86, t, 3), (1.86, t, 12), NAVY_D)
-    c.lface(1.86, 0.82, 1.18, 2, 10, (255, 226, 160), light=True)  # the doors, lit
-    c.line((1.0, 1.86, 2), (1.0, 1.86, 10), NAVY_D)
-    c.box(0.66, 1.84, 1.34, 1.99, 10, 12, ORANGE, top=shade(ORANGE, 1.06), left=ORANGE_D)  # canopy
-    c.box(0.12, 0.12, 1.88, 1.88, 15, 17, shade(CON_L, 0.86))
-    c.lface(1.88, 0.12, 1.88, 15, 16, col)
-    c.rface(1.88, 0.12, 1.88, 15, 16, shade(col, 0.8))
-    # tower
-    u0, u1 = 0.42, 1.58
-    c.box(u0, u0, u1, u1, 17, H, NAVY)
-    c.windows(u0, u0, u1, u1, 16, H - 2, key, every=0.29, size=0.18, fh=7)
-    c.lface(u1, u1 - 0.12, u1, 17, H, col)  # the corner fin
-    c.rface(u1, u1 - 0.12, u1, 17, H, shade(col, 0.78))
-    c.box(u0 - 0.04, u0 - 0.04, u1 + 0.04, u1 + 0.04, H, H + 4, col)
-    z = H + 4
-    c.poly([(u0, u0, z), (u1, u0, z), (u1, u1, z), (u0, u1, z)], shade(NAVY, 1.3))
-    r = seeded(key + "roof")
-    if key == "compute":
-        c.box(0.6, 0.6, 1.4, 1.4, z, z + 5, CON_M)
-        for u in (0.8, 1.2):
-            c.fan(u, 1.0, z + 5, r=0.2, frame=r(6))
-        for k in range(5):
-            c.lface(1.4, 0.66 + k * 0.14, 0.72 + k * 0.14, z + 1, z + 3, (120, 230, 120) if r(2) else ORANGE, light=True)
-    elif key == "storage":
-        for u, v in ((0.78, 0.78), (1.22, 0.78), (0.78, 1.22), (1.22, 1.22)):
-            c.box(u - 0.03, v - 0.03, u + 0.03, v + 0.03, z, z + 7, NAVY_D)
-        x, y = cyl(c, 1.0, 1.0, z + 7, z + 21, 0.36, col)
-        c.d.polygon([(x - 13, y), (x + 13, y), (x, y - 7)], fill=A(shade(col, 0.72)))
-        c.d.polygon([(x - 13, y), (x, y), (x, y - 7)], fill=A(shade(col, 0.86)))
-        for k in (5, 10):
-            c.d.line([(x - 12, y + k), (x + 12, y + k)], fill=A(shade(col, 0.7)))
-    elif key == "database":
-        for k in range(3):
-            x, y = c.P(1.0, 1.0, z + 3 + k * 7)
-            dc = col if k % 2 == 0 else shade(col, 1.25)
-            c.d.rectangle((x - 13, y - 4, x + 13, y + 2), fill=A(shade(dc, 0.72)))
-            c.d.ellipse((x - 13, y - 1, x + 13, y + 6), fill=A(shade(dc, 0.72)))
-            c.d.ellipse((x - 13, y - 8, x + 13, y), fill=A(dc))
-            c.d.line([(x - 9, y + 3), (x + 9, y + 3)], fill=A((255, 214, 120)))
-            c.ld.line([(x - 9, y + 3), (x + 9, y + 3)], fill=A((255, 214, 120)))
-    elif key == "networking":
-        c.box(0.7, 0.7, 1.3, 1.3, z, z + 5, CON_M)
-        c.box(0.96, 0.96, 1.04, 1.04, z + 5, z + 36, CON_L)
-        for k in range(z + 10, z + 34, 6):
-            c.line((0.9, 1.0, k), (1.1, 1.0, k), CON_M)
-        x, y = c.P(0.84, 1.0, z + 18)  # a dish
-        c.d.line([(x, y), (x + 4, y)], fill=A(CON_M))
-        c.d.ellipse((x - 5, y - 6, x + 1, y + 6), fill=A(CON_M))
-        c.d.ellipse((x - 4, y - 5, x, y + 5), fill=A(WHITE))
-        x, y = c.P(1.0, 1.0, z + 38)
-        c.d.rectangle((x - 1, y - 1, x + 1, y + 1), fill=A((230, 40, 40)))
-        c.ld.rectangle((x - 1, y - 1, x + 1, y + 1), fill=A((255, 80, 60)))
-    elif key == "security":
-        for k in range(5):
-            t = u0 + k * 0.27
-            c.box(t, u0 - 0.04, t + 0.13, u0 + 0.1, z, z + 7, shade(CON_L, 0.8))
-            c.box(u0 - 0.04, t, u0 + 0.1, t + 0.13, z, z + 7, shade(CON_L, 0.9))
-        for k in range(5):
-            t = u0 + k * 0.27
-            c.box(t, u1 - 0.1, t + 0.13, u1 + 0.04, z, z + 7, shade(CON_L, 0.9))
-            c.box(u1 - 0.1, t, u1 + 0.04, t + 0.13, z, z + 7, shade(CON_L, 0.8))
-        x, y = c.P(1.0, u1, H - 16)
-        c.d.polygon([(x - 7, y - 8), (x + 7, y - 8), (x + 7, y), (x, y + 7), (x - 7, y)], fill=A(col))
-        c.d.polygon([(x - 5, y - 6), (x + 5, y - 6), (x + 5, y), (x, y + 5), (x - 5, y)], outline=A(WHITE))
-        c.d.line([(x, y - 5), (x, y + 4)], fill=A(WHITE))
-    else:  # aiml
-        c.pyramid(u0, u0, u1, u1, z, 26, shade(col, 1.25))
-        apex = (1.0, 1.0, z + 26)
-        for k in range(1, 4):
-            t = k / 4
-            a = (u0 + (1.0 - u0) * t, u1 + (1.0 - u1) * t, z + 26 * t)
-            b = (u1 + (1.0 - u1) * t, u1 + (1.0 - u1) * t, z + 26 * t)
-            d = (u1 + (1.0 - u1) * t, u0 + (1.0 - u0) * t, z + 26 * t)
-            c.line(a, b, shade(col, 0.8))
-            c.line(b, d, shade(col, 0.6))
-        c.line((u1, u1, z), apex, shade(col, 0.7))
-        c.ld.polygon([c.P(u0 + 0.08, u1, z + 1), c.P(u1, u1, z + 1), c.P(1.0, 1.0, z + 22)], fill=(120, 255, 220, 150))
-        x, y = c.P(*apex)
-        c.d.rectangle((x - 1, y - 1, x + 1, y + 1), fill=A(WHITE))
-        c.ld.rectangle((x - 1, y - 1, x + 1, y + 1), fill=A(WHITE))
-    return c
+    """A district's headquarters (2x2): each district has its own building type, drawn with the service-building kit
+    in services/hq.py (a server hall, a warehouse and water tower, an archive, an exchange and mast, a keep, a glass
+    pyramid lab). key is the district id."""
+    from services.hq import hq as draw
+    return draw(col, key)
 
 
 def lookout_tower():
@@ -1006,28 +826,78 @@ def workshop():
 
 
 def drawer_for(service):
-    """Every service has its own drawer lm_<id> (landmarks_aws*.py); the generic KINDS are only a fallback."""
-    import landmarks_aws
-    return landmarks_aws.BESPOKE.get(service["id"]) or KINDS[service["kind"]]
+    """Every service's front building lm_<id>, from services/<district>.py (services.REGISTRY, which refuses a district
+    module that misses one). There is no generic fallback."""
+    import services
+    if service["id"] not in services.REGISTRY:
+        raise KeyError(f"no drawer for {service['id']}: add lm_/tw_{service['id']} to services/{service['districtId']}.py")
+    return services.REGISTRY[service["id"]][0]
+
+
+def landmark(s, tier, col):
+    """One service's landmark at one tier: the bespoke building in front of its tower (growth_art), the empty sky
+    trimmed. Returns ((img, anchor), (lights, anchor) or None)."""
+    import growth_art
+    from services.kit import lot_dressing
+    tower = growth_art.tower_for(s, tier)
+    # Novice and Practitioner lots get people-scale street furniture laid under the building (it only fills empty lot)
+    front = growth_art.with_tower(drawer_for(s)(3, 3, tier, col, f"{s['id']}{tier}").finish(), lot_dressing(s["id"], tier, col, s.get("kind")))
+    img, anchor, lit = growth_art.with_tower(front, tower.finish() if tower else None)
+    return growth_art.crop(img, anchor), (growth_art.crop(lit, anchor) if lit is not None else None)
+
+
+def tower_tip(name, img, anchor):
+    """A service tower's tip must be the sprite's top centre: Landmark.setLevel stands the legend crowns on the
+    sprite's top centre (getTopCenter). Returns the tip's height above the lot's N corner, in px."""
+    top = img.getbbox()[1]
+    cx = img.width // 2
+    if anchor[0] != cx or not any(img.getpixel((x, top))[3] for x in (cx - 1, cx)):
+        raise ValueError(f"{name}: the tower's tip is not its top centre (legend crowns would float)")
+    return anchor[1] - top
+
+
+def silhouettes(world, report):
+    """How alike the Master skylines of a district look: for each pair, the overlap (intersection over union) of
+    their silhouettes above 60 px, both aligned on the lot corner. The services/ districts aim for < 0.8."""
+    import services
+    for d in {s["districtId"] for s in world["services"] if s["id"] in services.REGISTRY}:
+        ids = sorted(s["id"] for s in world["services"] if s["districtId"] == d)
+        masks = {}
+        for sid in ids:
+            img, (ax, ay) = SPRITES[f"lm:{sid}:4"]
+            m = Image.new("L", (240, 420), 0)
+            m.paste(img.getchannel("A").point(lambda a: 255 if a else 0), (120 - ax, 400 - ay))
+            m.paste(0, (0, 340, 240, 420))
+            masks[sid] = m
+        worst = (0.0, "")
+        for i, a in enumerate(ids):
+            for b in ids[i + 1:]:
+                both = ImageChops.multiply(masks[a], masks[b]).histogram()[255]
+                union = ImageChops.lighter(masks[a], masks[b]).histogram()[255]
+                worst = max(worst, (round(both / max(1, union), 3), f"{a}/{b}"))
+        report["overlap"][d] = {"worst": worst[0], "pair": worst[1]}
 
 
 def build_landmarks(world):
     import culture_art
+    import services
     colors = {d["id"]: rgb(d["color"]) for d in world["districts"]}
     for fw, fh in ((3, 3), (2, 2), (1, 1)):
-        add(f"construction{fw}x{fh}", construction(fw, fh), lights=False)
-    import growth_art
+        add(f"construction{fw}x{fh}", construction(fw, fh))
+    report = {"tips": {}, "overlap": {}}
     for s in world["services"]:
-        draw = drawer_for(s)
         for tier in (1, 2, 3, 4):
-            # the bespoke landmark in front of its knowledge tower (growth_art), with the empty sky trimmed
-            tower = growth_art.knowledge_tower(s["districtId"], tier, f"kt:{s['id']}")
-            img, anchor, lit = growth_art.with_tower(draw(3, 3, tier, colors[s["districtId"]], f"{s['id']}{tier}").finish(),
-                                                     tower.finish() if tower else None)
+            day, night = landmark(s, tier, colors[s["districtId"]])
             name = f"lm:{s['id']}:{tier}"
-            add(name, *growth_art.crop(img, anchor))
-            if lit is not None:
-                add(name + "@lights", *growth_art.crop(lit, anchor))
+            add(name, *day)
+            if night is not None:
+                add(name + "@lights", *night)
+            if s["id"] in services.REGISTRY and tier == 4:
+                report["tips"][s["id"]] = tower_tip(name, *day)
+    silhouettes(world, report)
+    with open(os.path.join(HERE, "report.json"), "w") as f:
+        json.dump(report, f, indent=2, sort_keys=True)
+        f.write("\n")
     for d in world["districts"]:
         add(f"hq:{d['id']}", hq(colors[d["id"]], d["id"]))
     add("spheres", spheres())
@@ -1103,22 +973,91 @@ def build_interior():
 
 
 # ── packing ───────────────────────────────────────────────────────────────────
+# Each sprite is trimmed to its opaque pixels before packing (a building's @lights layer is mostly empty sky and wall).
+# The atlas stores the trim the TexturePacker way ("trimmed", "spriteSourceSize", "sourceSize"), and Phaser draws a
+# trimmed frame at its offset inside the full source size (Frame.setTrim), so origins, crops, flips, getBounds and
+# getPixelAlpha all keep working in untrimmed pixels: sprites.json's anchors (ax, ay, w, h) describe the full canvas
+# and nothing in the game changes. Frames that swap in place (a van's facings, a ride's frames) stay swappable.
+
+GAP = 1  # transparent pixels kept round every frame, so nothing bleeds into a neighbour
+
+
+def trim(img):
+    """(cropped image, (x, y) of the crop in the full canvas). An empty sprite keeps one transparent pixel."""
+    box = img.getchannel("A").getbbox()
+    if box is None:
+        return img.crop((0, 0, 1, 1)), (0, 0)
+    return (img, (0, 0)) if box == (0, 0, img.width, img.height) else (img.crop(box), box[:2])
+
+
+class MaxRects:
+    """MaxRects bin packer, best-short-side-fit (Jukka Jylänki, "A Thousand Ways to Pack the Bin"). Deterministic:
+    ties go to the free rectangle found first, and the free list keeps its order."""
+
+    def __init__(self, w, h):
+        self.free = [(0, 0, w, h)]
+
+    def insert(self, w, h):
+        best, score = None, None
+        for fx, fy, fw, fh in self.free:
+            if w <= fw and h <= fh:
+                s = (min(fw - w, fh - h), max(fw - w, fh - h), fy, fx)
+                if score is None or s < score:
+                    best, score = (fx, fy), s
+        if best is None:
+            return None
+        self._place((best[0], best[1], w, h))
+        return best
+
+    def _place(self, r):
+        x, y, w, h = r
+        kept, split = [], []
+        for f in self.free:
+            fx, fy, fw, fh = f
+            if x >= fx + fw or x + w <= fx or y >= fy + fh or y + h <= fy:
+                kept.append(f)
+                continue
+            if x > fx:
+                split.append((fx, fy, x - fx, fh))
+            if x + w < fx + fw:
+                split.append((x + w, fy, fx + fw - x - w, fh))
+            if y > fy:
+                split.append((fx, fy, fw, y - fy))
+            if y + h < fy + fh:
+                split.append((fx, y + h, fw, fy + fh - y - h))
+
+        def inside(a, b):
+            return b[0] <= a[0] and b[1] <= a[1] and a[0] + a[2] <= b[0] + b[2] and a[1] + a[3] <= b[1] + b[3]
+
+        # the kept rectangles already hold none of each other, and a new piece lies inside the one it was cut from, so
+        # only the new pieces can be redundant: drop each one inside a kept rectangle or another piece (of two equal
+        # pieces, the first stays)
+        fresh = [a for i, a in enumerate(split)
+                 if not any(inside(a, b) for b in kept)
+                 and not any(inside(a, b) and (a != b or j < i) for j, b in enumerate(split) if j != i)]
+        self.free = kept + fresh
+
 
 def pack(sprites, max_w=2048, max_h=2048):
-    items = sorted(sprites.items(), key=lambda kv: -kv[1][0].height)
-    pages, cur, x, y, row = [], {}, 0, 0, 0
-    for name, (img, anchor) in items:
-        w, h = img.width + 2, img.height + 2
-        if x + w > max_w:
-            x, y, row = 0, y + row, 0
-        if y + h > max_h:
-            pages.append(cur)
-            cur, x, y, row = {}, 0, 0, 0
-        cur[name] = (img, anchor, x + 1, y + 1)
-        x += w
-        row = max(row, h)
-    if cur:
-        pages.append(cur)
+    """Pages of {name: (trimmed image, (x, y) on the page, (dx, dy) trim offset)}. Biggest first (longer side, then
+    area, then name: a stable order), each into the first page it fits."""
+    trimmed = {name: trim(img) for name, (img, _) in sprites.items()}
+    order = sorted(trimmed, key=lambda n: (-max(trimmed[n][0].size), -trimmed[n][0].width * trimmed[n][0].height, n))
+    bins, pages = [], []
+    for name in order:
+        img, off = trimmed[name]
+        w, h = img.width + 2 * GAP, img.height + 2 * GAP
+        if w > max_w or h > max_h:
+            raise ValueError(f"sprite too big for a {max_w}×{max_h} page: {name} {img.size}")
+        for b, page in zip(bins, pages):
+            at = b.insert(w, h)
+            if at:
+                break
+        else:
+            bins.append(MaxRects(max_w, max_h))
+            pages.append({})
+            b, page, at = bins[-1], pages[-1], bins[-1].insert(w, h)
+        page[name] = (img, (at[0] + GAP, at[1] + GAP), off)
     return pages
 
 
@@ -1141,8 +1080,22 @@ def main():
     signatures_art.build(add)
     import park_art
     park_art.build(add)
+    import airport_art
+    airport_art.build(add)
+    import clients_art
+    clients_art.build(add)
     import legend_art
     legend_art.build(add)
+    import streets_art
+    streets_art.build(add)
+    import infill_art
+    infill_art.build(add)
+    import builder_art
+    builder_art.build(add)
+    import combos_art
+    combos_art.build(add)
+    import seasons_art
+    seasons_art.build(add)  # after the props, landscape, streets and build-mode art: it recolours their sprites
     build_landmarks(world)
     build_interior()
 
@@ -1150,17 +1103,22 @@ def main():
     for old in os.listdir(OUT):
         os.remove(os.path.join(OUT, old))
     pages = pack(SPRITES)
-    textures, anchors = [], {}
+    textures = []
+    # anchors describe each sprite's full canvas (the atlas's sourceSize), tallest first as they always were
+    anchors = {name: {"ax": anchor[0], "ay": anchor[1], "w": img.width, "h": img.height}
+               for name, (img, anchor) in sorted(SPRITES.items(), key=lambda kv: -kv[1][0].height)}
     for i, page in enumerate(pages):
-        pw = max(x + img.width for img, _, x, _ in page.values()) + 1
-        ph = max(y + img.height for img, _, _, y in page.values()) + 1
+        pw = max(x + img.width for img, (x, _), _ in page.values()) + GAP
+        ph = max(y + img.height for img, (_, y), _ in page.values()) + GAP
         sheet = Image.new("RGBA", (pw, ph), CLEAR)
         frames = []
-        for name, (img, anchor, x, y) in page.items():
+        for name in sorted(page):
+            img, (x, y), (dx, dy) = page[name]
+            full = SPRITES[name][0]
             sheet.paste(img, (x, y))
-            frames.append({"filename": name, "frame": {"x": x, "y": y, "w": img.width, "h": img.height}, "rotated": False, "trimmed": False,
-                           "spriteSourceSize": {"x": 0, "y": 0, "w": img.width, "h": img.height}, "sourceSize": {"w": img.width, "h": img.height}})
-            anchors[name] = {"ax": anchor[0], "ay": anchor[1], "w": img.width, "h": img.height}
+            frames.append({"filename": name, "frame": {"x": x, "y": y, "w": img.width, "h": img.height}, "rotated": False,
+                           "trimmed": img.size != full.size,
+                           "spriteSourceSize": {"x": dx, "y": dy, "w": img.width, "h": img.height}, "sourceSize": {"w": full.width, "h": full.height}})
         fn = f"atlas-{i}.png"
         sheet.save(os.path.join(OUT, fn), optimize=True)
         textures.append({"image": fn, "format": "RGBA8888", "size": {"w": pw, "h": ph}, "scale": 1, "frames": frames})
@@ -1200,6 +1158,22 @@ def preview():
     import preview_landmarks
     preview_landmarks.contact_sheet(SPRITES, [n for n in SPRITES if n.startswith("lm:")], os.path.join(CACHE, "landmarks-preview.png"))
     preview_landmarks.contact_sheet(SPRITES, [n for n in SPRITES if n.startswith("culture:")], os.path.join(CACHE, "culture-preview.png"), per_row=6)
+    import airport_art
+    import clients_art
+    airport_art.preview(SPRITES, os.path.join(CACHE, "airport-preview.png"))
+    clients_art.preview(SPRITES, os.path.join(CACHE, "clients-preview.png"))
+    clients_art.preview(SPRITES, os.path.join(CACHE, "clients2-preview.png"), tuple(clients_art.CLIENTS2))
+    import builder_art
+    builder_art.preview(SPRITES, os.path.join(CACHE, "builder-preview.png"))
+    import combos_art
+    import seasons_art
+    combos_art.preview(SPRITES, os.path.join(CACHE, "combos-preview.png"))
+    seasons_art.preview(SPRITES, os.path.join(CACHE, "seasons-preview.png"))
+    import preview_services
+    with open(os.path.join(ROOT, "shared", "world.json")) as f:
+        world = json.load(f)
+    preview_services.write(SPRITES, preview_services.build_all(world), world, os.path.join(CACHE, "services-preview.png"),
+                           os.path.join(CACHE, "services-city-preview.png"))
 
 
 if __name__ == "__main__":

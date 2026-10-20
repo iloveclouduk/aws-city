@@ -1,6 +1,6 @@
 {
-  "source": "Service codes verified verbatim in the public AWS Health Dashboard feed (health.aws.amazon.com/public/currentevents, impacted_services keys '<code>-<region>', 2026-10-11). Aurora and EBS have no codes of their own there: AWS reports them under Amazon RDS and Amazon EC2. What's New product tags verified in the What's New RSS (aws.amazon.com/about-aws/whats-new/recent/feed/, category 'general:products/<tag>', 2026-10-11). Titles match a landmark only by the exact phrases below. Anything not listed shows as 'other'.",
-  "asOf": "2026-10-11",
+  "source": "Service codes verified verbatim in the public AWS Health Dashboard feed (health.aws.amazon.com/public/currentevents, impacted_services keys '<code>-<region>', 2026-10-11). Aurora and EBS have no codes of their own there: AWS reports them under Amazon RDS and Amazon EC2. What's New product tags verified in the What's New RSS (aws.amazon.com/about-aws/whats-new/recent/feed/, category 'general:products/<tag>', 2026-10-11). Titles match a landmark only by the exact phrases below. Anything not listed shows as 'other'. The services added on 2026-10-19 were checked the same way that day: their codes (state for Step Functions, ec2systemsmanager for Systems Manager, docdb for DocumentDB, elasticsearch for OpenSearch Service, and globalaccelerator, which has no Region suffix and so reads as a global event) and their What's New tags. App Runner, Lightsail, Organizations and Comprehend had no current event to verify a code against, so they match by title only.",
+  "asOf": "2026-10-19",
   "health": {
     "ec2": ["ec2", "ebs"],
     "lambda": ["lambda"],
@@ -32,7 +32,24 @@
     "cloudwatch": ["cloudwatch"],
     "cloudtrail": ["cloudwatch"],
     "bedrock": ["bedrock"],
-    "sagemaker": ["sagemaker"]
+    "sagemaker": ["sagemaker"],
+    "batch": ["batch"],
+    "backup": ["backup"],
+    "kinesis": ["kinesis"],
+    "elasticsearch": ["opensearch"],
+    "docdb": ["documentdb"],
+    "transitgateway": ["transitgateway"],
+    "globalaccelerator": ["globalaccelerator"],
+    "secretsmanager": ["secretsmanager"],
+    "inspector": ["inspector"],
+    "macie": ["macie"],
+    "securityhub": ["securityhub"],
+    "polly": ["polly"],
+    "state": ["stepfunctions"],
+    "cloudformation": ["cloudformation"],
+    "ec2systemsmanager": ["systemsmanager"],
+    "config": ["config"],
+    "appsync": ["appsync"]
   },
   "products": {
     "amazon-ec2": ["ec2"],
@@ -52,7 +69,13 @@
     "amazon-guardduty": ["guardduty"],
     "amazon-cloudwatch": ["cloudwatch"],
     "aws-cloudtrail": ["cloudwatch"],
-    "amazon-bedrock": ["bedrock"]
+    "amazon-bedrock": ["bedrock"],
+    "aws-backup": ["backup"],
+    "amazon-opensearch-service": ["opensearch"],
+    "aws-transit-gateway": ["transitgateway"],
+    "aws-secrets-manager": ["secretsmanager"],
+    "aws-security-hub": ["securityhub"],
+    "aws-config": ["config"]
   },
   "titles": {
     "ec2": ["Amazon EC2"],
@@ -90,6 +113,27 @@
     "sagemaker": ["SageMaker"],
     "q": ["Amazon Q"],
     "rekognition": ["Rekognition"],
-    "textract": ["Textract"]
+    "textract": ["Textract"],
+    "apprunner": ["App Runner"],
+    "batch": ["AWS Batch"],
+    "lightsail": ["Lightsail"],
+    "backup": ["AWS Backup"],
+    "kinesis": ["Kinesis Data Streams"],
+    "opensearch": ["Amazon OpenSearch Service", "OpenSearch Serverless"],
+    "documentdb": ["Amazon DocumentDB"],
+    "transitgateway": ["Transit Gateway"],
+    "globalaccelerator": ["Global Accelerator"],
+    "secretsmanager": ["Secrets Manager"],
+    "inspector": ["Amazon Inspector"],
+    "macie": ["Macie"],
+    "securityhub": ["Security Hub"],
+    "polly": ["Amazon Polly"],
+    "comprehend": ["Comprehend"],
+    "stepfunctions": ["Step Functions"],
+    "cloudformation": ["CloudFormation"],
+    "systemsmanager": ["Systems Manager"],
+    "config": ["AWS Config"],
+    "organizations": ["AWS Organizations"],
+    "appsync": ["AppSync"]
   }
 }

@@ -1,0 +1,190 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the overnight render bake. Each scene file uploaded to a private S3 bucket matches an EventBridge rule that submits an AWS Batch job. The job queue runs on Fargate Spot, which scales to the queue and back to nothing, and each job retries if its capacity is taken back.
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: The render container image (for example in Amazon ECR)
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Subnets for the render tasks, with a route to pull the image (a NAT gateway or VPC endpoints)
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC of those subnets
+
+Resources:
+  ScenesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+            BucketKeyEnabled: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  RenderSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Render tasks, outbound only
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  JobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: read-scenes-write-frames
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub '${ScenesBucket.Arn}/scenes/*'
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub '${ScenesBucket.Arn}/frames/*'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  RenderCompute:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ComputeResources:
+        Type: FARGATE_SPOT
+        MaxvCpus: 64
+        Subnets: !Ref SubnetIds
+        SecurityGroupIds:
+          - !Ref RenderSecurityGroup
+      Tags:
+        managed-by: aws-city
+
+  RenderQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref RenderCompute
+      Tags:
+        managed-by: aws-city
+
+  RenderJob:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: container
+      PlatformCapabilities:
+        - FARGATE
+      RetryStrategy:
+        Attempts: 3
+      Timeout:
+        AttemptDurationSeconds: 7200
+      ContainerProperties:
+        Image: !Ref ImageUri
+        JobRoleArn: !GetAtt JobRole.Arn
+        ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+        ResourceRequirements:
+          - Type: VCPU
+            Value: '1'
+          - Type: MEMORY
+            Value: '2048'
+        Environment:
+          - Name: BUCKET
+            Value: !Ref ScenesBucket
+      Tags:
+        managed-by: aws-city
+
+  SubmitRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: submit-render-jobs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: batch:SubmitJob
+                Resource:
+                  - !Ref RenderQueue
+                  - !Ref RenderJob
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  UploadRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: A new scene file submits a render job
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - !Ref ScenesBucket
+          object:
+            key:
+              - prefix: scenes/
+      Targets:
+        - Id: render
+          Arn: !Ref RenderQueue
+          RoleArn: !GetAtt SubmitRole.Arn
+          BatchParameters:
+            JobDefinition: !Ref RenderJob
+            JobName: render-scene
+
+Outputs:
+  BucketName:
+    Description: Upload scene files under scenes/; frames are written under frames/
+    Value: !Ref ScenesBucket
+  JobQueueArn:
+    Value: !Ref RenderQueue

@@ -243,6 +243,46 @@
       "eks",
       "ec2",
       "The scheduler found room for three more pods on your nodes."
+    ],
+    [
+      "secretsmanager",
+      "rds",
+      "New password for you, Ray. Same one in the strongroom."
+    ],
+    [
+      "lambda",
+      "secretsmanager",
+      "Sid, may I have the database login? I'll keep it in my pocket a while."
+    ],
+    [
+      "inspector",
+      "ec2",
+      "Eddie, one of your machines needs a patch. Details are in the finding."
+    ],
+    [
+      "macie",
+      "s3",
+      "Sally, there are card numbers in one of your buckets. Let's tidy that up."
+    ],
+    [
+      "guardduty",
+      "securityhub",
+      "Hana, new finding from the watchtower. Looks serious."
+    ],
+    [
+      "securityhub",
+      "eventbridge",
+      "Critical one coming your way. Wake the on-call team."
+    ],
+    [
+      "polly",
+      "comprehend",
+      "Nora, which comments were the kind ones? I'll read them on air."
+    ],
+    [
+      "comprehend",
+      "dynamodb",
+      "Mood: positive. Names hidden. Please file it under today's show."
     ]
   ]
 }

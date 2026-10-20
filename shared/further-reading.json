@@ -8,7 +8,7 @@
   },
   "books": [
     { "id": "aws-fundamentals", "title": "AWS Fundamentals", "authors": "Tobias Schmidt and Sandro Volpicella", "publisher": "AWS Fundamentals", "url": "https://awsfundamentals.com/books/aws-fundamentals", "free": false, "freeSample": true, "services": ["ec2", "lambda", "ecs", "s3", "dynamodb", "rds", "vpc", "route53", "cloudfront", "apigateway", "sqs", "eventbridge", "iam", "cognito", "cloudwatch"] },
-    { "id": "aws-cookbook", "title": "AWS Cookbook", "authors": "John Culkin and Mike Zazon", "publisher": "O'Reilly", "year": 2021, "isbn": "9781492092599", "url": "https://www.oreilly.com/library/view/aws-cookbook/9781492092599/", "free": false, "services": ["ec2", "ecs", "fargate", "lambda", "s3", "ebs", "efs", "rds", "aurora", "dynamodb", "vpc", "route53", "iam", "kms", "cloudwatch", "athena", "glue", "rekognition", "textract"] },
+    { "id": "aws-cookbook", "title": "AWS Cookbook", "authors": "John Culkin and Mike Zazon", "publisher": "O'Reilly", "year": 2021, "isbn": "9781492092599", "url": "https://www.oreilly.com/library/view/aws-cookbook/9781492092599/", "free": false, "services": ["ec2", "ecs", "fargate", "lambda", "s3", "ebs", "efs", "rds", "aurora", "dynamodb", "vpc", "route53", "iam", "kms", "cloudwatch", "athena", "glue", "rekognition", "textract", "secretsmanager", "comprehend"] },
     { "id": "serverless-development", "title": "Serverless Development on AWS", "authors": "Sheen Brisals and Luke Hedger", "publisher": "O'Reilly", "year": 2024, "isbn": "9781098141929", "url": "https://www.oreilly.com/library/view/serverless-development-on/9781098141929/", "free": false, "services": ["lambda", "apigateway", "dynamodb", "sqs", "eventbridge", "cognito", "cloudwatch"] },
     { "id": "generative-ai-on-aws", "title": "Generative AI on AWS", "authors": "Chris Fregly, Antje Barth and Shelbee Eigenbrode", "publisher": "O'Reilly", "year": 2023, "isbn": "9781098159214", "url": "https://www.oreilly.com/library/view/generative-ai-on/9781098159214/", "free": false, "services": ["bedrock", "sagemaker"] }
   ],
@@ -44,10 +44,32 @@
     "guardduty": { "cheatSheet": "https://tutorialsdojo.com/amazon-guardduty/" },
     "cloudwatch": { "cheatSheet": "https://tutorialsdojo.com/amazon-cloudwatch/", "articles": "https://awsfundamentals.com/blog/service/cloudwatch" },
     "bedrock": { "cheatSheet": "https://tutorialsdojo.com/amazon-bedrock/", "articles": "https://awsfundamentals.com/blog/service/bedrock" },
-    "agentcore": { "cheatSheet": "https://tutorialsdojo.com/amazon-bedrock-agentcore/" },
+    "agentcore": { "cheatSheet": "https://tutorialsdojo.com/amazon-bedrock-agentcore/", "articles": "https://awsfundamentals.com/blog/bedrock-agentcore-harness" },
     "sagemaker": { "cheatSheet": "https://tutorialsdojo.com/amazon-sagemaker/" },
     "q": { "cheatSheet": "https://tutorialsdojo.com/amazon-q/", "articles": "https://awsfundamentals.com/blog/service/amazon-q" },
     "rekognition": { "cheatSheet": "https://tutorialsdojo.com/amazon-rekognition/" },
-    "textract": { "cheatSheet": "https://tutorialsdojo.com/amazon-textract/" }
+    "textract": { "cheatSheet": "https://tutorialsdojo.com/amazon-textract/" },
+    "securityagent": { "guide": "https://tutorialsdojo.com/aws-security-agent-context-aware-application-security/" },
+    "apprunner": { "cheatSheet": "https://tutorialsdojo.com/aws-app-runner/", "articles": "https://awsfundamentals.com/blog/aws-app-runner-the-easy-way-to-run-your-containers" },
+    "batch": { "cheatSheet": "https://tutorialsdojo.com/aws-batch/" },
+    "lightsail": { "cheatSheet": "https://tutorialsdojo.com/amazon-lightsail/" },
+    "backup": { "cheatSheet": "https://tutorialsdojo.com/aws-backup/" },
+    "kinesis": { "cheatSheet": "https://tutorialsdojo.com/amazon-kinesis/" },
+    "opensearch": { "cheatSheet": "https://tutorialsdojo.com/amazon-opensearch-service/" },
+    "documentdb": { "cheatSheet": "https://tutorialsdojo.com/amazon-documentdb/" },
+    "transitgateway": { "cheatSheet": "https://tutorialsdojo.com/aws-transit-gateway/" },
+    "globalaccelerator": { "cheatSheet": "https://tutorialsdojo.com/aws-global-accelerator/" },
+    "secretsmanager": { "cheatSheet": "https://tutorialsdojo.com/aws-secrets-manager/" },
+    "inspector": { "cheatSheet": "https://tutorialsdojo.com/amazon-inspector/" },
+    "macie": { "cheatSheet": "https://tutorialsdojo.com/amazon-macie/" },
+    "securityhub": { "cheatSheet": "https://tutorialsdojo.com/aws-security-hub/" },
+    "polly": { "cheatSheet": "https://tutorialsdojo.com/amazon-polly/" },
+    "comprehend": { "cheatSheet": "https://tutorialsdojo.com/amazon-comprehend/" },
+    "stepfunctions": { "cheatSheet": "https://tutorialsdojo.com/aws-step-functions/", "articles": "https://awsfundamentals.com/blog/service/step-functions" },
+    "cloudformation": { "cheatSheet": "https://tutorialsdojo.com/aws-cloudformation/" },
+    "systemsmanager": { "cheatSheet": "https://tutorialsdojo.com/aws-systems-manager/" },
+    "config": { "cheatSheet": "https://tutorialsdojo.com/aws-config/", "articles": "https://awsfundamentals.com/blog/service/config" },
+    "organizations": { "cheatSheet": "https://tutorialsdojo.com/aws-organizations/", "articles": "https://awsfundamentals.com/blog/service/organizations" },
+    "appsync": { "cheatSheet": "https://tutorialsdojo.com/aws-appsync/" }
   }
 }

@@ -133,6 +133,51 @@
    "type"
   ]
  },
+ "apprunner": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "carry",
+   "type"
+  ]
+ },
+ "batch": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "cook",
+   "type"
+  ]
+ },
+ "lightsail": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "hammer",
+   "type"
+  ]
+ },
  "s3": {
   "role": "agent",
   "anims": [
@@ -223,6 +268,36 @@
    "type"
   ]
  },
+ "backup": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "file",
+   "type"
+  ]
+ },
+ "kinesis": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "scan",
+   "type"
+  ]
+ },
  "dynamodb": {
   "role": "agent",
   "anims": [
@@ -308,6 +383,36 @@
    "sit",
    "jump",
    "think",
+   "type"
+  ]
+ },
+ "opensearch": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "scan",
+   "type"
+  ]
+ },
+ "documentdb": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "file",
    "type"
   ]
  },
@@ -401,6 +506,36 @@
    "type"
   ]
  },
+ "transitgateway": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "check",
+   "type"
+  ]
+ },
+ "globalaccelerator": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "carry",
+   "type"
+  ]
+ },
  "iam": {
   "role": "agent",
   "anims": [
@@ -476,6 +611,80 @@
   ]
  },
  "cloudwatch": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "scan",
+   "type"
+  ]
+ },
+ "securityagent": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "scan",
+   "type"
+  ]
+ },
+ "secretsmanager": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "lock",
+   "type"
+  ]
+ },
+ "inspector": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "check",
+   "type"
+  ]
+ },
+ "securityhub": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "type"
+  ]
+ },
+ "macie": {
   "role": "agent",
   "anims": [
    "idle",
@@ -575,6 +784,124 @@
    "sit",
    "jump",
    "file",
+   "type"
+  ]
+ },
+ "polly": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "dance",
+   "type"
+  ]
+ },
+ "comprehend": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "think",
+   "type"
+  ]
+ },
+ "stepfunctions": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "dance",
+   "type"
+  ]
+ },
+ "cloudformation": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "type"
+  ]
+ },
+ "systemsmanager": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "hammer",
+   "type"
+  ]
+ },
+ "config": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "check",
+   "type"
+  ]
+ },
+ "organizations": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "file",
+   "type"
+  ]
+ },
+ "appsync": {
+  "role": "agent",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
    "type"
   ]
  },
@@ -1079,6 +1406,33 @@
    "hold_sign"
   ]
  },
+ "player-gold-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "fish",
+   "drink",
+   "dance",
+   "sleep",
+   "blow_kiss",
+   "hold_sign",
+   "open_door",
+   "type",
+   "carry"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "player-gold"
+ },
  "ec2-crowd": {
   "role": "crowd",
   "anims": [
@@ -1198,6 +1552,66 @@
    54
   ],
   "of": "beanstalk"
+ },
+ "apprunner-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "carry",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "apprunner"
+ },
+ "batch-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "cook",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "batch"
+ },
+ "lightsail-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "hammer",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "lightsail"
  },
  "s3-crowd": {
   "role": "crowd",
@@ -1319,6 +1733,46 @@
   ],
   "of": "lakeformation"
  },
+ "backup-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "file",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "backup"
+ },
+ "kinesis-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "scan",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "kinesis"
+ },
  "dynamodb-crowd": {
   "role": "crowd",
   "anims": [
@@ -1436,6 +1890,46 @@
    54
   ],
   "of": "neptune"
+ },
+ "opensearch-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "scan",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "opensearch"
+ },
+ "documentdb-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "file",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "documentdb"
  },
  "vpc-crowd": {
   "role": "crowd",
@@ -1557,6 +2051,46 @@
   ],
   "of": "eventbridge"
  },
+ "transitgateway-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "check",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "transitgateway"
+ },
+ "globalaccelerator-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "carry",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "globalaccelerator"
+ },
  "iam-crowd": {
   "role": "crowd",
   "anims": [
@@ -1676,6 +2210,105 @@
   ],
   "of": "cloudwatch"
  },
+ "securityagent-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "scan",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "securityagent"
+ },
+ "secretsmanager-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "lock",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "secretsmanager"
+ },
+ "inspector-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "check",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "inspector"
+ },
+ "securityhub-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "securityhub"
+ },
+ "macie-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "scan",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "macie"
+ },
  "bedrock-crowd": {
   "role": "crowd",
   "anims": [
@@ -1793,6 +2426,164 @@
    54
   ],
   "of": "textract"
+ },
+ "polly-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "dance",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "polly"
+ },
+ "comprehend-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "think",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "comprehend"
+ },
+ "stepfunctions-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "dance",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "stepfunctions"
+ },
+ "cloudformation-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "cloudformation"
+ },
+ "systemsmanager-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "hammer",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "systemsmanager"
+ },
+ "config-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "check",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "config"
+ },
+ "organizations-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "file",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "organizations"
+ },
+ "appsync-crowd": {
+  "role": "crowd",
+  "anims": [
+   "idle",
+   "walk",
+   "wave",
+   "hi",
+   "talk",
+   "laugh",
+   "sit",
+   "jump",
+   "type"
+  ],
+  "frame": [
+   36,
+   54
+  ],
+  "of": "appsync"
  },
  "concierge-crowd": {
   "role": "crowd",

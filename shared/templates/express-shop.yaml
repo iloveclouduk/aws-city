@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the bakery shop off App Runner. ECS Express Mode builds an ECS service on Fargate, an Application Load Balancer, auto scaling and networking from the shop's container image and two roles. Then shift the domain over with Route 53 weighted records and delete the App Runner service.
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: The container image the App Runner service runs today (for example in Amazon ECR)
+  ContainerPort:
+    Type: Number
+    Default: 8080
+    Description: The port the app listens on (the App Runner service's application port)
+
+Resources:
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  InfrastructureRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSInfrastructureRoleforExpressGatewayServices'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ShopService:
+    Type: AWS::ECS::ExpressGatewayService
+    Properties:
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      InfrastructureRoleArn: !GetAtt InfrastructureRole.Arn
+      PrimaryContainer:
+        Image: !Ref ImageUri
+        ContainerPort: !Ref ContainerPort
+      HealthCheckPath: /
+      ScalingTarget:
+        MinTaskCount: 1
+        MaxTaskCount: 4
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+Outputs:
+  ServiceUrl:
+    Description: The new shop's own address; test it before shifting any traffic
+    Value: !GetAtt ShopService.Endpoint
+  ServiceArn:
+    Value: !GetAtt ShopService.ServiceArn

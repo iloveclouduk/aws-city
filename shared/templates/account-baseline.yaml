@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - every new account, ready. Deploy in the organization's management account. One organization trail records every account, today's and each new one, into one private central bucket, and a service control policy stops any team switching it off.
+
+Parameters:
+  OrganizationId:
+    Type: String
+    AllowedPattern: '^o-[a-z0-9]{10,32}$'
+    Description: Your organization's ID (Organizations console, o-...)
+  RootId:
+    Type: String
+    AllowedPattern: '^r-[0-9a-z]{4,32}$'
+    Description: The organization root's ID (r-...), where the by-law applies
+
+Resources:
+  LogBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  # The organization trail policy from the CloudTrail docs: the management account's prefix and the organization's.
+  LogBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LogBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AWSCloudTrailAclCheck
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt LogBucket.Arn
+            Condition:
+              StringEquals:
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/city-audit'
+          - Sid: AWSCloudTrailWrite
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub '${LogBucket.Arn}/AWSLogs/${AWS::AccountId}/*'
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/city-audit'
+          - Sid: AWSCloudTrailOrganizationWrite
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub '${LogBucket.Arn}/AWSLogs/${OrganizationId}/*'
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/city-audit'
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt LogBucket.Arn
+              - !Sub '${LogBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  CityAuditTrail:
+    Type: AWS::CloudTrail::Trail
+    DependsOn: LogBucketPolicy
+    Properties:
+      TrailName: city-audit
+      S3BucketName: !Ref LogBucket
+      IsLogging: true
+      IsOrganizationTrail: true
+      IsMultiRegionTrail: true
+      IncludeGlobalServiceEvents: true
+      EnableLogFileValidation: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  KeepTheRecord:
+    Type: AWS::Organizations::Policy
+    Properties:
+      Name: keep-the-city-audit-trail
+      Description: No account may stop, delete or change the organization's audit trail.
+      Type: SERVICE_CONTROL_POLICY
+      TargetIds:
+        - !Ref RootId
+      Content:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: KeepTheRecord
+            Effect: Deny
+            Action:
+              - cloudtrail:StopLogging
+              - cloudtrail:DeleteTrail
+              - cloudtrail:UpdateTrail
+              - cloudtrail:PutEventSelectors
+            Resource: !Sub 'arn:${AWS::Partition}:cloudtrail:*:*:trail/city-audit'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+Outputs:
+  BucketName:
+    Description: Every account's logs, under AWSLogs/<organization id>/
+    Value: !Ref LogBucket
+  TrailArn:
+    Description: The organization trail
+    Value: !GetAtt CityAuditTrail.Arn

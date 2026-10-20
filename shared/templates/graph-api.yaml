@@ -1,0 +1,180 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - who knows whom. A Neptune Serverless cluster in your private subnets holds the account graph; an HTTP API that accepts only IAM-signed calls invokes a Lambda function inside the VPC that runs read-only openCypher queries, signed with IAM.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC for the graph and the function
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Two or more private subnets, in different Availability Zones
+
+Resources:
+  FunctionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: The query function
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  GraphSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Neptune, reachable only from the query function
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8182
+          ToPort: 8182
+          SourceSecurityGroupId: !Ref FunctionSecurityGroup
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  GraphSubnets:
+    Type: AWS::Neptune::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Private subnets for the account graph
+      SubnetIds: !Ref PrivateSubnetIds
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  GraphCluster:
+    Type: AWS::Neptune::DBCluster
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      StorageEncrypted: true
+      IamAuthEnabled: true
+      BackupRetentionPeriod: 7
+      DBSubnetGroupName: !Ref GraphSubnets
+      VpcSecurityGroupIds:
+        - !Ref GraphSecurityGroup
+      ServerlessScalingConfiguration:
+        MinCapacity: 1
+        MaxCapacity: 8
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  GraphWriter:
+    Type: AWS::Neptune::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref GraphCluster
+      DBInstanceClass: db.serverless
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  QueryRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+      Policies:
+        - PolicyName: read-the-graph-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: neptune-db:ReadDataViaQuery
+                Resource: !Sub 'arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${GraphCluster.ClusterResourceId}/*'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  QueryFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.13
+      Handler: index.handler
+      Role: !GetAtt QueryRole.Arn
+      MemorySize: 256
+      Timeout: 10
+      VpcConfig:
+        SubnetIds: !Ref PrivateSubnetIds
+        SecurityGroupIds:
+          - !Ref FunctionSecurityGroup
+      Environment:
+        Variables:
+          NEPTUNE: !Sub 'https://${GraphCluster.ReadEndpoint}:${GraphCluster.Port}/openCypher'
+      Code:
+        ZipFile: |
+          import json, os, urllib.parse, urllib.request
+          import boto3
+          from botocore.auth import SigV4Auth
+          from botocore.awsrequest import AWSRequest
+
+          # Accounts linked to a card within three steps, through shared phones, addresses or cards.
+          QUERY = 'MATCH (c:Card {id: $card})-[*1..3]-(a:Account) RETURN DISTINCT a.id AS account LIMIT 50'
+
+          def handler(event, context):
+              card = (event.get('queryStringParameters') or {}).get('card', '')
+              body = urllib.parse.urlencode({'query': QUERY, 'parameters': json.dumps({'card': card})})
+              req = AWSRequest('POST', os.environ['NEPTUNE'], data=body, headers={'Content-Type': 'application/x-www-form-urlencoded'})
+              SigV4Auth(boto3.Session().get_credentials(), 'neptune-db', os.environ['AWS_REGION']).add_auth(req)
+              with urllib.request.urlopen(urllib.request.Request(req.url, data=body.encode(), headers=dict(req.headers))) as r:
+                  return {'statusCode': 200, 'body': r.read().decode()}
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  FraudApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-api'
+      ProtocolType: HTTP
+      Tags:
+        managed-by: aws-city
+
+  FraudIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref FraudApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt QueryFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  # Graph data is private: every call must be signed (SigV4) by an IAM identity allowed execute-api:Invoke.
+  FraudRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref FraudApi
+      RouteKey: GET /links
+      AuthorizationType: AWS_IAM
+      Target: !Sub 'integrations/${FraudIntegration}'
+
+  FraudStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref FraudApi
+      StageName: $default
+      AutoDeploy: true
+      Tags:
+        managed-by: aws-city
+
+  FraudPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref QueryFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${FraudApi}/*'
+
+Outputs:
+  ApiUrl:
+    Description: Call GET /links?card=<id>, signed with IAM credentials allowed execute-api:Invoke
+    Value: !GetAtt FraudApi.ApiEndpoint
+  ClusterEndpoint:
+    Description: Load the graph through this writer endpoint, from inside the VPC
+    Value: !GetAtt GraphCluster.Endpoint

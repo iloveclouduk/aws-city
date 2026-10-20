@@ -1,0 +1,287 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the bakery order line. An HTTP API starts a Step Functions workflow named after the order (so the same order never runs twice) that saves it, sets the cakes aside and charges the card, and undoes both if the payment fails.
+
+Resources:
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  PaymentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  # A stand-in for the card company: it declines any order over 100, so you can watch the undo steps run.
+  PaymentFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Role: !GetAtt PaymentRole.Arn
+      MemorySize: 128
+      Timeout: 10
+      Code:
+        ZipFile: |
+          exports.handler = async (order) => {
+            if (Number(order.total) > 100) {
+              const e = new Error('Card declined');
+              e.name = 'PaymentDeclined';
+              throw e;
+            }
+            return { charged: Number(order.total) };
+          };
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  WorkflowLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  WorkflowRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: order-steps-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt OrdersTable.Arn
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt PaymentFunction.Arn
+              # Vended logs need these on every resource (Step Functions logging docs).
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogDelivery
+                  - logs:GetLogDelivery
+                  - logs:UpdateLogDelivery
+                  - logs:DeleteLogDelivery
+                  - logs:ListLogDeliveries
+                  - logs:PutResourcePolicy
+                  - logs:DescribeResourcePolicies
+                  - logs:DescribeLogGroups
+                Resource: '*'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  OrderWorkflow:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineType: STANDARD
+      RoleArn: !GetAtt WorkflowRole.Arn
+      LoggingConfiguration:
+        Level: ERROR
+        IncludeExecutionData: false
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt WorkflowLogs.Arn
+      DefinitionSubstitutions:
+        Table: !Ref OrdersTable
+        Payment: !GetAtt PaymentFunction.Arn
+      Definition:
+        Comment: Save the order, set the cakes aside, charge the card; undo in reverse if the charge fails.
+        QueryLanguage: JSONata
+        StartAt: SaveOrder
+        States:
+          SaveOrder:
+            Type: Task
+            Resource: arn:aws:states:::dynamodb:putItem
+            Arguments:
+              TableName: ${Table}
+              Item:
+                pk:
+                  S: '{% "order#" & $states.input.orderId %}'
+                status:
+                  S: placed
+            Output: '{% $states.input %}'
+            Next: SetCakesAside
+          SetCakesAside:
+            Type: Task
+            Resource: arn:aws:states:::dynamodb:updateItem
+            Arguments:
+              TableName: ${Table}
+              Key:
+                pk:
+                  S: '{% "order#" & $states.input.orderId %}'
+              UpdateExpression: SET #s = :s
+              ExpressionAttributeNames:
+                '#s': status
+              ExpressionAttributeValues:
+                ':s':
+                  S: reserved
+            Output: '{% $states.input %}'
+            Next: ChargeCard
+          ChargeCard:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Arguments:
+              FunctionName: ${Payment}
+              Payload: '{% $states.input %}'
+            Output: '{% $states.input %}'
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                Output: '{% $states.input %}'
+                Next: PutCakesBack
+            Next: MarkPaid
+          MarkPaid:
+            Type: Task
+            Resource: arn:aws:states:::dynamodb:updateItem
+            Arguments:
+              TableName: ${Table}
+              Key:
+                pk:
+                  S: '{% "order#" & $states.input.orderId %}'
+              UpdateExpression: SET #s = :s
+              ExpressionAttributeNames:
+                '#s': status
+              ExpressionAttributeValues:
+                ':s':
+                  S: paid
+            End: true
+          PutCakesBack:
+            Type: Task
+            Resource: arn:aws:states:::dynamodb:updateItem
+            Arguments:
+              TableName: ${Table}
+              Key:
+                pk:
+                  S: '{% "order#" & $states.input.orderId %}'
+              UpdateExpression: SET #s = :s
+              ExpressionAttributeNames:
+                '#s': status
+              ExpressionAttributeValues:
+                ':s':
+                  S: released
+            Output: '{% $states.input %}'
+            Next: CancelOrder
+          CancelOrder:
+            Type: Task
+            Resource: arn:aws:states:::dynamodb:deleteItem
+            Arguments:
+              TableName: ${Table}
+              Key:
+                pk:
+                  S: '{% "order#" & $states.input.orderId %}'
+            Next: PaymentFailed
+          PaymentFailed:
+            Type: Fail
+            Error: PaymentDeclined
+            Cause: The card was declined, so the cakes and the order were put back.
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: start-this-workflow-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !Ref OrderWorkflow
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  OrdersApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-orders'
+      ProtocolType: HTTP
+      Tags:
+        managed-by: aws-city
+
+  # The execution is named after the order id: a second POST of the same order is refused (ExecutionAlreadyExists).
+  StartWorkflow:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref OrdersApi
+      IntegrationType: AWS_PROXY
+      IntegrationSubtype: StepFunctions-StartExecution
+      CredentialsArn: !GetAtt ApiRole.Arn
+      PayloadFormatVersion: '1.0'
+      RequestParameters:
+        StateMachineArn: !Ref OrderWorkflow
+        Name: $request.body.orderId
+        Input: $request.body
+
+  OrderRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref OrdersApi
+      RouteKey: POST /orders
+      Target: !Sub 'integrations/${StartWorkflow}'
+
+  DefaultStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref OrdersApi
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+      Tags:
+        managed-by: aws-city
+
+Outputs:
+  OrdersUrl:
+    Description: POST {"orderId":"o-1","total":12} here (a total over 100 shows the undo)
+    Value: !Sub '${OrdersApi.ApiEndpoint}/orders'
+  StateMachineArn:
+    Description: Watch each order's steps in the Step Functions console
+    Value: !Ref OrderWorkflow

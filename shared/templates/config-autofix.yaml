@@ -1,0 +1,152 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the bucket that kept opening. An AWS Config rule checks the photo bucket's public access block whenever it changes, a Systems Manager runbook switches the block back on automatically, and each change lands in an SQS queue for the team. Needs AWS Config recording in this Region.
+
+Resources:
+  PhotoBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  BlockRule:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      Description: The photo bucket must block public access (checked on every change).
+      Source:
+        Owner: AWS
+        SourceIdentifier: S3_BUCKET_LEVEL_PUBLIC_ACCESS_PROHIBITED
+      Scope:
+        ComplianceResourceTypes:
+          - AWS::S3::Bucket
+        ComplianceResourceId: !Ref PhotoBucket
+
+  FixRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ssm.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: block-this-bucket-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutBucketPublicAccessBlock
+                  - s3:GetBucketPublicAccessBlock
+                Resource: !GetAtt PhotoBucket.Arn
+              # The runbook's own required permissions (AWSConfigRemediation-ConfigureS3BucketPublicAccessBlock).
+              - Effect: Allow
+                Action: ssm:StartAutomationExecution
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}::automation-definition/AWSConfigRemediation-ConfigureS3BucketPublicAccessBlock:*'
+              - Effect: Allow
+                Action: ssm:GetAutomationExecution
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:automation-execution/*'
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AutoFix:
+    Type: AWS::Config::RemediationConfiguration
+    Properties:
+      ConfigRuleName: !Ref BlockRule
+      TargetType: SSM_DOCUMENT
+      TargetId: AWSConfigRemediation-ConfigureS3BucketPublicAccessBlock
+      Automatic: true
+      MaximumAutomaticAttempts: 3
+      RetryAttemptSeconds: 60
+      Parameters:
+        AutomationAssumeRole:
+          StaticValue:
+            Values:
+              - !GetAtt FixRole.Arn
+        BucketName:
+          ResourceValue:
+            Value: RESOURCE_ID
+        BlockPublicAcls:
+          StaticValue:
+            Values:
+              - 'true'
+        IgnorePublicAcls:
+          StaticValue:
+            Values:
+              - 'true'
+        BlockPublicPolicy:
+          StaticValue:
+            Values:
+              - 'true'
+        RestrictPublicBuckets:
+          StaticValue:
+            Values:
+              - 'true'
+
+  AlertQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AlertQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref AlertQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt AlertQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt BucketOpened.Arn
+
+  BucketOpened:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: The photo bucket broke the public access rule
+      EventPattern:
+        source:
+          - aws.config
+        detail-type:
+          - Config Rules Compliance Change
+        detail:
+          configRuleName:
+            - !Ref BlockRule
+          newEvaluationResult:
+            complianceType:
+              - NON_COMPLIANT
+      Targets:
+        - Id: team-queue
+          Arn: !GetAtt AlertQueue.Arn
+
+Outputs:
+  BucketName:
+    Description: The photo bucket the rule watches
+    Value: !Ref PhotoBucket
+  QueueUrl:
+    Description: Each time the block was switched off (CloudTrail names who did it)
+    Value: !Ref AlertQueue

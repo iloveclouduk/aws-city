@@ -1,0 +1,111 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS City - the recipe box. An encrypted Amazon DocumentDB cluster with a second instance in another Availability Zone, its password kept in Secrets Manager, and an ECS cluster for the recipe app's Fargate tasks. Run the app's container with the app security group and it connects as it did to MongoDB.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The cooking club's VPC
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Two private subnets in different Availability Zones
+
+Resources:
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: The recipe app Fargate tasks
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: DocumentDB from the recipe app only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 27017
+          ToPort: 27017
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+          Description: The recipe app
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  RecipeSubnets:
+    Type: AWS::DocDB::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: The recipe archive's private subnets
+      SubnetIds: !Ref SubnetIds
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  RecipeCluster:
+    Type: AWS::DocDB::DBCluster
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      MasterUsername: chef
+      # DocumentDB keeps the password in Secrets Manager, encrypted with KMS.
+      ManageMasterUserPassword: true
+      StorageEncrypted: true
+      BackupRetentionPeriod: 7
+      DBSubnetGroupName: !Ref RecipeSubnets
+      VpcSecurityGroupIds:
+        - !Ref DatabaseSecurityGroup
+      EnableCloudwatchLogsExports:
+        - audit
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  # Two instances: the cluster puts them in different Availability Zones and fails over to the replica.
+  PrimaryInstance:
+    Type: AWS::DocDB::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref RecipeCluster
+      DBInstanceClass: db.t4g.medium
+      AutoMinorVersionUpgrade: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  ReplicaInstance:
+    Type: AWS::DocDB::DBInstance
+    DependsOn: PrimaryInstance
+    Properties:
+      DBClusterIdentifier: !Ref RecipeCluster
+      DBInstanceClass: db.t4g.medium
+      AutoMinorVersionUpgrade: true
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+  AppCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      CapacityProviders:
+        - FARGATE
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 1
+      Tags:
+        - Key: managed-by
+          Value: aws-city
+
+Outputs:
+  ClusterEndpoint:
+    Description: The app's MongoDB connection host (port 27017, TLS on)
+    Value: !GetAtt RecipeCluster.Endpoint
+  EcsClusterName:
+    Description: Run the recipe app's Fargate service here, with the app security group
+    Value: !Ref AppCluster
+  AppSecurityGroupId:
+    Description: The only security group DocumentDB lets in
+    Value: !Ref AppSecurityGroup
